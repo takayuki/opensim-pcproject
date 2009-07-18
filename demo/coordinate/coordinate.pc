@@ -1,0 +1,41 @@
+/ry { 0 exch 360 div M_PI mul dup sin exch 0 exch cos vector4 rotate} def
+/rz {0 exch 0 exch 360 div M_PI mul dup sin exch cos vector4 rotate} def
+/origin {
+  <0,0,0> moveto createsphere
+  dup lw lw lw vector3 setsize
+  dup c ALL_SIDES setcolor
+  dup 0.9 ALL_SIDES setalpha
+} def
+/arrow {
+  <0,0,0> moveto l 0 0 vector3 lineto
+  dup c ALL_SIDES setcolor
+  dup 0.7 ALL_SIDES setalpha 
+  gsave
+  l 0 0 vector3 translate
+  <0,0,0> moveto 90 ry createcylinder
+  dup <.3,.3,.4> setsize
+  dup <1,1> settaper
+  dup c ALL_SIDES setcolor
+  dup 0.9 ALL_SIDES setalpha
+  gstore
+} def
+[
+begin
+  /o <128,128,28> def
+  /l 5.0 def
+  /lw 0.1 def
+  o translate
+  begin
+    /c <1,0,0> def
+    lw setlinewidth origin arrow
+  end
+  begin
+    /c <0,1,0> def
+    90 rz arrow
+  end
+  begin
+    /c <0,0,1> def
+    -90 ry arrow
+  end
+end
+] {show} forall
