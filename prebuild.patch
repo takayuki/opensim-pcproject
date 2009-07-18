@@ -1,0 +1,12 @@
+diff --git a/prebuild.xml b/prebuild.xml
+index 77b6e1a..abf2136 100644
+--- a/prebuild.xml
++++ b/prebuild.xml
+@@ -1724,6 +1724,7 @@
+       <Reference name="Nini.dll" />
+       <Reference name="log4net.dll"/>
+       <Reference name="DotNetOpenMail.dll"/>
++      <Reference name="Tools.dll"/>
+ 
+ 	  
+       <Files>
