@@ -1847,7 +1847,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             system["srand"] = new PCOp(OpSRand);
             system["sleep"] = new PCOp(OpSleep);
             system["gsave"] = new PCOp(OpGSave);
-            system["gstore"] = new PCOp(OpGRestore);
+            system["grestore"] = new PCOp(OpGRestore);
             system["translate"] = new PCOp(OpTranslate);
             system["rotate"] = new PCOp(OpRotate);
             system["currentpoint"] = new PCOp(OpCurrentPoint);
