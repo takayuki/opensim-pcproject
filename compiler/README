@@ -1,0 +1,2 @@
+The compiler tools are available at:
+svn co http://opensimulator.org/svn/opensim-libs/trunk/managed/lsl2cs/Tools/
