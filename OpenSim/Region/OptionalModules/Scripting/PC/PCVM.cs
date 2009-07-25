@@ -1875,6 +1875,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             system["lineto"] = new PCOp(OpLineTo);
             system["rlineto"] = new PCOp(OpRLineTo);
             system["banner"] = new PCOp(OpBanner);
+            system["teapot"] = new PCOp(OpTeapot);
             system["M_PI"] = new PCFloat((float)Math.PI);
             system["M_E"] = new PCFloat((float)Math.E);
             system["ALL_SIDES"] = new PCInt(ALL_SIDES);
