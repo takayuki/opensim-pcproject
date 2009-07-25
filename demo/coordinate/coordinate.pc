@@ -9,7 +9,7 @@
   dup r r r vector3 setsize
   dup c ALL_SIDES setcolor
   dup 0.9 ALL_SIDES setalpha
-  gstore
+  grestore
   end
 } def
 /arrow {
@@ -42,7 +42,7 @@
   end
   90 rz l lw <0,1,0> arrow
   -90 ry l lw <0,0,1> arrow
-  gstore
+  grestore
   end
 ] {show} forall
 } def
