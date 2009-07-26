@@ -106,7 +106,6 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                     for (j = 0; j <= rv; j++)
                     {
                         Vector3 v = r[i, j];
-                        System.Diagnostics.Debug.WriteLine(v.ToString());
                         line.Add(new PCVector3(v));
                     }
                     patch.Add(line);
@@ -126,7 +125,6 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                     for (i = 0; i <= ru; i++)
                     {        
                         Vector3 v = r[i, j];
-                        System.Diagnostics.Debug.WriteLine(v.ToString());
                         line.Add(new PCVector3(v));
                     }
                     patch.Add(line);
