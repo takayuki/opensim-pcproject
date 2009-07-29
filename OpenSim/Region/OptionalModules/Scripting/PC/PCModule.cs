@@ -130,9 +130,14 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 "Execute a PC script on a new instance of the PC virtual machine");
             commandExec.AddArgument("filename",
                 "The PC script file you wish to load from", "String");
+            Command commandLoad = new Command("load", CommandIntentions.COMMAND_HAZARDOUS, CommandLoad,
+                "Load a PC application module");
+            commandLoad.AddArgument("filename",
+                "The PC application module you wish to load", "String");
 
             m_commander.RegisterCommand("new", commandNew);
             m_commander.RegisterCommand("exec", commandExec);
+            m_commander.RegisterCommand("load", commandLoad);
             
             m_scene.RegisterModuleCommander(m_commander);
         }
@@ -148,6 +153,52 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             using (StreamReader file = new StreamReader(path))
             {
                 PCVM.Load(m_scene, m_source, file);
+            }
+        }
+
+        private void CommandLoad(Object[] args)
+        {
+            string path = (string)args[0];
+            Assembly assembly;
+            Type applicationType;
+            IPCApplication application;
+
+            try
+            {
+                assembly = Assembly.LoadFrom(path);
+                applicationType = null;
+
+                foreach (Type pluginType in assembly.GetTypes())
+                {
+                    if (pluginType.IsPublic)
+                    {
+                        Type typeInterface = pluginType.GetInterface("IPCApplication", true);
+
+                        if (typeInterface != null)
+                        {
+                            applicationType = pluginType;
+                            break;
+                        }
+                    }
+                }
+                if (applicationType != null)
+                {
+                    application = (IPCApplication)Activator.CreateInstance(applicationType);
+                    using (PCVM vm = new PCVM(m_scene, m_source, new PCDict()))
+                    {
+                        try
+                        {
+                            application.Initialize(m_scene, m_source, vm);
+                            application.Run();
+                        }
+                        catch
+                        {
+                        }
+                    }
+                }
+            }
+            finally
+            {
             }
         }
     }
