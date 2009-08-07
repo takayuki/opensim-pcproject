@@ -1781,6 +1781,19 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             System.Threading.Thread.Sleep(((PCConst)o).ToInt());
             return true;
         }
+
+        private bool OpPause()
+        {
+            System.Console.ReadLine();
+            return true;
+        }
+
+        private bool OpQuit()
+        {
+            Init(false);
+            return false;
+        }
+
         private void PostInit(PCDict system)
         {
             system["nop"] = new PCOp(OpNop);
@@ -1846,6 +1859,8 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             system["rand"] = new PCOp(OpRand);
             system["srand"] = new PCOp(OpSRand);
             system["sleep"] = new PCOp(OpSleep);
+            system["pause"] = new PCOp(OpPause);
+            system["quit"] = new PCOp(OpQuit);
             system["gsave"] = new PCOp(OpGSave);
             system["grestore"] = new PCOp(OpGRestore);
             system["translate"] = new PCOp(OpTranslate);
