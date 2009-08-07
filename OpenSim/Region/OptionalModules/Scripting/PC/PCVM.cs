@@ -2229,7 +2229,107 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             Console.WriteLine("Total: {0} objects in stack", total);
         }
 
-        private static Parser MakeParser()
+        private void ReadEvalLoop(Parser parser)
+        {
+            while (true)
+            {
+                try
+                {
+                    ShowNextStep();
+
+                    Console.Write("?");
+                    string line = Console.ReadLine().Trim();
+
+                    if (line == "")
+                    {
+                        Step();
+                        continue;
+                    }
+                    else if (line.ToCharArray()[0] == ':')
+                    {
+                        if (2 <= line.Length)
+                        {
+                            string command = line.Substring(0, 2);
+                            if (command == ":s")
+                            {
+                                DumpStack(true);
+                                continue;
+                            }
+                            else if (command == ":f")
+                            {
+                                Finish();
+                                continue;
+                            }
+                            else if (command == ":l")
+                            {
+                                string path = line.Substring(2).Trim();
+                                SYMBOL newast;
+                                using (StreamReader s = new StreamReader(path))
+                                {
+                                    newast = parser.Parse(s);
+                                }
+                                if (newast == null)
+                                    continue;
+                                Call((Compiler.ExpPair)newast);
+                                continue;
+                            }
+                            else if (command == ":q")
+                            {
+                                break;
+                            }
+                        }
+                        Console.WriteLine("usage:");
+                        Console.WriteLine("[return]   step");
+                        Console.WriteLine(":l<file>   load");
+                        Console.WriteLine(":s         dump");
+                        Console.WriteLine(":f         finish");
+                        Console.WriteLine(":q         quit");
+                    }
+                    else
+                    {
+                        SYMBOL newast = parser.Parse(line);
+                        if (newast == null)
+                            continue;
+                        Inject((Compiler.ExpPair)newast);
+                        Step();
+                    }
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("ERROR: {0} (at {1})", e.Message, CurrentStepPos());
+                    Console.WriteLine("{0}", e.StackTrace);
+                    Init(false);
+                }
+            }
+        }
+        
+        public bool Load(Parser parser, string script, bool debug)
+        {
+            try
+            {
+                SYMBOL ast = parser.Parse(script);
+                if (ast == null)
+                    return false;
+                Call((Compiler.ExpPair)ast);
+                if (debug)
+                {
+                    ReadEvalLoop(parser);
+                }
+                else
+                {
+                    Finish();
+                }
+                return true;
+            }
+            catch (Exception e)
+            {
+                m_log.InfoFormat("ERROR: {0} (at {1})", e.Message, CurrentStepPos());
+                m_log.InfoFormat("{0}", e.StackTrace);
+                return false;
+            }
+        }
+
+        public static Parser MakeParser()
         {
             Tools.YyParser parser = new Compiler.yyPCParser();
             ErrorHandler handler = new ErrorHandler(true);
@@ -2263,113 +2363,11 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             }
         }
 
-        public static bool Load(Scene scene, IConfigSource source,string script)
-        {
-            Parser parser = MakeParser();
-            PCVM vm = new PCVM(scene, source, new PCDict());
-
-            try
-            {
-                SYMBOL ast = parser.Parse(script);
-                if (ast == null)
-                    return false;
-                vm.Call((Compiler.ExpPair)ast);
-                vm.Finish();
-                return true;
-            }
-            catch (Exception e)
-            {
-                m_log.InfoFormat("ERROR: {0} (at {1})", e.Message, vm.CurrentStepPos());
-                m_log.InfoFormat("{0}", e.StackTrace);
-                return false;
-            }
-            finally
-            {
-                vm.Dispose();
-            }
-        }
-
         public static void ReadEvalLoop(Scene scene, IConfigSource source)
         {
-            Parser parser = MakeParser();
-            PCVM vm = new PCVM(scene, source, new PCDict());
-
-            try
+            using (PCVM vm = new PCVM(scene, source, new PCDict()))
             {
-                do
-                {
-                    try
-                    {
-                        vm.ShowNextStep();
-
-                        Console.Write("?");
-                        string line = Console.ReadLine().Trim();
-
-                        if (line == "")
-                        {
-                            vm.Step();
-                            continue;
-                        }
-                        else if (line.ToCharArray()[0] == ':')
-                        {
-                            if (2 <= line.Length)
-                            {
-                                string command = line.Substring(0, 2);
-                                if (command == ":s")
-                                {
-                                    vm.DumpStack(true);
-                                    continue;
-                                }
-                                else if (command == ":f")
-                                {
-                                    vm.Finish();
-                                    continue;
-                                }
-                                else if (command == ":l")
-                                {
-                                    string path = line.Substring(2).Trim();
-                                    SYMBOL ast;
-                                    using (StreamReader s = new StreamReader(path))
-                                    {
-                                        ast = parser.Parse(s);
-                                    }
-                                    if (ast == null)
-                                        continue;
-                                    vm.Call((Compiler.ExpPair)ast);
-                                    continue;
-                                }
-                                else if (command == ":q")
-                                {
-                                    break;
-                                }
-                            }
-                            Console.WriteLine("usage:");
-                            Console.WriteLine("[return]   step");
-                            Console.WriteLine(":l<file>   load");
-                            Console.WriteLine(":s         dump");
-                            Console.WriteLine(":f         finish");
-                            Console.WriteLine(":q         quit");
-                        }
-                        else
-                        {
-                            SYMBOL ast = parser.Parse(line);
-                            if (ast == null)
-                                continue;
-                            vm.Inject((Compiler.ExpPair)ast);
-                            vm.Step();
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        Console.WriteLine("ERROR: {0} (at {1})", e.Message, vm.CurrentStepPos());
-                        Console.WriteLine("{0}", e.StackTrace);
-                        vm.Init(false);
-                    }
-                } while (true);
-            }
-            finally
-            {
-                vm.Dispose();
+                vm.ReadEvalLoop(MakeParser());
             }
         }
     }
