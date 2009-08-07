@@ -58,7 +58,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
 {
     public interface IPCApplication
     {
-        void Initialize(Scene scene, IConfigSource source, PCVM vm);
-        void Run();
+        void Initialize(Scene scene, IConfigSource source, Tools.Parser parser, PCVM vm);
+        void Run(bool debug);
     }
 }

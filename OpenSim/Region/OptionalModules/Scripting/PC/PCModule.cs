@@ -134,6 +134,8 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 "Load a PC application module");
             commandLoad.AddArgument("filename",
                 "The PC application module you wish to load", "String");
+            commandLoad.AddArgument("debug",
+                "Start the application with the debugger", "Boolean");
 
             m_commander.RegisterCommand("new", commandNew);
             m_commander.RegisterCommand("exec", commandExec);
@@ -159,6 +161,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
         private void CommandLoad(Object[] args)
         {
             string path = (string)args[0];
+            bool debug = (bool)args[1];
             Assembly assembly;
             Type applicationType;
             IPCApplication application;
@@ -188,8 +191,9 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                     {
                         try
                         {
-                            application.Initialize(m_scene, m_source, vm);
-                            application.Run();
+                            Tools.Parser parser = PCVM.MakeParser();
+                            application.Initialize(m_scene, m_source, parser, vm);
+                            application.Run(debug);
                         }
                         catch
                         {
