@@ -299,10 +299,12 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
     public class PCSceneObjectPart : PCObj
     {
         public SceneObjectPart var;
+        public Vector3 positionAtShown;
+        public Quaternion rotationAtShown;
         public PCSceneObjectPart(SceneObjectPart var) { this.var = var; }
         public override string ToString()
         {
-            return "<" + var.ToString() + "," + var.RotationOffset.ToString() + ">";
+            return "<" + var.ToString() + ">";
         }
     }
     
@@ -1865,6 +1867,11 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             system["grestore"] = new PCOp(OpGRestore);
             system["translate"] = new PCOp(OpTranslate);
             system["rotate"] = new PCOp(OpRotate);
+            system["sceneobjects"] = new PCOp(OpSceneObjects);
+            system["scenetranslate"] = new PCOp(OpSceneTranslate);
+            system["scenerotate"] = new PCOp(OpSceneRotate);
+            system["scenesetposition"] = new PCOp(OpSceneSetPosition);
+            system["scenesetrotate"] = new PCOp(OpSceneSetRotate);
             system["currentpoint"] = new PCOp(OpCurrentPoint);
             system["moveto"] = new PCOp(OpMoveTo);
             system["rmoveto"] = new PCOp(OpRMoveTo);

@@ -125,13 +125,13 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
 
     public partial class PCVM : IDisposable
     {
-        private List<SceneObjectPart> m_shownSceneObjectPart = new List<SceneObjectPart>();
+        private List<PCSceneObjectPart> m_shownSceneObjectPart = new List<PCSceneObjectPart>();
 
         public void Dispose()
         {
-            foreach (SceneObjectPart part in m_shownSceneObjectPart)
+            foreach (PCSceneObjectPart part in m_shownSceneObjectPart)
             {
-                m_scene.DeleteSceneObject(part.ParentGroup, false);
+                m_scene.DeleteSceneObject(part.var.ParentGroup, false);
             }
             m_shownSceneObjectPart.Clear();
         }
@@ -218,7 +218,262 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             CurrentGraphicState.Rotate = new Quaternion(q.X,q.Y,q.Z,q.W);
             return true;
         }
+
+        private bool OpSceneObjects()
+        {
+            PCArray o = new PCArray();
+
+            foreach (PCSceneObjectPart part in m_shownSceneObjectPart)
+            {
+                o.Add(part);
+            }
+            Stack.Push(o);
+            return true;
+        }
         
+        private Quaternion QuaternionFromVector4(Vector4 v)
+        {
+            Quaternion q;
+            q = new Quaternion(v.X, v.Y, v.Z, v.W);
+            q.Normalize();
+            return q;
+        }
+
+        private Vector4 Vector4FromVector3(Vector3 v)
+        {
+            return new Vector4(v, 1.0f);
+        }
+
+        private Vector3 Vector3FromVector4(Vector4 v)
+        {
+            return new Vector3(v.X/v.W, v.Y/v.W, v.Z/v.W);
+        }
+
+        private bool OpSceneTranslate()
+        {
+            PCObj param;
+            PCObj sceneobjects;
+
+            try
+            {
+                param = Stack.Pop();
+            }
+            catch (InvalidOperationException)
+            {
+                throw new PCEmptyStackException();
+            }
+            if (!(param is PCVector3))
+            {
+                Stack.Push(param);
+                throw new PCTypeCheckException();
+            }
+
+            try
+            {
+                sceneobjects = Stack.Pop();
+            }
+            catch (InvalidOperationException)
+            {
+                throw new PCEmptyStackException();
+            }
+            if (!(sceneobjects is PCArray))
+            {
+                Stack.Push(sceneobjects);
+                throw new PCTypeCheckException();
+            }
+            foreach (PCObj o in ((PCArray)sceneobjects).val)
+            {
+                if (!(o is PCSceneObjectPart))
+                {
+                    Stack.Push(sceneobjects);
+                    throw new PCTypeCheckException();
+                }
+            }
+
+            Matrix4 rotm = Matrix4.CreateFromQuaternion(CurrentGraphicState.Rotate);
+            foreach (PCObj o in ((PCArray)sceneobjects).val)
+            {
+                SceneObjectPart part = ((PCSceneObjectPart)o).var;
+                Vector3 disp = Vector3FromVector4(Vector4.Transform(((PCVector3)param).val, rotm));
+                Vector3 newpos = part.AbsolutePosition + disp;
+                part.UpdateGroupPosition(newpos);
+            }
+            return true;
+        }
+
+        private bool OpSceneRotate()
+        {
+            PCObj param;
+            PCObj sceneobjects;
+
+            try
+            {
+                param = Stack.Pop();
+            }
+            catch (InvalidOperationException)
+            {
+                throw new PCEmptyStackException();
+            }
+            if (!(param is PCVector4))
+            {
+                Stack.Push(param);
+                throw new PCTypeCheckException();
+            }
+
+            try
+            {
+                sceneobjects = Stack.Pop();
+            }
+            catch (InvalidOperationException)
+            {
+                throw new PCEmptyStackException();
+            }
+            if (!(sceneobjects is PCArray))
+            {
+                Stack.Push(sceneobjects);
+                throw new PCTypeCheckException();
+            }
+            foreach (PCObj o in ((PCArray)sceneobjects).val)
+            {
+                if (!(o is PCSceneObjectPart))
+                {
+                    Stack.Push(sceneobjects);
+                    throw new PCTypeCheckException();
+                }
+            }
+
+            Quaternion rotq = QuaternionFromVector4(((PCVector4)param).val);
+            Matrix4 rotm = Matrix4.CreateFromQuaternion(rotq);
+            Vector4 origin = Vector4FromVector3(Transform(Vector3.Zero));
+            foreach (PCObj o in ((PCArray)sceneobjects).val)
+            {
+                PCSceneObjectPart pcpart = ((PCSceneObjectPart)o);
+                SceneObjectPart part = pcpart.var;
+                Vector4 pos = Vector4.Subtract(Vector4FromVector3(part.AbsolutePosition), origin);
+                Vector4 newpos = Vector4.Transform(pos, rotm) + origin;
+                part.UpdateGroupPosition(Vector3FromVector4(newpos));
+                part.UpdateRotation(rotq * part.RotationOffset);
+                part.ParentGroup.AbsolutePosition = part.ParentGroup.AbsolutePosition;
+            }
+            return true;
+        }
+
+        private bool OpSceneSetPosition()
+        {
+            PCObj param;
+            PCObj sceneobjects;
+
+            try
+            {
+                param = Stack.Pop();
+            }
+            catch (InvalidOperationException)
+            {
+                throw new PCEmptyStackException();
+            }
+            if (!(param is PCVector3))
+            {
+                Stack.Push(param);
+                throw new PCTypeCheckException();
+            }
+
+            try
+            {
+                sceneobjects = Stack.Pop();
+            }
+            catch (InvalidOperationException)
+            {
+                throw new PCEmptyStackException();
+            }
+            if (!(sceneobjects is PCArray))
+            {
+                Stack.Push(sceneobjects);
+                throw new PCTypeCheckException();
+            }
+            foreach (PCObj o in ((PCArray)sceneobjects).val)
+            {
+                if (!(o is PCSceneObjectPart))
+                {
+                    Stack.Push(sceneobjects);
+                    throw new PCTypeCheckException();
+                }
+            }
+
+            Matrix4 rotm = Matrix4.CreateFromQuaternion(CurrentGraphicState.Rotate);
+            foreach (PCObj o in ((PCArray)sceneobjects).val)
+            {
+                PCSceneObjectPart pcpart = ((PCSceneObjectPart)o);
+                SceneObjectPart part = pcpart.var;
+                Vector3 disp = Vector3FromVector4(Vector4.Transform(((PCVector3)param).val, rotm));
+                Vector3 newpos = pcpart.positionAtShown + disp;
+                part.UpdateGroupPosition(newpos);
+            }
+            return true;
+        }
+
+        private bool OpSceneSetRotate()
+        {
+            PCObj param;
+            PCObj sceneobjects;
+
+            try
+            {
+                param = Stack.Pop();
+            }
+            catch (InvalidOperationException)
+            {
+                throw new PCEmptyStackException();
+            }
+            if (!(param is PCVector4))
+            {
+                Stack.Push(param);
+                throw new PCTypeCheckException();
+            }
+
+            try
+            {
+                sceneobjects = Stack.Pop();
+            }
+            catch (InvalidOperationException)
+            {
+                throw new PCEmptyStackException();
+            }
+            if (!(sceneobjects is PCArray))
+            {
+                Stack.Push(sceneobjects);
+                throw new PCTypeCheckException();
+            }
+            foreach (PCObj o in ((PCArray)sceneobjects).val)
+            {
+                if (!(o is PCSceneObjectPart))
+                {
+                    Stack.Push(sceneobjects);
+                    throw new PCTypeCheckException();
+                }
+            }
+
+            Quaternion InverseRotate = Quaternion.Inverse(CurrentGraphicState.Rotate);
+            Matrix4 InverseRotateMatrix = Matrix4.CreateFromQuaternion(InverseRotate);
+            Matrix4 RotateMatrix = Matrix4.CreateFromQuaternion(CurrentGraphicState.Rotate);
+            Quaternion rotq = QuaternionFromVector4(((PCVector4)param).val);
+            Matrix4 rotm = Matrix4.CreateFromQuaternion(rotq);
+            Vector4 origin = Vector4FromVector3(Transform(Vector3.Zero));
+            foreach (PCObj o in ((PCArray)sceneobjects).val)
+            {
+                PCSceneObjectPart pcpart = ((PCSceneObjectPart)o);
+                SceneObjectPart part = pcpart.var;
+                Vector4 disp = Vector4.Subtract(Vector4FromVector3(pcpart.positionAtShown), origin);
+                disp = Vector4.Transform(disp, InverseRotateMatrix);
+                disp = Vector4.Transform(disp, rotm);
+                disp = Vector4.Transform(disp, RotateMatrix);
+                Vector4 newpos = disp + origin;
+                part.UpdateGroupPosition(Vector3FromVector4(newpos));
+                part.UpdateRotation(Rotate(rotq * InverseRotate * pcpart.rotationAtShown));
+                part.ParentGroup.AbsolutePosition = part.ParentGroup.AbsolutePosition;
+            }
+            return true;
+        }
+
         private bool OpCurrentPoint()
         {
             Stack.Push(new PCVector3(CurrentPoint));
@@ -833,7 +1088,9 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             SceneObjectPart part = ((PCSceneObjectPart)o).var;
             if (m_scene.AddNewSceneObject(part.ParentGroup, false))
             {
-                m_shownSceneObjectPart.Add(part);
+                ((PCSceneObjectPart)o).positionAtShown = part.AbsolutePosition;
+                ((PCSceneObjectPart)o).rotationAtShown = part.RotationOffset;
+                m_shownSceneObjectPart.Add((PCSceneObjectPart)o);
                 m_log.InfoFormat("create: part: {0}", part.UUID.ToString());
             }
             return true;
