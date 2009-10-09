@@ -1226,13 +1226,14 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
 
         private SceneObjectPart CreatePrim(PrimitiveShapeFunction shapeFunction, string name, Vector3 pos, Vector3 size)
         {
-            SceneObjectGroup sceneObject = new SceneObjectGroup();
             SceneObjectPart part = new SceneObjectPart(UUID.Zero, shapeFunction(), Transform(pos), Rotate(Quaternion.Identity), Vector3.Zero);
             part.Name = name;
             part.Scale = size;
             part.ObjectFlags |= (uint)PrimFlags.Phantom;
             part.ObjectFlags |= (uint)PrimFlags.Temporary;
-            sceneObject.SetRootPart(part);
+            SceneObjectGroup sceneObject = new SceneObjectGroup(part);
+            part.SetParent(sceneObject);
+            sceneObject.SetScene(m_scene);
             return part;
         }
 
