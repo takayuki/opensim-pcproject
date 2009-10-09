@@ -219,6 +219,27 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             return true;
         }
 
+        private bool OpScenePin()
+        {
+            PCObj part;
+
+            try
+            {
+                part = Stack.Pop();
+            }
+            catch (InvalidOperationException)
+            {
+                throw new PCEmptyStackException();
+            }
+            if (!(part is PCSceneObjectPart))
+            {
+                Stack.Push(part);
+                throw new PCTypeCheckException();
+            }
+            ((PCSceneObjectPart)part).Pin();
+            return true;
+        }
+
         private bool OpSceneObjects()
         {
             PCArray o = new PCArray();
@@ -405,7 +426,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 PCSceneObjectPart pcpart = ((PCSceneObjectPart)o);
                 SceneObjectPart part = pcpart.var;
                 Vector3 disp = Vector3FromVector4(Vector4.Transform(((PCVector3)param).val, rotm));
-                Vector3 newpos = pcpart.positionAtShown + disp;
+                Vector3 newpos = pcpart.PositionAtPin + disp;
                 part.UpdateGroupPosition(newpos);
             }
             return true;
@@ -462,13 +483,13 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             {
                 PCSceneObjectPart pcpart = ((PCSceneObjectPart)o);
                 SceneObjectPart part = pcpart.var;
-                Vector4 disp = Vector4.Subtract(Vector4FromVector3(pcpart.positionAtShown), origin);
+                Vector4 disp = Vector4.Subtract(Vector4FromVector3(pcpart.PositionAtPin), origin);
                 disp = Vector4.Transform(disp, InverseRotateMatrix);
                 disp = Vector4.Transform(disp, rotm);
                 disp = Vector4.Transform(disp, RotateMatrix);
                 Vector4 newpos = disp + origin;
                 part.UpdateGroupPosition(Vector3FromVector4(newpos));
-                part.UpdateRotation(Rotate(rotq * InverseRotate * pcpart.rotationAtShown));
+                part.UpdateRotation(Rotate(rotq * InverseRotate * pcpart.RotationAtPin));
                 part.ParentGroup.AbsolutePosition = part.ParentGroup.AbsolutePosition;
             }
             return true;
@@ -1088,8 +1109,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             SceneObjectPart part = ((PCSceneObjectPart)o).var;
             if (m_scene.AddNewSceneObject(part.ParentGroup, false))
             {
-                ((PCSceneObjectPart)o).positionAtShown = part.AbsolutePosition;
-                ((PCSceneObjectPart)o).rotationAtShown = part.RotationOffset;
+                ((PCSceneObjectPart)o).Pin();
                 m_shownSceneObjectPart.Add((PCSceneObjectPart)o);
                 m_log.InfoFormat("create: part: {0}", part.UUID.ToString());
             }
