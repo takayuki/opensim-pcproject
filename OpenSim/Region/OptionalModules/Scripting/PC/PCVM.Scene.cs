@@ -1249,7 +1249,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             SceneObjectPart part = new SceneObjectPart(UUID.Zero, shapeFunction(), Transform(pos), Rotate(Quaternion.Identity), Vector3.Zero);
             part.Name = name;
             part.Scale = size;
-            part.ObjectFlags |= (uint)PrimFlags.Phantom;
+            part.ObjectFlags &= ~((uint)PrimFlags.Phantom);
             part.ObjectFlags |= (uint)PrimFlags.Temporary;
             SceneObjectGroup sceneObject = new SceneObjectGroup(part);
             part.SetParent(sceneObject);
