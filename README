@@ -1,0 +1,108 @@
+Distributed Procedural Creation Project
+
+Introduction
+
+Procedural Creation Project provides yet another way to create virtual-world
+contents, scripting all creation processes. The goal of the project, however,
+is not necessarily to replace the interactive creation, which is the standard
+way you have been already doing in modern virtual-world client software, such
+as SL viewer and its variants. Instead, the project will propose an entirely
+different approach for artists and designers to explore 3D drawings in
+procedural fashion. Also, it will bring a promising interface for scientist
+to visualize scientific data in a virtual world.
+
+Example
+
+The main component of Distributed Procedural Creation Project is a general
+purpose stack-based virtual machine, called PCVM (Procedural Creation Virtual
+Machine), which is implemented as a region module. Here is an example of PCVM
+code and its resulting images. The first one is Hello World! and the second
+one is simple coordinate axes to show the current coordinate. Because PCVM is
+a powerful higher-level abstraction of virtual-world content creation, any new
+functionality can be easily added to PCVM as a new operator. The third one is,
+for example, a teapot operator to generate an in-world instance of the Utah
+Teapot. Thanks to the stack-based architecture of PCVM, it is not pleasure
+that much for human-beings to write PCVM code by hand. Its architecture is
+rather intended to facilitate mechanically generating PCVM code. The forth
+one is a machine-generated maze. This is also an example of a distributed
+application using PCVM, that is, one machine mechanically generates a maze
+and injects its resulting data to another machine where a distributed PCVM-
+enabled region server is running.
+
+Related Works
+
+The MRM, Adam Frisby's recent work[1], will potentially overlap or even cover
+Distributed Procedural Creation Project. But, DPC is going to be completely
+separated from the existing framework, LLUDP and LSL. As mentioned above, DPC
+is currently working on a programming language interpreter implemented as a
+region module. Also, more interestingly, an instance of PCVM works as an Erlang
+node in its own right. In other words, distributed applications are fairly
+easily built using PCVM. Distributed Procedural Creation Project will be able
+to provide more powerful and general approach to connect in- and out-world.
+External Simulator Bridge[2] is an experimental region module to reflect
+external data source back into in-world states. DPC will cover most of its
+goals, too.
+
+Architecture
+
+As mentioned above, the heart of Distributed Procedural Creation Project is
+a PostScript[3]-like, general purpose stack-based interpreter implemented as
+a region module for procedural creation. It is called Procedural Creation
+Virtual Machine (PCVM). You may think of PostScript as a graphics format, or
+even some of you may call it more specifically a vector graphics format. But,
+neither description does not accurately show what PostScript is. In reality,
+PostScript is a full-fledged programming language. Even though it can be used
+as a general-purpose programming language, PostScript probably best works
+when used to describe printed pages as it was designed.
+
+Needless to say, PostScript works in 2D graphics on paper. But, we have
+another dimension in 3D virtual world. What if a PostScript-like programming
+language is offered in OpenSim To open up that new horizons, I started this
+project a couple of months ago. As PostScript draws on 2D paper, PC draws in
+3D space!!
+
+To provide a framework to build distributed applications using PCVM, an
+instance of PCVM works an Erlang[4] node in its own right. Erlang is a
+concurrent and distributed programming language originally designed and
+developed by Ericsson to build scalable, fault-tolerant, distributed telephony
+applications. Distributed Procedural Creation Project integrated Erlang.NET[5]
+into the DPC region module to enable an instance of PCVM to work as an Erlang
+node and communicate other Erlang nodes. It provides a powerful and general
+framework for PCVM to participate in distributed applications. Erlang.NET is
+also being developed and maintained by Distributed Procedural Creation Project.
+
+Another motivation for Distributed Procedural Creation Project was
+Processing[6], which "is an open source programming language and environment
+for people who want to program images, animation, and interactions." For those
+of you who are experienced programmers, Processing might be less attractive
+because it provides only a small set of basic operations, all of which are
+nothing different from ones you have done in any other graphics library, for
+example, draw a dot, draw a line, put a color on them, etc. In addition,
+Processing is basically designed as a 2D application, although some extensions
+for 3D graphics are available. But, Processing has opened up another door and
+invited a large audience of artists and designers. Most of them were not
+computer programmers at first, but they have been creating a great number of
+great works using Processing, more or less in procedural manner. Look at a
+collection of works created using Processing[7]. I have a dream that one day
+a virtual-world exhibition for DPC artists will be held in a OpenSim grid!
+
+Future Works
+
+The PCVM is a stack-based programming language interpreter. Thanks to its
+nature as a stack machine, instead of writing "1 + 1" in other standard
+programming languages, you have to achieve the same result writing "1 1 add".
+As you easily imagine, a slightly complex expression generates rapidly lengthy
+cryptic operations. Unless you are a pathologically enthusiastic computer
+programmer, the PCVM code is not at all a best choice for human-beings to
+practice a computer program. But, its simplicity is rather advantage to
+generate the PCVM code mechanically. The next step will be to write a PC
+library or even a PC compiler, so that you can write an equivalent PCVM code
+in other programming languages like C# in a more standardized way.
+
+[1] http://www.adamfrisby.com/blog/tag/mrm/
+[2] http://forge.opensimulator.org/gf/project/extsim/
+[3] http://en.wikipedia.org/wiki/PostScript
+[4] http://www.erlang.org/
+[5] http://github.com/takayuki/Erlang.NET
+[6] http://processing.org/
+[7] http://processing.org/exhibition/

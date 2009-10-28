@@ -1,0 +1,20 @@
+Distributed Procedural Creation Project
+Takayuki Usui
+2009-10-24
+
+The former Procedural Creation Project is promoted to Distributed Procedural
+Creation Project! A distributed PC module is implemented as a secondary
+region module. PCVM works as an Erlang node to participate in a distributed
+application.
+
+
+Welcome to Procedural Creation Project
+Takayuki Usui
+2009-07-19
+
+Procedural Creation Project offers another way to create virtual-world
+contents, scripting all creation processes. The goal of the project, however,
+is not necessarily to replace interactive creation you have been already doing
+in today's virtual-world client software, such as SL viewer and its variants.
+Instead, the project will propose an entirely different approach for artists
+and designers to explore 3D drawings in procedural fashion.
