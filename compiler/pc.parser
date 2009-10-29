@@ -1,0 +1,141 @@
+%parser pc.lexer PCParser
+%namespace OpenSim.Region.OptionalModules.Scripting.PC.Compiler
+%{
+public interface ISentinel {
+  bool Continue();
+}
+%}
+%declare{ public string str; }
+%symbol Exp {}
+%symbol ExpPair {
+  public Exp hd;
+  public ExpPair tl;
+  public ExpPair(Exp hd,ExpPair tl) { this.hd = hd; this.tl = tl; }
+}
+%node ExpTail : Exp {
+  private class DefaultSentinel : ISentinel {
+    public bool Continue() { return false ; }
+  }
+  private ISentinel m_sentinel;
+  public ISentinel Sentinel {
+    get { return m_sentinel; }
+    set { m_sentinel = value; }
+  }
+  public ExpTail() { m_sentinel = new DefaultSentinel(); }
+  public override string ToString() { return "[tail]"; }
+}
+%symbol ExpConst : Exp {
+  public virtual float ToFloat() { return 0; }
+}
+%node ExpFloat : ExpConst {
+  public float val;
+  public ExpFloat(float val) { this.val = val; }
+  public override float ToFloat() { return val; }
+  public override string ToString() { return val.ToString(); }
+}
+%node ExpInt : ExpConst {
+  public int val;
+  public ExpInt(int val) { this.val = val; }
+  public override float ToFloat() { return (float)val; }
+  public override string ToString() { return val.ToString(); }
+}
+%node ExpBool : Exp {
+  public bool val;
+  public ExpBool(bool val) { this.val = val; }
+  public override string ToString() { return val.ToString(); }
+}
+%node ExpId : Exp {
+  public string val;
+  public ExpId(string val) { this.val = val; }
+  public override string ToString() { return val; }
+}
+%node ExpStr : Exp {
+  public string val;
+  public ExpStr(string val) { this.val = val; }
+  public override string ToString() { return val; }
+}
+%node ExpNum : Exp {
+  public ExpConst obj;
+  public ExpNum(ExpConst obj) { this.obj = obj; }
+  public virtual float ToFloat() {
+    if (obj is ExpInt) return (float)((ExpInt)obj).val;
+    else return ((ExpFloat)obj).val;
+  }
+  public virtual int ToInt() {
+    if (obj is ExpInt) return ((ExpInt)obj).val;
+    else return (int)((ExpFloat)obj).val;
+  }
+  public override string ToString() {
+    if (obj is ExpFloat) return ((ExpFloat)obj).ToString();
+    else return ((ExpInt)obj).ToString();
+  }
+}
+%node ExpSym : Exp {
+  public string val;
+  public ExpSym(string val) { this.val = val; }
+  public override string ToString() { return "/"+val.ToString(); }
+}
+%node ExpUUID : Exp {
+  public OpenMetaverse.UUID val;
+  public ExpUUID(OpenMetaverse.UUID val) { this.val = val; }
+  public override string ToString() { return val.ToString(); }
+}
+%node ExpMark : Exp {
+  public override string ToString() { return "["; }
+}
+%node ExpVector2 : Exp {
+  public OpenMetaverse.Vector2 val;
+  public ExpVector2(float x,float y) {
+    this.val = new OpenMetaverse.Vector2(x,y);
+  }
+  public override string ToString() { return val.ToString(); }
+}
+%node ExpVector3 : Exp {
+  public OpenMetaverse.Vector3 val;
+  public ExpVector3(float x,float y,float z) {
+    this.val = new OpenMetaverse.Vector3(x,y,z);
+  }
+  public override string ToString() { return val.ToString(); }
+}
+%node ExpVector4 : Exp {
+  public OpenMetaverse.Vector4 val;
+  public ExpVector4(float x,float y,float z,float w) {
+    this.val = new OpenMetaverse.Vector4(x,y,z,w);
+  }
+  public override string ToString() { return val.ToString(); }
+}
+%node ExpFun : Exp {
+  public ExpPair val;
+  public ExpFun(ExpPair val) { this.val = val; }
+  public override string ToString() { return "<func>"; }
+}
+%start ExpPair
+ExpPair:
+ { hd = new ExpTail(yyp); tl = null; }
+| Exp:x ExpPair:xs { hd = x; tl = xs; }
+;
+Exp:
+  BOOL:x %ExpBool(x.val)
+| IDENT:x %ExpId(x.yytext)
+| ExpConst:x %ExpNum(x)
+| SLASH IDENT:x %ExpSym(x.yytext)
+| UUID:x %ExpUUID(x.val)
+| STR:x %ExpStr(x.yytext)
+| LBRACKET %ExpMark
+| RBRACKET %ExpId("]")
+| LESS ExpConst:x COMMA ExpConst:y GREATER
+  %ExpVector2(x.ToFloat(),y.ToFloat())
+| LESS ExpConst:x COMMA ExpConst:y COMMA ExpConst:z GREATER
+  %ExpVector3(x.ToFloat(),y.ToFloat(),z.ToFloat())
+| LESS ExpConst:x COMMA ExpConst:y COMMA ExpConst:z COMMA ExpConst:w GREATER
+  %ExpVector4(x.ToFloat(),y.ToFloat(),z.ToFloat(),w.ToFloat())
+| LBRACE ExpPair:x RBRACE %ExpFun(x)
+;
+ExpConst:
+  FLOAT:x %ExpFloat(x.val)
+| PLUS FLOAT:x %ExpFloat(x.val)
+| MINUS FLOAT:x %ExpFloat(-x.val)
+| INT:x %ExpInt(x.val)
+| PLUS INT:x %ExpInt(x.val)
+| MINUS INT:x %ExpInt(-x.val)
+;

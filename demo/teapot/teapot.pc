@@ -1,0 +1,17 @@
+/t {
+  begin
+  /lw 0.1 def
+  /r 12 def
+  /s 5 def
+  lw setlinewidth
+  r r vector2 s s s vector3 teapot
+  {{moveto createsphere dup lw lw lw vector3 setsize show} forall}
+  forall
+  {{dup 0 get moveto {lineto dup 0.8 ALL_SIDES setalpha show} forall} forall}
+  forall
+  {{dup 0 get moveto {lineto dup 0.8 ALL_SIDES setalpha show} forall} forall}
+  forall
+  end
+} def
+<128,128,28> translate
+t
