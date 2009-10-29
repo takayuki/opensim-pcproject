@@ -1,0 +1,61 @@
+diff --git a/prebuild.xml b/prebuild.xml
+index e236bc1..65175fe 100644
+--- a/prebuild.xml
++++ b/prebuild.xml
+@@ -1655,6 +1655,7 @@
+       <Reference name="log4net.dll"/>
+       <Reference name="DotNetOpenMail.dll"/>
+       <Reference name="Tools.dll" />
++      <Reference name="Erlang.NET" />
+ 
+ 	  
+       <Files>
+@@ -2448,6 +2449,48 @@
+       </Files>
+     </Project>
+ 
++    <Project name="Erlang.NET" path="ThirdParty/Erlang.NET/lib" type="Library">
++      <Configuration name="Debug">
++        <Options>
++          <OutputPath>../../../bin/</OutputPath>
++        </Options>
++      </Configuration>
++      <Configuration name="Release">
++        <Options>
++          <OutputPath>../../../bin/</OutputPath>
++        </Options>
++      </Configuration>
++
++      <ReferencePath>../../../bin/</ReferencePath>
++      <Reference name="System"/>
++      <Reference name="System.Configuration"/>
++      <Reference name="log4net.dll"/>
++      <Files>
++        <Match pattern="*.cs" recurse="true"/>
++      </Files>
++    </Project>
++
++    <Project name="Maze" path="Maze" type="Exe">
++      <Configuration name="Debug">
++        <Options>
++          <OutputPath>../bin/</OutputPath>
++        </Options>
++      </Configuration>
++      <Configuration name="Release">
++        <Options>
++          <OutputPath>../bin/</OutputPath>
++        </Options>
++      </Configuration>
++
++      <ReferencePath>../bin/</ReferencePath>
++      <Reference name="System"/>
++      <Reference name="Erlang.NET"/>
++
++      <Files>
++        <Match pattern="*.cs" recurse="false"/>
++      </Files>
++    </Project>
++
+     <Project frameworkVersion="v3_5" name="OpenSim.Region.ScriptEngine.Shared" path="OpenSim/Region/ScriptEngine/Shared" type="Library">
+       <Configuration name="Debug">
+         <Options>

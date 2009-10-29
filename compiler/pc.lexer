@@ -1,0 +1,47 @@
+%lexer PCLexer
+%encoding UTF8
+%namespace OpenSim.Region.OptionalModules.Scripting.PC.Compiler
+%declare{ public string str; }
+%token BOOL { public bool val; }
+%token FLOAT { public float val; }
+%token IDENT {}
+%token INT { public int val; }
+%token STR {}
+%token UUID { public OpenMetaverse.UUID val; }
+%define digit [0-9]
+%define exp [eE][-+]?{digit}+
+%define float ({digit}+"."{digit}*{exp}?)|("."{digit}+{exp}?)|({digit}+{exp})
+%define int {digit}+
+%define letter [_a-zA-Z]
+%define ident {letter}({digit}|{letter})*
+%define h [0-9a-fA-F]
+%define h4 {h}{h}{h}{h}
+%define h8 {h}{h}{h}{h}{h}{h}{h}{h}
+%define h12 {h}{h}{h}{h}{h}{h}{h}{h}{h}{h}{h}{h}
+%define uuid "{"{h8}"-"{h4}"-"{h4}"-"{h4}"-"{h12}"}"
+"+" %PLUS
+"-" %MINUS
+"/" %SLASH
+"<" %LESS
+">" %GREATER
+"[" %LBRACKET
+"]" %RBRACKET
+"{" %LBRACE
+"}" %RBRACE
+"," %COMMA
+"false" %BOOL { val = false; }
+"true" %BOOL { val = true; }
+{float} %FLOAT { val = float.Parse(yytext); }
+{ident} %IDENT
+{int} %INT { val = int.Parse(yytext); }
+"(" { yybegin("STRING"); yyl.str = ""; }
+<STRING>[^\)] { yyl.str += yytext; }
+<STRING>\\n { yyl.str += "\n"; }
+<STRING>\\t { yyl.str += "\t"; }
+<STRING>\\) { yyl.str += ")"; }
+<STRING>\\\\ { yyl.str += "\\"; }
+<STRING>\\ { yyl.str += '\\'; }
+<STRING>")" { yybegin("YYINITIAL"); yyl.yytext = yyl.str; return new STR(); }
+{uuid} %UUID { val = new OpenMetaverse.UUID(yytext); }
+"%".* {}
+[ \t\r\n] {}

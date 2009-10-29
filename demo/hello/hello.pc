@@ -1,0 +1,5 @@
+/rx {360.0 div M_PI mul dup sin exch 0 exch 0 exch cos vector4 rotate} def
+<100,128,28> translate
+90 rx
+(Hello,World!) <5,5.6> banner
+{{moveto createsphere dup <0.8,0.8,0.8> setsize show} forall} forall
