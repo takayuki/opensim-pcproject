@@ -1711,6 +1711,8 @@
       <Reference name="Nini.dll" />
       <Reference name="log4net.dll"/>
       <Reference name="DotNetOpenMail.dll"/>
+      <Reference name="Tools.dll" />
+      <Reference name="Erlang.NET" />
 
 	  
       <Files>
@@ -2440,6 +2442,48 @@
         </Match>
         <Match path="Resources" pattern="*.sql" buildAction="EmbeddedResource"/>
         <Match pattern="*.addin.xml" path="Resources" buildAction="EmbeddedResource" recurse="true"/>
+      </Files>
+    </Project>
+
+    <Project name="Erlang.NET" path="ThirdParty/Erlang.NET/lib" type="Library">
+      <Configuration name="Debug">
+        <Options>
+          <OutputPath>../../../bin/</OutputPath>
+        </Options>
+      </Configuration>
+      <Configuration name="Release">
+        <Options>
+          <OutputPath>../../../bin/</OutputPath>
+        </Options>
+      </Configuration>
+
+      <ReferencePath>../../../bin/</ReferencePath>
+      <Reference name="System"/>
+      <Reference name="System.Configuration"/>
+      <Reference name="log4net.dll"/>
+      <Files>
+        <Match pattern="*.cs" recurse="true"/>
+      </Files>
+    </Project>
+
+    <Project name="Maze" path="Maze" type="Exe">
+      <Configuration name="Debug">
+        <Options>
+          <OutputPath>../bin/</OutputPath>
+        </Options>
+      </Configuration>
+      <Configuration name="Release">
+        <Options>
+          <OutputPath>../bin/</OutputPath>
+        </Options>
+      </Configuration>
+
+      <ReferencePath>../bin/</ReferencePath>
+      <Reference name="System"/>
+      <Reference name="Erlang.NET"/>
+
+      <Files>
+        <Match pattern="*.cs" recurse="false"/>
       </Files>
     </Project>
 
