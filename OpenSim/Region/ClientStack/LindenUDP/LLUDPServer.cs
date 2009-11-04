@@ -153,6 +153,9 @@ namespace OpenSim.Region.ClientStack.LindenUDP
         /// <summary>Flag to signal when clients should send pings</summary>
         private bool m_sendPing;
 
+        private int m_defaultRTO = 0;
+        private int m_maxRTO = 0;
+
         public Socket Server { get { return null; } }
 
         public LLUDPServer(IPAddress listenIP, ref uint port, int proxyPortOffsetParm, bool allow_alternate_port, IConfigSource configSource, AgentCircuitManager circuitManager)
@@ -189,6 +192,9 @@ namespace OpenSim.Region.ClientStack.LindenUDP
                 AvatarTerseUpdatesPerPacket = config.GetInt("AvatarTerseUpdatesPerPacket", 10);
                 PrimFullUpdatesPerPacket = config.GetInt("PrimFullUpdatesPerPacket", 100);
                 TextureSendLimit = config.GetInt("TextureSendLimit", 20);
+
+                m_defaultRTO = config.GetInt("DefaultRTO", 0);
+                m_maxRTO = config.GetInt("MaxRTO", 0);
             }
             else
             {
@@ -247,8 +253,8 @@ namespace OpenSim.Region.ClientStack.LindenUDP
 
         public void BroadcastPacket(Packet packet, ThrottleOutPacketType category, bool sendToPausedAgents, bool allowSplitting)
         {
-            // CoarseLocationUpdate packets cannot be split in an automated way
-            if (packet.Type == PacketType.CoarseLocationUpdate && allowSplitting)
+            // CoarseLocationUpdate and AvatarGroupsReply packets cannot be split in an automated way
+            if ((packet.Type == PacketType.CoarseLocationUpdate || packet.Type == PacketType.AvatarGroupsReply) && allowSplitting)
                 allowSplitting = false;
 
             if (allowSplitting && packet.HasVariableBlocks)
@@ -256,8 +262,8 @@ namespace OpenSim.Region.ClientStack.LindenUDP
                 byte[][] datas = packet.ToBytesMultiple();
                 int packetCount = datas.Length;
 
-                //if (packetCount > 1)
-                //    m_log.Debug("[LLUDPSERVER]: Split " + packet.Type + " packet into " + packetCount + " packets");
+                if (packetCount < 1)
+                    m_log.Error("[LLUDPSERVER]: Failed to split " + packet.Type + " with estimated length " + packet.Length);
 
                 for (int i = 0; i < packetCount; i++)
                 {
@@ -295,8 +301,8 @@ namespace OpenSim.Region.ClientStack.LindenUDP
                 byte[][] datas = packet.ToBytesMultiple();
                 int packetCount = datas.Length;
 
-                //if (packetCount > 1)
-                //    m_log.Debug("[LLUDPSERVER]: Split " + packet.Type + " packet into " + packetCount + " packets");
+                if (packetCount < 1)
+                    m_log.Error("[LLUDPSERVER]: Failed to split " + packet.Type + " with estimated length " + packet.Length);
 
                 for (int i = 0; i < packetCount; i++)
                 {
@@ -407,6 +413,13 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             pc.PingID.OldestUnacked = 0;
 
             SendPacket(udpClient, pc, ThrottleOutPacketType.Unknown, false);
+        }
+
+        public void CompletePing(LLUDPClient udpClient, byte pingID)
+        {
+            CompletePingCheckPacket completePing = new CompletePingCheckPacket();
+            completePing.PingID.PingID = pingID;
+            SendPacket(udpClient, completePing, ThrottleOutPacketType.Unknown, false);
         }
 
         public void ResendUnacked(LLUDPClient udpClient)
@@ -669,10 +682,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             {
                 // We don't need to do anything else with ping checks
                 StartPingCheckPacket startPing = (StartPingCheckPacket)packet;
-
-                CompletePingCheckPacket completePing = new CompletePingCheckPacket();
-                completePing.PingID.PingID = startPing.PingID.PingID;
-                SendPacket(udpClient, completePing, ThrottleOutPacketType.Unknown, false);
+                CompletePing(udpClient, startPing.PingID.PingID);
                 return;
             }
             else if (packet.Type == PacketType.CompletePingCheck)
@@ -762,7 +772,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
         protected virtual void AddClient(uint circuitCode, UUID agentID, UUID sessionID, IPEndPoint remoteEndPoint, AuthenticateResponse sessionInfo)
         {
             // Create the LLUDPClient
-            LLUDPClient udpClient = new LLUDPClient(this, m_throttleRates, m_throttle, circuitCode, agentID, remoteEndPoint);
+            LLUDPClient udpClient = new LLUDPClient(this, m_throttleRates, m_throttle, circuitCode, agentID, remoteEndPoint, m_defaultRTO, m_maxRTO);
             IClientAPI existingClient;
 
             if (!m_scene.TryGetClient(agentID, out existingClient))

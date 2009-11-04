@@ -3541,7 +3541,7 @@ namespace OpenSim.Region.Physics.OdePlugin
         public override void UnCombine(PhysicsScene pScene)
         {
             IntPtr localGround = IntPtr.Zero;
-            float[] localHeightfield;
+//            float[] localHeightfield;
             bool proceed = false;
             List<IntPtr> geomDestroyList = new List<IntPtr>();
 
@@ -3553,7 +3553,7 @@ namespace OpenSim.Region.Physics.OdePlugin
                     {
                         if (geom == localGround)
                         {
-                            localHeightfield = TerrainHeightFieldHeights[geom];
+//                            localHeightfield = TerrainHeightFieldHeights[geom];
                             proceed = true;
                         }
                         else
@@ -3575,7 +3575,7 @@ namespace OpenSim.Region.Physics.OdePlugin
                             // memory corruption
                             if (TerrainHeightFieldHeights.ContainsKey(g))
                             {
-                                float[] removingHeightField = TerrainHeightFieldHeights[g];
+//                                float[] removingHeightField = TerrainHeightFieldHeights[g];
                                 TerrainHeightFieldHeights.Remove(g);
 
                                 if (RegionTerrain.ContainsKey(g))
