@@ -213,18 +213,41 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                         }
                         else
                         {
-                            m_vm.Finish();
-                            reply[2] = new OtpErlangAtom("finished");
+                            Queue<PCObj> popped = new Queue<PCObj>();
+                            try
+                            {
+                                m_vm.Finish(popped);
+                            }
+                            finally
+                            {
+                                reply[2] = new OtpErlangAtom("finished");
+                            }
                         }
                     }
                     else if (instr == "step")
                     {
-                        reply[2] = m_vm.Step() ? new OtpErlangAtom("continue") : new OtpErlangAtom("finished");
+                        bool cont = true;
+                        Queue<PCObj> popped = new Queue<PCObj>();
+                        try
+                        {
+                            cont = m_vm.Step(popped);
+                        }
+                        finally
+                        {
+                            reply[2] = new OtpErlangAtom(cont ? "continue" : "finished");
+                        }
                     }
                     else if (instr == "finish")
                     {
-                        m_vm.Finish();
-                        reply[2] = new OtpErlangAtom("finished");
+                        Queue<PCObj> popped = new Queue<PCObj>();
+                        try
+                        {
+                            m_vm.Finish(popped);
+                        }
+                        finally
+                        {
+                            reply[2] = new OtpErlangAtom("finished");
+                        }
                     }
                     else if (instr == "echo")
                     {
