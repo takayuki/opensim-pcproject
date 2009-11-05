@@ -175,7 +175,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
     {
         public UUID val;
         public PCUUID(UUID val) { this.val = val; }
-        public override string ToString() { return val.ToString(); }
+        public override string ToString() { return "{" + val.ToString() + "}"; }
     }
 
     public class PCVector2 : PCObj
@@ -228,6 +228,11 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
     public class PCDict : PCObj
     {
         private Dictionary<string, PCObj> dict;
+
+        public Dictionary<string, PCObj> Dict
+        {
+            get { return dict; }
+        }
 
         public PCDict()
         {
