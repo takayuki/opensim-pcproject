@@ -151,7 +151,6 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
 
     public class PCMark : PCObj
     {
-        public string val;
         public PCMark() { }
         public override string ToString() { return "["; }
     }
