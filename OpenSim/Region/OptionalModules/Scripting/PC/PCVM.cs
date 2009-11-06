@@ -95,6 +95,22 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             base(String.Format("{0} is not implemented", name)) { }
     }
 
+    public class PCPopFromStackException : Exception
+    {
+        public PCObj m_obj;
+
+        public PCObj Obj
+        {
+            get { return m_obj; }
+        }
+
+        public PCPopFromStackException(PCObj obj) :
+            base("pop from stack successfully")
+        {
+            this.m_obj = obj;
+        }
+    }
+
     public delegate bool PCOperator();
 
     public abstract class PCObj
@@ -151,7 +167,6 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
 
     public class PCMark : PCObj
     {
-        public string val;
         public PCMark() { }
         public override string ToString() { return "["; }
     }
@@ -160,7 +175,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
     {
         public UUID val;
         public PCUUID(UUID val) { this.val = val; }
-        public override string ToString() { return val.ToString(); }
+        public override string ToString() { return "{" + val.ToString() + "}"; }
     }
 
     public class PCVector2 : PCObj
@@ -213,6 +228,11 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
     public class PCDict : PCObj
     {
         private Dictionary<string, PCObj> dict;
+
+        public Dictionary<string, PCObj> Dict
+        {
+            get { return dict; }
+        }
 
         public PCDict()
         {
@@ -484,13 +504,12 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
         {
             try
             {
-                Stack.Pop();
+                throw new PCPopFromStackException(Stack.Pop());
             }
             catch (InvalidOperationException)
             {
                 throw new PCEmptyStackException();
             }
-            return true;
         }
 
         private bool OpRoll()
@@ -2114,7 +2133,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             }
         }
 
-        private bool StepDo(Compiler.Exp exp)
+        private bool StepDo(Compiler.Exp exp, Queue<PCObj> popped)
         {
             if (exp is Compiler.ExpId)
             {
@@ -2123,7 +2142,18 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 {
                     if (ent is PCOp)
                     {
-                        return ((PCOp)ent).op();
+                        try
+                        {
+                            return ((PCOp)ent).op();
+                        }
+                        catch (PCPopFromStackException e)
+                        {
+                            if (popped != null)
+                            {
+                                popped.Enqueue(e.Obj);
+                            }
+                            return true;
+                        }
                     }
                     else if (ent is PCFun)
                     {
@@ -2195,7 +2225,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             return true;
         }
 
-        public bool Step()
+        public bool Step(Queue<PCObj> popped)
         {
             if (NextInstr == null)
             {
@@ -2217,16 +2247,16 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 }
                 else
                 {
-                    if (StepDo(NextInstr.hd))
+                    if (StepDo(NextInstr.hd, popped))
                         NextInstr = NextInstr.tl;
                     return true;
                 }
             }
         }
 
-        public void Finish()
+        public void Finish(Queue<PCObj> popped)
         {
-            while (Step()) ;
+            while (Step(popped)) ;
         }
 
         public void ShowNextStep()
@@ -2250,6 +2280,23 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             }
         }
 
+        public void DumpPoppedObjects(bool all, Queue<PCObj> popped)
+        {
+            Object[] copy = popped.ToArray();
+            int cnt = 0;
+            int total = popped.Count;
+
+            if (popped.Count == 0)
+                return;
+
+            Console.WriteLine("++");
+            while (cnt < popped.Count && (all || cnt < 20))
+                Console.WriteLine("{0}", copy[cnt++].ToString());
+            if (total != cnt)
+                Console.WriteLine("...skip");
+            Console.WriteLine("Total: {0} object(s) were popped from stack", total);
+        }
+
         public void DumpStack(bool all)
         {
             Object[] copy = Stack.ToArray();
@@ -2261,7 +2308,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 Console.WriteLine("{0}", copy[cnt++].ToString());
             if (total != cnt)
                 Console.WriteLine("...skip");
-            Console.WriteLine("Total: {0} objects in stack", total);
+            Console.WriteLine("Total: {0} object(s) in stack", total);
         }
 
         private void ReadEvalLoop(Parser parser)
@@ -2277,7 +2324,15 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
 
                     if (line == "")
                     {
-                        Step();
+                        Queue<PCObj> popped = new Queue<PCObj>();
+                        try
+                        {
+                            Step(popped);
+                        }
+                        finally
+                        {
+                            DumpPoppedObjects(false, popped);
+                        }
                         continue;
                     }
                     else if (line.ToCharArray()[0] == ':')
@@ -2292,7 +2347,15 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                             }
                             else if (command == ":f")
                             {
-                                Finish();
+                                Queue<PCObj> popped = new Queue<PCObj>();
+                                try
+                                {
+                                    Finish(popped);
+                                }
+                                finally
+                                {
+                                    DumpPoppedObjects(false, popped);
+                                }
                                 continue;
                             }
                             else if (command == ":l")
@@ -2325,8 +2388,16 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                         SYMBOL newast = parser.Parse(line);
                         if (newast == null)
                             continue;
-                        Inject((Compiler.ExpPair)newast);
-                        Step();
+                        Queue<PCObj> popped = new Queue<PCObj>();
+                        try
+                        {
+                            Inject((Compiler.ExpPair)newast);
+                            Step(popped);
+                        }
+                        finally
+                        {
+                            DumpPoppedObjects(false, popped);
+                        }
                     }
                 }
                 catch (Exception e)
@@ -2352,7 +2423,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 }
                 else
                 {
-                    Finish();
+                    Finish(null);
                 }
                 return true;
             }
@@ -2383,7 +2454,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 if (ast == null)
                     return false;
                 vm.Call((Compiler.ExpPair)ast);
-                vm.Finish();
+                vm.Finish(null);
                 return true;
             }
             catch (Exception e)

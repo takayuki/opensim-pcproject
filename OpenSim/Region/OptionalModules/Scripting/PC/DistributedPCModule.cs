@@ -163,6 +163,93 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             m_vm = new PCVM(m_scene, m_source, m_dict);
         }
 
+        private OtpErlangObject ErlangObjectFromPCVMObject(PCObj input)
+        {
+            if (input is PCFloat)
+                return new OtpErlangFloat(((PCFloat)input).val);
+            if (input is PCInt)
+                return new OtpErlangInt(((PCInt)input).val);
+            if (input is PCBool)
+                return new OtpErlangBoolean(((PCBool)input).val);
+            if (input is PCSym)
+                return new OtpErlangAtom(((PCSym)input).val);
+            if (input is PCStr)
+                return new OtpErlangString(((PCStr)input).val);
+            if (input is PCMark)
+                return new OtpErlangString(((PCMark)input).ToString());
+            if (input is PCUUID)
+                return new OtpErlangString(((PCUUID)input).ToString());
+            if (input is PCVector2)
+            {
+                OtpErlangObject[] items = new OtpErlangObject[2];
+                items[0] = new OtpErlangFloat(((PCVector2)input).val.X);
+                items[1] = new OtpErlangFloat(((PCVector2)input).val.Y);
+                return new OtpErlangTuple(items);
+            }
+            if (input is PCVector3)
+            {
+                OtpErlangObject[] items = new OtpErlangObject[3];
+                items[0] = new OtpErlangFloat(((PCVector3)input).val.X);
+                items[1] = new OtpErlangFloat(((PCVector3)input).val.Y);
+                items[2] = new OtpErlangFloat(((PCVector3)input).val.Z);
+                return new OtpErlangTuple(items);
+            }
+            if (input is PCVector4)
+            {
+                OtpErlangObject[] items = new OtpErlangObject[4];
+                items[0] = new OtpErlangFloat(((PCVector4)input).val.X);
+                items[1] = new OtpErlangFloat(((PCVector4)input).val.Y);
+                items[2] = new OtpErlangFloat(((PCVector4)input).val.Z);
+                items[3] = new OtpErlangFloat(((PCVector4)input).val.W);
+                return new OtpErlangTuple(items);
+            }
+            if (input is PCNull)
+                return new OtpErlangAtom(((PCNull)input).ToString());
+            if (input is PCOp)
+                return new OtpErlangAtom(((PCOp)input).ToString());
+            if (input is PCFun)
+                return new OtpErlangAtom(((PCFun)input).ToString());
+            if (input is PCDict)
+            {
+                PCDict dict = (PCDict)input;
+                OtpErlangObject[] items = new OtpErlangObject[dict.Dict.Count*2];
+
+                int i = 0;
+                foreach (KeyValuePair<string, PCObj> pair in dict.Dict)
+                {
+                    items[i * 2] = new OtpErlangAtom(pair.Key);
+                    items[i * 2 + 1] = ErlangObjectFromPCVMObject(pair.Value);
+                    i++;
+                }
+                return new OtpErlangList(items);
+            }
+            if (input is PCArray)
+            {
+                PCArray array = (PCArray)input;
+                OtpErlangObject[] items = new OtpErlangObject[array.Length];
+                for (int i = 0; i < array.Length; i++)
+                {
+                    items[i] = ErlangObjectFromPCVMObject(array[i]);
+                }
+                return new OtpErlangList(items);
+            }
+            if (input is PCSceneObjectPart)
+                return ErlangObjectFromPCVMObject(new PCUUID(((PCSceneObjectPart)input).var.UUID));
+
+            return new OtpErlangAtom("nonobject");
+        }
+
+        private OtpErlangObject ErlangObjectFromPCVMObject(PCObj[] input)
+        {
+            OtpErlangObject[] vals = new OtpErlangObject[input.Length];
+
+            for (int i = 0; i <input.Length; i++)
+            {
+                vals[i] = ErlangObjectFromPCVMObject(input[i]);
+            }
+            return new OtpErlangList(vals);
+        }
+
         public override IEnumerator<OtpActor.Continuation> GetEnumerator()
         {
             m_log.Info("[Distributed PC] New PCVM is ready: " + m_mbox.Self);
@@ -213,18 +300,56 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                         }
                         else
                         {
-                            m_vm.Finish();
-                            reply[2] = new OtpErlangAtom("finished");
+                            Queue<PCObj> popped = new Queue<PCObj>();
+                            try
+                            {
+                                m_vm.Finish(popped);
+                            }
+                            finally
+                            {
+                                reply = new OtpErlangObject[] {
+                                    reply[0],
+                                    reply[1],
+                                    new OtpErlangAtom("finished"),
+                                    ErlangObjectFromPCVMObject(popped.ToArray())
+                                };
+                            }
                         }
                     }
                     else if (instr == "step")
                     {
-                        reply[2] = m_vm.Step() ? new OtpErlangAtom("continue") : new OtpErlangAtom("finished");
+                        bool cont = true;
+                        Queue<PCObj> popped = new Queue<PCObj>();
+                        try
+                        {
+                            cont = m_vm.Step(popped);
+                        }
+                        finally
+                        {
+                            reply = new OtpErlangObject[] {
+                                reply[0],
+                                reply[1],
+                                new OtpErlangAtom(cont ? "continue" : "finished"),
+                                ErlangObjectFromPCVMObject(popped.ToArray())
+                            };
+                        }
                     }
                     else if (instr == "finish")
                     {
-                        m_vm.Finish();
-                        reply[2] = new OtpErlangAtom("finished");
+                        Queue<PCObj> popped = new Queue<PCObj>();
+                        try
+                        {
+                            m_vm.Finish(popped);
+                        }
+                        finally
+                        {
+                            reply = new OtpErlangObject[] {
+                                reply[0],
+                                reply[1],
+                                new OtpErlangAtom("finished"),
+                                ErlangObjectFromPCVMObject(popped.ToArray())
+                            };
+                        }
                     }
                     else if (instr == "echo")
                     {
