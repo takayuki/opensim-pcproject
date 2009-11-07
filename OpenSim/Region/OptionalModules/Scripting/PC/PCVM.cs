@@ -319,27 +319,77 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
     public class PCSceneObjectPart : PCObj
     {
         public SceneObjectPart var;
-        
-        private Vector3 m_positionAtPin;
-        private Quaternion m_rotationAtPin;
 
-        public Vector3 PositionAtPin { get { return m_positionAtPin; } }
-        public Quaternion RotationAtPin { get { return m_rotationAtPin; } }
+        public PCSceneObjectPart(SceneObjectPart val) { this.var = val; }
 
-        public PCSceneObjectPart(SceneObjectPart var) { this.var = var; }
-
-        public void Pin()
-        {
-            m_positionAtPin = var.AbsolutePosition;
-            m_rotationAtPin = var.RotationOffset;
-        }
-        
         public override string ToString()
         {
             return "<" + var.ToString() + ">";
         }
     }
-    
+
+    public class PCSceneSnapshot : PCObj
+    {
+        public class SnapshotItem
+        {
+            private PCSceneObjectPart part;
+            private Vector3 position;
+            private Quaternion rotation;
+
+            public PCSceneObjectPart PCSceneObjectPart
+            {
+                get { return part; }
+            }
+
+            public Vector3 Position
+            {
+                get { return position; }
+            }
+
+            public Quaternion Rotation
+            {
+                get { return rotation; }
+            }
+
+            public SnapshotItem(PCSceneObjectPart part)
+            {
+                this.part = part;
+                this.position = part.var.AbsolutePosition;
+                this.rotation = part.var.RotationOffset;
+            }
+
+            public override string ToString()
+            {
+                return (new PCUUID(part.var.UUID)).ToString();
+            }
+        }
+
+        public SnapshotItem[] val;
+
+        public PCSceneSnapshot(PCSceneObjectPart[] parts)
+        {
+            val = new SnapshotItem[parts.Length];
+            for (int i = 0; i < parts.Length; i++)
+            {
+                val[i] = new SnapshotItem(parts[i]);
+            }
+        }
+
+        public override string ToString()
+        {
+            string s = "[";
+            bool f = false;
+            foreach (SnapshotItem o in val)
+            {
+                if (f) s += " ";
+                else f = true;
+                s += o.ToString();
+            }
+            s += "]";
+            return s;
+        }
+    }
+
     public partial class PCVM : IDisposable
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
@@ -1898,12 +1948,13 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             system["grestore"] = new PCOp(OpGRestore);
             system["translate"] = new PCOp(OpTranslate);
             system["rotate"] = new PCOp(OpRotate);
-            system["pin"] = new PCOp(OpScenePin);
+            system["snapshot"] = new PCOp(OpSnapshot);
+            system["loadsnapshot"] = new PCOp(OpLoadSnapshot);
             system["sceneobjects"] = new PCOp(OpSceneObjects);
-            system["scenetranslate"] = new PCOp(OpSceneTranslate);
-            system["scenerotate"] = new PCOp(OpSceneRotate);
-            system["scenesetposition"] = new PCOp(OpSceneSetPosition);
-            system["scenesetrotate"] = new PCOp(OpSceneSetRotate);
+            system["translatesnapshot"] = new PCOp(OpTranslateSnapshot);
+            system["rotatesnapshot"] = new PCOp(OpRotateSnapshot);
+            system["setsnapshotposition"] = new PCOp(OpSetSnapshotPosition);
+            system["setsnapshotrotation"] = new PCOp(OpSetSnapshotRotation);
             system["currentpoint"] = new PCOp(OpCurrentPoint);
             system["moveto"] = new PCOp(OpMoveTo);
             system["rmoveto"] = new PCOp(OpRMoveTo);

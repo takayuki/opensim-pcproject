@@ -235,6 +235,16 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             }
             if (input is PCSceneObjectPart)
                 return ErlangObjectFromPCVMObject(new PCUUID(((PCSceneObjectPart)input).var.UUID));
+            if (input is PCSceneSnapshot)
+            {
+                PCSceneSnapshot.SnapshotItem[] array = ((PCSceneSnapshot)input).val;
+                OtpErlangObject[] items = new OtpErlangObject[array.Length];
+                for (int i = 0; i < array.Length; i++)
+                {
+                    items[i] = ErlangObjectFromPCVMObject(array[i].PCSceneObjectPart);
+                }
+                return new OtpErlangList(items);
+            }
 
             return new OtpErlangAtom("nonobject");
         }
