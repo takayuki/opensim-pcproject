@@ -1372,6 +1372,49 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             return true;
         }
 
+        private bool OpLoadVector()
+        {
+            PCObj v;
+            
+            try
+            {
+                v = Stack.Pop();
+            }
+            catch (InvalidOperationException)
+            {
+                throw new PCEmptyStackException();
+            }
+            if (!(v is PCVector2) && !(v is PCVector3) && !(v is PCVector4))
+            {
+                Stack.Push(v);
+                throw new PCTypeCheckException();
+            }
+
+            if (v is PCVector2)
+            {
+                Stack.Push(new PCFloat(((PCVector2)v).val.X));
+                Stack.Push(new PCFloat(((PCVector2)v).val.Y));
+            }
+            else if (v is PCVector3)
+            {
+                Stack.Push(new PCFloat(((PCVector3)v).val.X));
+                Stack.Push(new PCFloat(((PCVector3)v).val.Y));
+                Stack.Push(new PCFloat(((PCVector3)v).val.Z));
+            }
+            else if (v is PCVector4)
+            {
+                Stack.Push(new PCFloat(((PCVector4)v).val.X));
+                Stack.Push(new PCFloat(((PCVector4)v).val.Y));
+                Stack.Push(new PCFloat(((PCVector4)v).val.Z));
+                Stack.Push(new PCFloat(((PCVector4)v).val.W));
+            }
+            else
+            {
+                throw new PCTypeCheckException();
+            }
+            return true;
+        }
+
         private bool OpIf()
         {
             PCObj proc;
@@ -1912,6 +1955,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             system["vector2"] = new PCOp(OpVector2);
             system["vector3"] = new PCOp(OpVector3);
             system["vector4"] = new PCOp(OpVector4);
+            system["loadvector"] = new PCOp(OpLoadVector);
             system["if"] = new PCOp(OpIf);
             system["ifelse"] = new PCOp(OpIfElse);
             system["loop"] = new PCOp(OpLoop);
