@@ -1189,6 +1189,31 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             return true;
         }
 
+        private bool OpLoad()
+        {
+            PCObj a;
+
+            try
+            {
+                a = Stack.Pop();
+            }
+            catch (InvalidOperationException)
+            {
+                throw new PCEmptyStackException();
+            }
+            if (!(a is PCArray))
+            {
+                Stack.Push(a);
+                throw new PCTypeCheckException();
+            }
+
+            foreach (PCObj o in ((PCArray)a).val)
+            {
+                Stack.Push(o);
+            }
+            return true;
+        }
+
         private bool OpLength()
         {
             PCObj o;
@@ -1949,6 +1974,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             system["idiv"] = new PCOp(OpIdiv);
             system["mod"] = new PCOp(OpMod);
             system["]"] = new PCOp(OpArray);
+            system["load"] = new PCOp(OpLoad);
             system["length"] = new PCOp(OpLength);
             system["get"] = new PCOp(OpGet);
             system["put"] = new PCOp(OpPut);
