@@ -115,13 +115,19 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
 
     public abstract class PCObj
     {
-        public PCObj() { }
+        public PCObj()
+        {
+        }
+        
         public abstract override string ToString();
     }
 
     public abstract class PCConst : PCObj
     {
-        public PCConst() { }
+        public PCConst()
+        {
+        }
+        
         public abstract float ToFloat();
         public abstract int ToInt();
     }
@@ -129,100 +135,250 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
     public class PCFloat : PCConst
     {
         public float val;
-        public PCFloat(float val) { this.val = val; }
-        public override float ToFloat() { return val; }
-        public override int ToInt() { return (int)val; }
-        public override string ToString() { return val.ToString(); }
+        
+        public PCFloat(float val)
+        {
+            this.val = val;
+        }
+        
+        public override float ToFloat()
+        {
+            return val;
+        }
+        
+        public override int ToInt()
+        {
+            return (int)val;
+        }
+        
+        public override string ToString()
+        {
+            return val.ToString();
+        }
     }
 
     public class PCInt : PCConst
     {
         public int val;
-        public PCInt(int val) { this.val = val; }
-        public override float ToFloat() { return (float)val; }
-        public override int ToInt() { return val; }
-        public override string ToString() { return val.ToString(); }
+        
+        public PCInt(int val)
+        {
+            this.val = val;
+        }
+        
+        public override float ToFloat()
+        {
+            return (float)val;
+        }
+        
+        public override int ToInt()
+        {
+            return val;
+        }
+        
+        public override string ToString()
+        {
+            return val.ToString();
+        }
     }
-    
+
     public class PCBool : PCObj
     {
         public bool val;
-        public PCBool(bool val) { this.val = val; }
-        public override string ToString() { return val.ToString(); }
+        
+        public PCBool(bool val)
+        {
+            this.val = val;
+        }
+        
+        public override string ToString()
+        {
+            return val.ToString();
+        }
     }
 
     public class PCSym : PCObj
     {
         public string val;
-        public PCSym(string val) { this.val = val; }
-        public override string ToString() { return "/" + val.ToString(); }
+        
+        public PCSym(string val)
+        {
+            this.val = val;
+        }
+        
+        public override string ToString()
+        {
+            return "/" + val.ToString();
+        }
     }
 
     public class PCStr : PCObj
     {
         public string val;
-        public PCStr(string val) { this.val = val; }
-        public override string ToString() { return "\"" + val.ToString() + "\""; }
+        
+        public PCStr(string val)
+        {
+            this.val = val;
+        }
+        
+        public override string ToString()
+        {
+            return "\"" + val.ToString() + "\"";
+        }
     }
 
     public class PCMark : PCObj
     {
-        public PCMark() { }
-        public override string ToString() { return "["; }
+        public PCMark()
+        {
+        }
+        
+        public override string ToString()
+        {
+            return "[";
+
+        }
     }
 
     public class PCUUID : PCObj
     {
         public UUID val;
-        public PCUUID(UUID val) { this.val = val; }
-        public override string ToString() { return "{" + val.ToString() + "}"; }
+
+        public PCUUID(UUID val)
+        {
+            this.val = val;
+        }
+        
+        public override string ToString()
+        {
+            return "{" + val.ToString() + "}";
+        }
     }
 
-    public class PCVector2 : PCObj
+    public abstract class PCVector : PCObj
+    {
+        public PCVector()
+        {
+        }
+
+        public abstract int Arity();
+    }
+
+    public class PCVector2 : PCVector
     {
         public Vector2 val;
-        public PCVector2(Vector2 val) { this.val = val; }
-        public PCVector2(float x, float y) { val = new Vector2(x, y); }
-        public override string ToString() { return val.ToString(); }
+
+        public PCVector2(Vector2 val)
+        {
+            this.val = val;
+        }
+
+        public PCVector2(float x, float y)
+        {
+            val = new Vector2(x, y);
+        }
+
+        public override int Arity()
+        {
+            return 2;
+        }
+
+        public override string ToString()
+        {
+            return val.ToString();
+        }
     }
 
-    public class PCVector3 : PCObj
+    public class PCVector3 : PCVector
     {
         public Vector3 val;
-        public PCVector3(Vector3 val) { this.val = val; }
-        public PCVector3(float x, float y, float z) { val = new Vector3(x, y, z); }
-        public override string ToString() { return val.ToString(); }
+
+        public PCVector3(Vector3 val)
+        {
+            this.val = val;
+        }
+        
+        public PCVector3(float x, float y, float z)
+        {
+            val = new Vector3(x, y, z);
+        }
+
+        public override int Arity()
+        {
+            return 3;
+        }
+        
+        public override string ToString()
+        {
+            return val.ToString();
+        }
     }
 
-    public class PCVector4 : PCObj
+    public class PCVector4 : PCVector
     {
         public Vector4 val;
-        public PCVector4(Vector4 val) { this.val = val; }
+
+        public PCVector4(Vector4 val)
+        {
+            this.val = val;
+        }
+        
         public PCVector4(float x, float y, float z, float w)
         {
             val = new Vector4(x, y, z, w);
         }
-        public override string ToString() { return val.ToString(); }
+
+        public override int Arity()
+        {
+            return 4;
+        }
+
+        public override string ToString()
+        {
+            return val.ToString();
+        }
     }
 
     public class PCNull : PCObj
     {
-        public PCNull() { }
-        public override string ToString() { return "null"; }
+        public PCNull()
+        {
+        }
+        
+        public override string ToString()
+        {
+            return "null";
+        }
     }
-    
+
     public class PCOp : PCObj
     {
         public PCOperator op;
-        public PCOp(PCOperator op) { this.op = op; }
-        public override string ToString() { return "<op>"; }
+
+        public PCOp(PCOperator op)
+        {
+            this.op = op;
+        }
+        
+        public override string ToString()
+        {
+            return "<op>";
+        }
     }
 
     public class PCFun : PCObj
     {
         public Compiler.ExpPair exp;
-        public PCFun(Compiler.ExpPair exp) { this.exp = exp; }
-        public override string ToString() { return "<fun>"; }
+
+        public PCFun(Compiler.ExpPair exp)
+        {
+            this.exp = exp;
+        }
+        
+        public override string ToString()
+        {
+            return "<fun>";
+        }
     }
 
     public class PCDict : PCObj
@@ -300,7 +456,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
         {
             val.Add(mem);
         }
-        
+
         public override string ToString()
         {
             string s = "[";
@@ -975,21 +1131,55 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 {
                     throw new PCEmptyStackException();
                 }
-                if (!(os[i] is PCConst))
-                {
-                    Stack.Push(os[i]);
-                    throw new PCTypeCheckException();
-                }
             }
-            if ((os[0] is PCInt) && (os[1] is PCInt))
+            if ((os[1] is PCConst) && (os[0] is PCConst))
             {
-                int val = ((PCInt)os[1]).val + ((PCInt)os[0]).val;
-                Stack.Push(new PCInt(val));
+                if ((os[1] is PCInt) && (os[0] is PCInt))
+                {
+                    int val = ((PCInt)os[1]).val + ((PCInt)os[0]).val;
+                    Stack.Push(new PCInt(val));
+                }
+                else
+                {
+                    float val = ((PCConst)os[1]).ToFloat() + ((PCConst)os[0]).ToFloat();
+                    Stack.Push(new PCFloat(val));
+                }
             }
             else
             {
-                float val = ((PCConst)os[1]).ToFloat() + ((PCConst)os[0]).ToFloat();
-                Stack.Push(new PCFloat(val));
+                try
+                {
+                    if (!(os[1] is PCVector) || !(os[0] is PCVector))
+                    {
+                        throw new PCTypeCheckException();
+                    }
+                    
+                    if (((PCVector)os[1]).Arity() != ((PCVector)os[0]).Arity())
+                    {
+                        throw new PCTypeCheckException();
+                    }
+
+                    switch (((PCVector)os[1]).Arity())
+                    {
+                        case 2:
+                            Stack.Push(new PCVector2(((PCVector2)os[1]).val + ((PCVector2)os[0]).val));
+                            break;
+                        case 3:
+                            Stack.Push(new PCVector3(((PCVector3)os[1]).val + ((PCVector3)os[0]).val));
+                            break;
+                        case 4:
+                            Stack.Push(new PCVector4(((PCVector4)os[1]).val + ((PCVector4)os[0]).val));
+                            break;
+                        default:
+                            throw new PCTypeCheckException();
+                    }
+                }
+                catch (PCTypeCheckException)
+                {
+                    Stack.Push(os[1]);
+                    Stack.Push(os[0]);
+                    throw;
+                }
             }
             return true;
         }
@@ -1008,21 +1198,56 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 {
                     throw new PCEmptyStackException();
                 }
-                if (!(os[i] is PCConst))
-                {
-                    Stack.Push(os[i]);
-                    throw new PCTypeCheckException();
-                }
             }
-            if ((os[0] is PCInt) && (os[1] is PCInt))
+
+            if ((os[1] is PCConst) && (os[0] is PCConst))
             {
-                int val = ((PCInt)os[1]).val - ((PCInt)os[0]).val;
-                Stack.Push(new PCInt(val));
+                if ((os[1] is PCInt) && (os[0] is PCInt))
+                {
+                    int val = ((PCInt)os[1]).val - ((PCInt)os[0]).val;
+                    Stack.Push(new PCInt(val));
+                }
+                else
+                {
+                    float val = ((PCConst)os[1]).ToFloat() - ((PCConst)os[0]).ToFloat();
+                    Stack.Push(new PCFloat(val));
+                }
             }
             else
             {
-                float val = ((PCConst)os[1]).ToFloat() - ((PCConst)os[0]).ToFloat();
-                Stack.Push(new PCFloat(val));
+                try
+                {
+                    if (!(os[1] is PCVector) || !(os[0] is PCVector))
+                    {
+                        throw new PCTypeCheckException();
+                    }
+                    
+                    if (((PCVector)os[1]).Arity() != ((PCVector)os[0]).Arity())
+                    {
+                        throw new PCTypeCheckException();
+                    }
+
+                    switch (((PCVector)os[1]).Arity())
+                    {
+                        case 2:
+                            Stack.Push(new PCVector2(((PCVector2)os[1]).val - ((PCVector2)os[0]).val));
+                            break;
+                        case 3:
+                            Stack.Push(new PCVector3(((PCVector3)os[1]).val - ((PCVector3)os[0]).val));
+                            break;
+                        case 4:
+                            Stack.Push(new PCVector4(((PCVector4)os[1]).val - ((PCVector4)os[0]).val));
+                            break;
+                        default:
+                            throw new PCTypeCheckException();
+                    }
+                }
+                catch (PCTypeCheckException)
+                {
+                    Stack.Push(os[1]);
+                    Stack.Push(os[0]);
+                    throw;
+                }
             }
             return true;
         }
@@ -1041,21 +1266,76 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 {
                     throw new PCEmptyStackException();
                 }
-                if (!(os[i] is PCConst))
-                {
-                    Stack.Push(os[i]);
-                    throw new PCTypeCheckException();
-                }
             }
-            if ((os[0] is PCInt) && (os[1] is PCInt))
+
+            if ((os[1] is PCConst) && (os[0] is PCConst))
             {
-                int val = ((PCInt)os[1]).val * ((PCInt)os[0]).val;
-                Stack.Push(new PCInt(val));
+                if ((os[1] is PCInt) && (os[0] is PCInt))
+                {
+                    int val = ((PCInt)os[1]).val * ((PCInt)os[0]).val;
+                    Stack.Push(new PCInt(val));
+                }
+                else
+                {
+                    float val = ((PCConst)os[1]).ToFloat() * ((PCConst)os[0]).ToFloat();
+                    Stack.Push(new PCFloat(val));
+                }
             }
             else
             {
-                float val = ((PCConst)os[1]).ToFloat() * ((PCConst)os[0]).ToFloat();
-                Stack.Push(new PCFloat(val));
+                try
+                {
+                    if (!(os[1] is PCVector) || (!(os[0] is PCConst) && !(os[0] is PCVector)))
+                    {
+                        throw new PCTypeCheckException();
+                    }
+
+                    if (os[0] is PCConst)
+                    {
+                        switch (((PCVector)os[1]).Arity())
+                        {
+                            case 2:
+                                Stack.Push(new PCVector2(((PCVector2)os[1]).val * ((PCConst)os[0]).ToFloat()));
+                                break;
+                            case 3:
+                                Stack.Push(new PCVector3(((PCVector3)os[1]).val * ((PCConst)os[0]).ToFloat()));
+                                break;
+                            case 4:
+                                Stack.Push(new PCVector4(((PCVector4)os[1]).val * ((PCConst)os[0]).ToFloat()));
+                                break;
+                            default:
+                                throw new PCTypeCheckException();
+                        }
+                    }
+                    else
+                    {
+                        if (((PCVector)os[1]).Arity() != ((PCVector)os[0]).Arity())
+                        {
+                            throw new PCTypeCheckException();
+                        }
+
+                        switch (((PCVector)os[1]).Arity())
+                        {
+                            case 2:
+                                Stack.Push(new PCVector2(((PCVector2)os[1]).val * ((PCVector2)os[0]).val));
+                                break;
+                            case 3:
+                                Stack.Push(new PCVector3(((PCVector3)os[1]).val * ((PCVector3)os[0]).val));
+                                break;
+                            case 4:
+                                Stack.Push(new PCVector4(((PCVector4)os[1]).val * ((PCVector4)os[0]).val));
+                                break;
+                            default:
+                                throw new PCTypeCheckException();
+                        }
+                    }
+                }
+                catch (PCTypeCheckException)
+                {
+                    Stack.Push(os[1]);
+                    Stack.Push(os[0]);
+                    throw;
+                }
             }
             return true;
         }
@@ -1074,14 +1354,69 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 {
                     throw new PCEmptyStackException();
                 }
-                if (!(os[i] is PCConst))
+            }
+
+            if ((os[1] is PCConst) && (os[0] is PCConst))
+            {
+                float val = ((PCConst)os[1]).ToFloat() / ((PCConst)os[0]).ToFloat();
+                Stack.Push(new PCFloat(val));
+            }
+            else
+            {
+                try
                 {
-                    Stack.Push(os[i]);
-                    throw new PCTypeCheckException();
+                    if (!(os[1] is PCVector) || (!(os[0] is PCConst) && !(os[0] is PCVector)))
+                    {
+                        throw new PCTypeCheckException();
+                    }
+
+                    if (os[0] is PCConst)
+                    {
+                        switch (((PCVector)os[1]).Arity())
+                        {
+                            case 2:
+                                Stack.Push(new PCVector2(((PCVector2)os[1]).val / ((PCConst)os[0]).ToFloat()));
+                                break;
+                            case 3:
+                                Stack.Push(new PCVector3(((PCVector3)os[1]).val / ((PCConst)os[0]).ToFloat()));
+                                break;
+                            case 4:
+                                Stack.Push(new PCVector4(((PCVector4)os[1]).val / ((PCConst)os[0]).ToFloat()));
+                                break;
+                            default:
+                                throw new PCTypeCheckException();
+                        }
+                    }
+                    else
+                    {
+                        if (((PCVector)os[1]).Arity() != ((PCVector)os[0]).Arity())
+                        {
+                            throw new PCTypeCheckException();
+                        }
+
+                        switch (((PCVector)os[1]).Arity())
+                        {
+                            case 2:
+                                Stack.Push(new PCVector2(((PCVector2)os[1]).val / ((PCVector2)os[0]).val));
+                                break;
+                            case 3:
+                                Stack.Push(new PCVector3(((PCVector3)os[1]).val / ((PCVector3)os[0]).val));
+                                break;
+                            case 4:
+                                Stack.Push(new PCVector4(((PCVector4)os[1]).val / ((PCVector4)os[0]).val));
+                                break;
+                            default:
+                                throw new PCTypeCheckException();
+                        }
+                    }
+                }
+                catch (PCTypeCheckException)
+                {
+                    Stack.Push(os[1]);
+                    Stack.Push(os[0]);
+                    throw;
                 }
             }
-            float val = ((PCConst)os[1]).ToFloat() / ((PCConst)os[0]).ToFloat();
-            Stack.Push(new PCFloat(val));
             return true;
         }
 
@@ -1400,7 +1735,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
         private bool OpLoadVector()
         {
             PCObj v;
-            
+
             try
             {
                 v = Stack.Pop();
@@ -2469,7 +2804,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                         if (2 <= line.Length)
                         {
                             string command = line.Substring(0, 2);
-                             if (command == ":t")
+                            if (command == ":t")
                             {
                                 step = !step;
                                 if (step)
@@ -2550,7 +2885,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 }
             }
         }
-        
+
         public bool Load(Parser parser, string script, bool debug)
         {
             try
@@ -2585,7 +2920,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             return new Compiler.PCParser(parser, handler);
         }
 
-        public static bool Load(Scene scene, IConfigSource source,StreamReader script)
+        public static bool Load(Scene scene, IConfigSource source, StreamReader script)
         {
             Parser parser = MakeParser();
             PCVM vm = new PCVM(scene, source, new PCDict());
