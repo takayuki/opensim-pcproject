@@ -1172,6 +1172,65 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             SetPhysics(((PCSceneObjectPart)part).var, ((PCBool)param).val);
             return true;
         }
+        
+        private bool OpRez()
+        {
+            PCObj uuid;
+
+            try
+            {
+                uuid = Stack.Pop();
+            }
+            catch (InvalidOperationException)
+            {
+                throw new PCEmptyStackException();
+            }
+            if (!(uuid is PCUUID))
+            {
+                Stack.Push(uuid);
+                throw new PCTypeCheckException();
+            }
+
+            AssetBase asset = null;
+            try
+            {
+                asset = m_scene.AssetService.Get(((PCUUID)uuid).val.ToString());
+            }
+            catch (Exception)
+            {
+            }
+
+            if (asset == null)
+            {
+                Stack.Push(uuid);
+                throw new PCNotFoundException(((PCUUID)uuid).val.ToString());
+            }
+            if (asset.Type != (uint)AssetType.Object)
+            {
+                Stack.Push(uuid);
+                throw new PCTypeCheckException();
+            }
+
+            SceneObjectPart root = null;
+            try
+            {
+                string data = Utils.BytesToString(asset.Data);
+                SceneObjectGroup sceneObject = SceneObjectSerializer.FromOriginalXmlFormat(data);
+                root = sceneObject.RootPart;
+                root.ObjectFlags &= ~((uint)PrimFlags.Phantom);
+                root.ObjectFlags |= (uint)PrimFlags.Temporary;
+                sceneObject.SetScene(m_scene);
+                SetPosition(root, CurrentPoint);
+                SetRotation(root,Quaternion.Identity);
+            }
+            catch (Exception)
+            {
+                Stack.Push(uuid);
+                throw new PCTypeCheckException();
+            }
+            Stack.Push(new PCSceneObjectPart(root));
+            return true;
+        }
 
         private bool OpShow()
         {
@@ -1198,7 +1257,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             }
             return true;
         }
-        
+
         private static PrimitiveShapeFunction CreateSphere = PrimitiveBaseShape.CreateSphere;
         private static PrimitiveShapeFunction CreateBox = PrimitiveBaseShape.CreateBox;
 

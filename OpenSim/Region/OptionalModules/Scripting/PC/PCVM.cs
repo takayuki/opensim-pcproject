@@ -2043,6 +2043,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             system["settemporary"] = new PCOp(OpSetTemporary);
             system["setphantom"] = new PCOp(OpSetPhantom);
             system["setphysics"] = new PCOp(OpSetPhysics);
+            system["rez"] = new PCOp(OpRez);
             system["show"] = new PCOp(OpShow);
             system["createsphere"] = new PCOp(OpCreateSphere);
             system["createbox"] = new PCOp(OpCreateBox);
