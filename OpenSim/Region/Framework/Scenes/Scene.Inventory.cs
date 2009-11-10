@@ -93,7 +93,6 @@ namespace OpenSim.Region.Framework.Scenes
 
         public void AddInventoryItem(UUID AgentID, InventoryItemBase item)
         {
-
             if (InventoryService.AddItem(item))
             {
                 int userlevel = 0;
@@ -627,11 +626,8 @@ namespace OpenSim.Region.Framework.Scenes
         /// <returns></returns>
         private AssetBase CreateAsset(string name, string description, sbyte assetType, byte[] data)
         {
-            AssetBase asset = new AssetBase();
-            asset.Name = name;
+            AssetBase asset = new AssetBase(UUID.Random(), name, assetType);
             asset.Description = description;
-            asset.Type = assetType;
-            asset.FullID = UUID.Random();
             asset.Data = (data == null) ? new byte[1] : data;
 
             return asset;

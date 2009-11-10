@@ -25,35 +25,42 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Text;
-using OpenMetaverse;
+using System;
+using System.Runtime.Remoting.Lifetime;
+using System.Threading;
+using System.Reflection;
+using System.Collections;
+using System.Collections.Generic;
+using OpenSim.Framework;
+using OpenSim.Region.Framework.Interfaces;
+using OpenSim.Region.ScriptEngine.Interfaces;
+using OpenSim.Region.ScriptEngine.Shared.Api.Interfaces;
+using integer = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLInteger;
+using vector = OpenSim.Region.ScriptEngine.Shared.LSL_Types.Vector3;
+using rotation = OpenSim.Region.ScriptEngine.Shared.LSL_Types.Quaternion;
+using key = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLString;
+using LSL_List = OpenSim.Region.ScriptEngine.Shared.LSL_Types.list;
+using LSL_String = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLString;
+using LSL_Float = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLFloat;
+using LSL_Integer = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLInteger;
 
-namespace OpenSim.Framework
+namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
 {
-    public class AssetLandmark : AssetBase
+    public partial class ScriptBaseClass : MarshalByRefObject
     {
-        public Vector3 Position;
-        public ulong RegionHandle;
-        public UUID RegionID;
-        public int Version;
+        public IMOD_Api m_MOD_Functions;
 
-        public AssetLandmark(AssetBase a)
-            : base(a.FullID, a.Name, a.Type)
+        public void ApiTypeMOD(IScriptApi api)
         {
-            Data = a.Data;
-            Description = a.Description;
-            InternData();
+            if (!(api is IMOD_Api))
+                return;
+
+            m_MOD_Functions = (IMOD_Api)api;
         }
 
-        private void InternData()
+        public string modSendCommand(string module, string command, string k)
         {
-            string temp = Util.UTF8.GetString(Data).Trim();
-            string[] parts = temp.Split('\n');
-            int.TryParse(parts[0].Substring(17, 1), out Version);
-            UUID.TryParse(parts[1].Substring(10, 36), out RegionID);
-            // the vector is stored with spaces as separators, not with commas ("10.3 32.5 43" instead of "10.3, 32.5, 43")
-            Vector3.TryParse(parts[2].Substring(10, parts[2].Length - 10).Replace(" ", ","), out Position);
-            ulong.TryParse(parts[3].Substring(14, parts[3].Length - 14), out RegionHandle);
+            return m_MOD_Functions.modSendCommand(module, command, k);
         }
     }
 }

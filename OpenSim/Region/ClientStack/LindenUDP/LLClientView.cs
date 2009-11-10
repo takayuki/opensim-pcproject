@@ -220,6 +220,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
         public event FriendActionDelegate OnApproveFriendRequest;
         public event FriendActionDelegate OnDenyFriendRequest;
         public event FriendshipTermination OnTerminateFriendship;
+        public event GrantUserFriendRights OnGrantUserRights;
         public event MoneyTransferRequest OnMoneyTransferRequest;
         public event EconomyDataRequest OnEconomyDataRequest;
         public event MoneyBalanceRequest OnMoneyBalanceRequest;
@@ -1264,7 +1265,8 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             //
             // for one example of this kind of thing.  In fact, the Linden servers appear to only send about
             // 6 to 7 items at a time, so let's stick with 6
-            int MAX_ITEMS_PER_PACKET = 6;
+            int MAX_ITEMS_PER_PACKET = 5;
+            int MAX_FOLDERS_PER_PACKET = 6;
 
             int totalItems = fetchItems ? items.Count : 0;
             int totalFolders = fetchFolders ? folders.Count : 0;
@@ -1287,8 +1289,8 @@ namespace OpenSim.Region.ClientStack.LindenUDP
                 if (currentPacket == null) // Start a new packet
                 {
                     foldersToSend = totalFolders - foldersSent;
-                    if (foldersToSend > MAX_ITEMS_PER_PACKET)
-                        foldersToSend = MAX_ITEMS_PER_PACKET;
+                    if (foldersToSend > MAX_FOLDERS_PER_PACKET)
+                        foldersToSend = MAX_FOLDERS_PER_PACKET;
 
                     if (foldersToSend == 0)
                     {
@@ -1301,7 +1303,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
                 }
 
                 if (foldersToSend-- > 0)
-                    currentPacket.FolderData[foldersSent % MAX_ITEMS_PER_PACKET] = CreateFolderDataBlock(folders[foldersSent++]);
+                    currentPacket.FolderData[foldersSent % MAX_FOLDERS_PER_PACKET] = CreateFolderDataBlock(folders[foldersSent++]);
                 else if(itemsToSend-- > 0)
                     currentPacket.ItemData[itemsSent % MAX_ITEMS_PER_PACKET] = CreateItemDataBlock(items[itemsSent++]);
                 else
@@ -3194,12 +3196,17 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             if (!IsActive) return; // We don't need to update inactive clients.
 
             CoarseLocationUpdatePacket loc = (CoarseLocationUpdatePacket)PacketPool.Instance.GetPacket(PacketType.CoarseLocationUpdate);
-            // TODO: don't create new blocks if recycling an old packet
-            int total = CoarseLocations.Count;
-            CoarseLocationUpdatePacket.IndexBlock ib =
-                new CoarseLocationUpdatePacket.IndexBlock();
+            loc.Header.Reliable = false;
+
+            // Each packet can only hold around 62 avatar positions and the client clears the mini-map each time
+            // a CoarseLocationUpdate packet is received. Oh well.
+            int total = Math.Min(CoarseLocations.Count, 60);
+
+            CoarseLocationUpdatePacket.IndexBlock ib = new CoarseLocationUpdatePacket.IndexBlock();
+
             loc.Location = new CoarseLocationUpdatePacket.LocationBlock[total];
             loc.AgentData = new CoarseLocationUpdatePacket.AgentDataBlock[total];
+
             int selfindex = -1;
             for (int i = 0; i < total; i++)
             {
@@ -3209,18 +3216,17 @@ namespace OpenSim.Region.ClientStack.LindenUDP
                 lb.X = (byte)CoarseLocations[i].X;
                 lb.Y = (byte)CoarseLocations[i].Y;
 
-                lb.Z = CoarseLocations[i].Z > 1024 ? (byte)0 : (byte)(CoarseLocations[i].Z * 0.25);
+                lb.Z = CoarseLocations[i].Z > 1024 ? (byte)0 : (byte)(CoarseLocations[i].Z * 0.25f);
                 loc.Location[i] = lb;
                 loc.AgentData[i] = new CoarseLocationUpdatePacket.AgentDataBlock();
                 loc.AgentData[i].AgentID = users[i];
                 if (users[i] == AgentId)
                     selfindex = i;
             }
+
             ib.You = (short)selfindex;
             ib.Prey = -1;
             loc.Index = ib;
-            loc.Header.Reliable = false;
-            loc.Header.Zerocoded = true;
 
             OutPacket(loc, ThrottleOutPacketType.Task);
         }
@@ -4031,11 +4037,11 @@ namespace OpenSim.Region.ClientStack.LindenUDP
 
         protected ImprovedTerseObjectUpdatePacket.ObjectDataBlock CreateImprovedTerseBlock(SendPrimitiveTerseData data)
         {
-            return CreateImprovedTerseBlock(false, data.LocalID, data.State, Vector4.Zero, data.Position, data.Velocity,
+            return CreateImprovedTerseBlock(false, data.LocalID, data.AttachPoint, Vector4.Zero, data.Position, data.Velocity,
                 data.Acceleration, data.Rotation, data.AngularVelocity, data.TextureEntry);
         }
 
-        protected ImprovedTerseObjectUpdatePacket.ObjectDataBlock CreateImprovedTerseBlock(bool avatar, uint localID, byte state,
+        protected ImprovedTerseObjectUpdatePacket.ObjectDataBlock CreateImprovedTerseBlock(bool avatar, uint localID, int attachPoint,
             Vector4 collisionPlane, Vector3 position, Vector3 velocity, Vector3 acceleration, Quaternion rotation,
             Vector3 angularVelocity, byte[] textureEntry)
         {
@@ -4047,7 +4053,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             pos += 4;
 
             // Avatar/CollisionPlane
-            data[pos++] = state;
+            data[pos++] = (byte)((attachPoint % 16) * 16 + (attachPoint / 16)); ;
             if (avatar)
             {
                 data[pos++] = 1;
@@ -4903,6 +4909,10 @@ namespace OpenSim.Region.ClientStack.LindenUDP
         /// <param name="throttlePacketType">Throttling category for the packet</param>
         protected void OutPacket(Packet packet, ThrottleOutPacketType throttlePacketType)
         {
+            #region BinaryStats
+            LLUDPServer.LogPacketHeader(false, m_circuitCode, 0, packet.Type, (ushort)packet.Length);
+            #endregion BinaryStats
+
             m_udpServer.SendPacket(m_udpClient, packet, throttlePacketType, true);
         }
 
@@ -9718,7 +9728,26 @@ namespace OpenSim.Region.ClientStack.LindenUDP
                             Utils.BytesToString(avatarInterestUpdate.PropertiesData.SkillsText),
                             Utils.BytesToString(avatarInterestUpdate.PropertiesData.LanguagesText));
                     break;
-
+				                    
+                case PacketType.GrantUserRights:
+                    GrantUserRightsPacket GrantUserRights =
+                            (GrantUserRightsPacket)Pack;
+                    #region Packet Session and User Check
+                    if (m_checkPackets)
+                    {
+                        if (GrantUserRights.AgentData.SessionID != SessionId ||
+                            GrantUserRights.AgentData.AgentID != AgentId)
+                            break;
+                    }
+                    #endregion
+                    GrantUserFriendRights GrantUserRightsHandler = OnGrantUserRights;
+                    if (GrantUserRightsHandler != null)
+                        GrantUserRightsHandler(this,
+                            GrantUserRights.AgentData.AgentID,
+                            GrantUserRights.Rights[0].AgentRelated,
+                            GrantUserRights.Rights[0].RelatedRights);
+                    break;
+                    
                 case PacketType.PlacesQuery:
                     PlacesQueryPacket placesQueryPacket =
                             (PlacesQueryPacket)Pack;
