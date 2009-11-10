@@ -2437,6 +2437,8 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
 
         private void ReadEvalLoop(Parser parser)
         {
+            bool step = false;
+
             while (true)
             {
                 try
@@ -2451,7 +2453,10 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                         Queue<PCObj> popped = new Queue<PCObj>();
                         try
                         {
-                            Step(popped);
+                            if (step)
+                                Step(popped);
+                            else
+                                Finish(popped);
                         }
                         finally
                         {
@@ -2464,7 +2469,16 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                         if (2 <= line.Length)
                         {
                             string command = line.Substring(0, 2);
-                            if (command == ":s")
+                             if (command == ":t")
+                            {
+                                step = !step;
+                                if (step)
+                                    Console.WriteLine("Step mode is ON");
+                                else
+                                    Console.WriteLine("Step mode is OFF");
+                                continue;
+                            }
+                            else if (command == ":s")
                             {
                                 DumpStack(true);
                                 continue;
@@ -2505,6 +2519,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                         Console.WriteLine(":l<file>   load");
                         Console.WriteLine(":s         dump");
                         Console.WriteLine(":f         finish");
+                        Console.WriteLine(":t         toggle running mode (step/finish)");
                         Console.WriteLine(":q         quit");
                     }
                     else
@@ -2516,7 +2531,10 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                         try
                         {
                             Inject((Compiler.ExpPair)newast);
-                            Step(popped);
+                            if (step)
+                                Step(popped);
+                            else
+                                Finish(popped);
                         }
                         finally
                         {
