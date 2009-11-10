@@ -57,6 +57,7 @@ using OpenSim.Framework;
 using OpenSim.Framework.Communications;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Region.Framework.Scenes.Serialization;
 using OpenSim.Framework.Servers;
 
 namespace OpenSim.Region.OptionalModules.Scripting.PC
@@ -281,7 +282,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             return true;
         }
 
-        private bool OpSceneObjects()
+        private bool OpLoadScene()
         {
             PCArray o = new PCArray();
 

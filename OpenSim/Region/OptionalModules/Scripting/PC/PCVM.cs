@@ -2018,9 +2018,9 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             system["grestore"] = new PCOp(OpGRestore);
             system["translate"] = new PCOp(OpTranslate);
             system["rotate"] = new PCOp(OpRotate);
+            system["loadscene"] = new PCOp(OpLoadScene);
             system["snapshot"] = new PCOp(OpSnapshot);
             system["loadsnapshot"] = new PCOp(OpLoadSnapshot);
-            system["sceneobjects"] = new PCOp(OpSceneObjects);
             system["translatesnapshot"] = new PCOp(OpTranslateSnapshot);
             system["rotatesnapshot"] = new PCOp(OpRotateSnapshot);
             system["setsnapshotposition"] = new PCOp(OpSetSnapshotPosition);
