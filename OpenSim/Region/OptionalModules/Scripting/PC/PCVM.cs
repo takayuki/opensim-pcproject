@@ -2040,6 +2040,8 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             system["setshiny"] = new PCOp(OpSetShiny);
             system["setfullbright"] = new PCOp(OpSetFullBright);
             system["setalpha"] = new PCOp(OpSetAlpha);
+            system["settemporary"] = new PCOp(OpSetTemporary);
+            system["setphantom"] = new PCOp(OpSetPhantom);
             system["setphysics"] = new PCOp(OpSetPhysics);
             system["show"] = new PCOp(OpShow);
             system["createsphere"] = new PCOp(OpCreateSphere);

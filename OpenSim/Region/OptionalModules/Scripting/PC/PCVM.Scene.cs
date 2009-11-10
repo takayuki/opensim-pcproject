@@ -132,7 +132,10 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
         {
             foreach (PCSceneObjectPart part in m_shownSceneObjectPart)
             {
-                m_scene.DeleteSceneObject(part.var.ParentGroup, false);
+                if ((part.var.Flags & PrimFlags.Temporary) != 0)
+                {
+                    m_scene.DeleteSceneObject(part.var.ParentGroup, false);
+                }
             }
             m_shownSceneObjectPart.Clear();
         }
@@ -1065,6 +1068,76 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             return true;
         }
 
+        private bool OpSetTemporary()
+        {
+            PCObj param;
+            PCObj part;
+
+            try
+            {
+                param = Stack.Pop();
+            }
+            catch (InvalidOperationException)
+            {
+                throw new PCEmptyStackException();
+            }
+            if (!(param is PCBool))
+            {
+                Stack.Push(param);
+                throw new PCTypeCheckException();
+            }
+            try
+            {
+                part = Stack.Pop();
+            }
+            catch (InvalidOperationException)
+            {
+                throw new PCEmptyStackException();
+            }
+            if (!(part is PCSceneObjectPart))
+            {
+                Stack.Push(part);
+                throw new PCTypeCheckException();
+            }
+            SetTemporary(((PCSceneObjectPart)part).var, ((PCBool)param).val);
+            return true;
+        }
+
+        private bool OpSetPhantom()
+        {
+            PCObj param;
+            PCObj part;
+
+            try
+            {
+                param = Stack.Pop();
+            }
+            catch (InvalidOperationException)
+            {
+                throw new PCEmptyStackException();
+            }
+            if (!(param is PCBool))
+            {
+                Stack.Push(param);
+                throw new PCTypeCheckException();
+            }
+            try
+            {
+                part = Stack.Pop();
+            }
+            catch (InvalidOperationException)
+            {
+                throw new PCEmptyStackException();
+            }
+            if (!(part is PCSceneObjectPart))
+            {
+                Stack.Push(part);
+                throw new PCTypeCheckException();
+            }
+            SetPhantom(((PCSceneObjectPart)part).var, ((PCBool)param).val);
+            return true;
+        }
+
         private bool OpSetPhysics()
         {
             PCObj param;
@@ -1278,17 +1351,42 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             part.ParentGroup.AbsolutePosition = part.ParentGroup.AbsolutePosition;
         }
 
-        private void SetPhysics(SceneObjectPart part, bool flag)
+        private void SetTemporary(SceneObjectPart part, bool flag)
         {
-            bool isTemporary = (part.ObjectFlags & (uint)PrimFlags.Temporary) != 0;
-
             if (flag)
             {
-                part.UpdatePrimFlags(true, isTemporary, false, part.VolumeDetectActive);
+                part.ObjectFlags |= (uint)PrimFlags.Temporary;
             }
             else
             {
-                part.UpdatePrimFlags(false, isTemporary, true, part.VolumeDetectActive);
+                part.ObjectFlags &= ~((uint)PrimFlags.Phantom);
+            }
+        }
+
+        private void SetPhantom(SceneObjectPart part, bool flag)
+        {
+            if (flag)
+            {
+                part.ObjectFlags |= (uint)PrimFlags.Phantom;
+            }
+            else
+            {
+                part.ObjectFlags &= ~((uint)PrimFlags.Phantom);
+            }
+        }
+
+        private void SetPhysics(SceneObjectPart part, bool flag)
+        {
+            bool isTemporary = (part.ObjectFlags & (uint)PrimFlags.Temporary) != 0;
+            bool isPhantom = (part.ObjectFlags & (uint)PrimFlags.Phantom) != 0;
+
+            if (flag)
+            {
+                part.UpdatePrimFlags(true, isTemporary, isPhantom, part.VolumeDetectActive);
+            }
+            else
+            {
+                part.UpdatePrimFlags(false, isTemporary, isPhantom, part.VolumeDetectActive);
             }
         }
 
