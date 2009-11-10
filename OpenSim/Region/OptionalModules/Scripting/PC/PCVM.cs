@@ -318,13 +318,13 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
 
     public class PCSceneObjectPart : PCObj
     {
-        public SceneObjectPart var;
+        public SceneObjectPart val;
 
-        public PCSceneObjectPart(SceneObjectPart val) { this.var = val; }
+        public PCSceneObjectPart(SceneObjectPart val) { this.val = val; }
 
         public override string ToString()
         {
-            return "<" + var.ToString() + ">";
+            return "<" + val.ToString() + ">";
         }
     }
 
@@ -354,13 +354,13 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             public SnapshotItem(PCSceneObjectPart part)
             {
                 this.part = part;
-                this.position = part.var.AbsolutePosition;
-                this.rotation = part.var.RotationOffset;
+                this.position = part.val.AbsolutePosition;
+                this.rotation = part.val.RotationOffset;
             }
 
             public override string ToString()
             {
-                return (new PCUUID(part.var.UUID)).ToString();
+                return (new PCUUID(part.val.UUID)).ToString();
             }
         }
 

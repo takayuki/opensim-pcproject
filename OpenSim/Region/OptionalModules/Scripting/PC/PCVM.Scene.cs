@@ -132,9 +132,9 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
         {
             foreach (PCSceneObjectPart part in m_shownSceneObjectPart)
             {
-                if ((part.var.Flags & PrimFlags.Temporary) != 0)
+                if ((part.val.Flags & PrimFlags.Temporary) != 0)
                 {
-                    m_scene.DeleteSceneObject(part.var.ParentGroup, false);
+                    m_scene.DeleteSceneObject(part.val.ParentGroup, false);
                 }
             }
             m_shownSceneObjectPart.Clear();
@@ -352,7 +352,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             foreach (PCSceneSnapshot.SnapshotItem item in ((PCSceneSnapshot)snapshot).val)
             {
                 PCSceneObjectPart pcpart = item.PCSceneObjectPart;
-                SceneObjectPart part = pcpart.var;
+                SceneObjectPart part = pcpart.val;
                 Vector3 disp = Vector3FromVector4(Vector4.Transform(((PCVector3)param).val, rotm));
                 Vector3 newpos = part.AbsolutePosition + disp;
                 part.UpdateGroupPosition(newpos);
@@ -399,7 +399,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             foreach (PCSceneSnapshot.SnapshotItem item in ((PCSceneSnapshot)snapshot).val)
             {
                 PCSceneObjectPart pcpart = item.PCSceneObjectPart;
-                SceneObjectPart part = pcpart.var;
+                SceneObjectPart part = pcpart.val;
                 Vector4 pos = Vector4.Subtract(Vector4FromVector3(part.AbsolutePosition), origin);
                 Vector4 newpos = Vector4.Transform(pos, rotm) + origin;
                 part.UpdateGroupPosition(Vector3FromVector4(newpos));
@@ -446,7 +446,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             foreach (PCSceneSnapshot.SnapshotItem item in ((PCSceneSnapshot)snapshot).val)
             {
                 PCSceneObjectPart pcpart = item.PCSceneObjectPart;
-                SceneObjectPart part = pcpart.var;
+                SceneObjectPart part = pcpart.val;
                 Vector3 disp = Vector3FromVector4(Vector4.Transform(((PCVector3)param).val, rotm));
                 Vector3 newpos = item.Position + disp;
                 part.UpdateGroupPosition(newpos);
@@ -496,7 +496,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             foreach (PCSceneSnapshot.SnapshotItem item in ((PCSceneSnapshot)snapshot).val)
             {
                 PCSceneObjectPart pcpart = item.PCSceneObjectPart;
-                SceneObjectPart part = pcpart.var;
+                SceneObjectPart part = pcpart.val;
                 Vector4 disp = Vector4.Subtract(Vector4FromVector3(item.Position), origin);
                 disp = Vector4.Transform(disp, InverseRotateMatrix);
                 disp = Vector4.Transform(disp, rotm);
@@ -574,7 +574,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 Stack.Push(part);
                 throw new PCTypeCheckException();
             }
-            Stack.Push(new PCVector3(((PCSceneObjectPart)part).var.ParentGroup.AbsolutePosition));
+            Stack.Push(new PCVector3(((PCSceneObjectPart)part).val.ParentGroup.AbsolutePosition));
             return true;
         }
 
@@ -609,7 +609,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 Stack.Push(part);
                 throw new PCTypeCheckException();
             }
-            SetPosition(((PCSceneObjectPart)part).var, ((PCVector3)param).val);
+            SetPosition(((PCSceneObjectPart)part).val, ((PCVector3)param).val);
             return true;
         }
 
@@ -644,8 +644,8 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 Stack.Push(part);
                 throw new PCTypeCheckException();
             }
-            Vector3 newpos = ((PCSceneObjectPart)part).var.ParentGroup.AbsolutePosition + ((PCVector3)param).val;
-            SetPosition(((PCSceneObjectPart)part).var, newpos);
+            Vector3 newpos = ((PCSceneObjectPart)part).val.ParentGroup.AbsolutePosition + ((PCVector3)param).val;
+            SetPosition(((PCSceneObjectPart)part).val, newpos);
             return true;
         }
 
@@ -681,7 +681,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 throw new PCTypeCheckException();
             }
             Vector4 q = ((PCVector4)param).val;
-            SetRotation(((PCSceneObjectPart)part).var, Rotate(new Quaternion(q.X, q.Y, q.Z, q.W)));
+            SetRotation(((PCSceneObjectPart)part).val, Rotate(new Quaternion(q.X, q.Y, q.Z, q.W)));
             return true;
         }
         
@@ -716,8 +716,8 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 Stack.Push(part);
                 throw new PCTypeCheckException();
             }
-            ((PCSceneObjectPart)part).var.Scale = ((PCVector3)param).val;
-            ((PCSceneObjectPart)part).var.ScheduleFullUpdate();
+            ((PCSceneObjectPart)part).val.Scale = ((PCVector3)param).val;
+            ((PCSceneObjectPart)part).val.ScheduleFullUpdate();
             return true;
         }
 
@@ -754,9 +754,9 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             }
             byte taperx = Util.Clamp<byte>(Convert.ToByte(((((PCVector2)param).val.X) + 1.0f) * 100.0f), 0, 200);
             byte tapery = Util.Clamp<byte>(Convert.ToByte(((((PCVector2)param).val.Y) + 1.0f) * 100.0f), 0, 200);
-            ((PCSceneObjectPart)part).var.Shape.PathScaleX = taperx;
-            ((PCSceneObjectPart)part).var.Shape.PathScaleY = tapery;
-            ((PCSceneObjectPart)part).var.ScheduleFullUpdate();
+            ((PCSceneObjectPart)part).val.Shape.PathScaleX = taperx;
+            ((PCSceneObjectPart)part).val.Shape.PathScaleY = tapery;
+            ((PCSceneObjectPart)part).val.ScheduleFullUpdate();
             return true;
         }
 
@@ -805,7 +805,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 Stack.Push(part);
                 throw new PCTypeCheckException();
             }
-            SetColor(((PCSceneObjectPart)part).var, ((PCVector3)color).val, ((PCConst)face).ToInt());
+            SetColor(((PCSceneObjectPart)part).val, ((PCVector3)color).val, ((PCConst)face).ToInt());
             return true;
         }
 
@@ -854,7 +854,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 Stack.Push(part);
                 throw new PCTypeCheckException();
             }
-            SetTexture(((PCSceneObjectPart)part).var, ((PCUUID)texture).val, ((PCConst)face).ToInt());
+            SetTexture(((PCSceneObjectPart)part).val, ((PCUUID)texture).val, ((PCConst)face).ToInt());
             return true;
         }
         
@@ -903,7 +903,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 Stack.Push(part);
                 throw new PCTypeCheckException();
             }
-            SetGlow(((PCSceneObjectPart)part).var, (((PCConst)glow).ToFloat()), ((PCConst)face).ToInt());
+            SetGlow(((PCSceneObjectPart)part).val, (((PCConst)glow).ToFloat()), ((PCConst)face).ToInt());
             return true;
         }
         
@@ -966,7 +966,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 Stack.Push(part);
                 throw new PCTypeCheckException();
             }
-            SetShiny(((PCSceneObjectPart)part).var, ((PCConst)shiny).ToInt(), (Bumpiness)((PCConst)bump).ToInt(), ((PCConst)face).ToInt());
+            SetShiny(((PCSceneObjectPart)part).val, ((PCConst)shiny).ToInt(), (Bumpiness)((PCConst)bump).ToInt(), ((PCConst)face).ToInt());
             return true;
         }
 
@@ -1015,7 +1015,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 Stack.Push(part);
                 throw new PCTypeCheckException();
             }
-            SetFullBright(((PCSceneObjectPart)part).var, ((PCBool)flag).val, ((PCConst)face).ToInt());
+            SetFullBright(((PCSceneObjectPart)part).val, ((PCBool)flag).val, ((PCConst)face).ToInt());
             return true;
         }
 
@@ -1064,7 +1064,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 Stack.Push(part);
                 throw new PCTypeCheckException();
             }
-            SetAlpha(((PCSceneObjectPart)part).var,((PCConst)alpha).ToFloat(),((PCConst)face).ToInt());
+            SetAlpha(((PCSceneObjectPart)part).val,((PCConst)alpha).ToFloat(),((PCConst)face).ToInt());
             return true;
         }
 
@@ -1099,7 +1099,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 Stack.Push(part);
                 throw new PCTypeCheckException();
             }
-            SetTemporary(((PCSceneObjectPart)part).var, ((PCBool)param).val);
+            SetTemporary(((PCSceneObjectPart)part).val, ((PCBool)param).val);
             return true;
         }
 
@@ -1134,7 +1134,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 Stack.Push(part);
                 throw new PCTypeCheckException();
             }
-            SetPhantom(((PCSceneObjectPart)part).var, ((PCBool)param).val);
+            SetPhantom(((PCSceneObjectPart)part).val, ((PCBool)param).val);
             return true;
         }
 
@@ -1169,7 +1169,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 Stack.Push(part);
                 throw new PCTypeCheckException();
             }
-            SetPhysics(((PCSceneObjectPart)part).var, ((PCBool)param).val);
+            SetPhysics(((PCSceneObjectPart)part).val, ((PCBool)param).val);
             return true;
         }
         
@@ -1249,7 +1249,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 Stack.Push(o);
                 throw new PCTypeCheckException();
             }
-            SceneObjectPart part = ((PCSceneObjectPart)o).var;
+            SceneObjectPart part = ((PCSceneObjectPart)o).val;
             if (m_scene.AddNewSceneObject(part.ParentGroup, false))
             {
                 m_shownSceneObjectPart.Add((PCSceneObjectPart)o);
