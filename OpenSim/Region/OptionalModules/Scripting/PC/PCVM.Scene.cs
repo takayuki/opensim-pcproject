@@ -57,6 +57,7 @@ using OpenSim.Framework;
 using OpenSim.Framework.Communications;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Region.Framework.Scenes.Serialization;
 using OpenSim.Framework.Servers;
 
 namespace OpenSim.Region.OptionalModules.Scripting.PC
@@ -131,7 +132,10 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
         {
             foreach (PCSceneObjectPart part in m_shownSceneObjectPart)
             {
-                m_scene.DeleteSceneObject(part.var.ParentGroup, false);
+                if ((part.val.Flags & PrimFlags.Temporary) != 0)
+                {
+                    m_scene.DeleteSceneObject(part.val.ParentGroup, false);
+                }
             }
             m_shownSceneObjectPart.Clear();
         }
@@ -219,28 +223,69 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             return true;
         }
 
-        private bool OpScenePin()
+        private bool OpSnapshot()
         {
-            PCObj part;
+            PCObj parts;
 
             try
             {
-                part = Stack.Pop();
+                parts = Stack.Pop();
             }
             catch (InvalidOperationException)
             {
                 throw new PCEmptyStackException();
             }
-            if (!(part is PCSceneObjectPart))
+            if (!(parts is PCArray))
             {
-                Stack.Push(part);
+                Stack.Push(parts);
                 throw new PCTypeCheckException();
             }
-            ((PCSceneObjectPart)part).Pin();
+            foreach (PCObj o in ((PCArray)parts).val)
+            {
+                if (!(o is PCSceneObjectPart))
+                {
+                    Stack.Push(parts);
+                    throw new PCTypeCheckException();
+                }
+            }
+
+            PCSceneObjectPart[] items = new PCSceneObjectPart[((PCArray)parts).Length];
+            for (int i = 0; i < items.Length; i++)
+            {
+                items[i] = (PCSceneObjectPart)((PCArray)parts).val[i];
+            }
+            Stack.Push(new PCSceneSnapshot(items));
             return true;
         }
 
-        private bool OpSceneObjects()
+        private bool OpLoadSnapshot()
+        {
+            PCObj snapshot;
+
+            try
+            {
+                snapshot = Stack.Pop();
+            }
+            catch (InvalidOperationException)
+            {
+                throw new PCEmptyStackException();
+            }
+            if (!(snapshot is PCSceneSnapshot))
+            {
+                Stack.Push(snapshot);
+                throw new PCTypeCheckException();
+            }
+
+            PCArray o = new PCArray();
+            foreach (PCSceneSnapshot.SnapshotItem item in ((PCSceneSnapshot)snapshot).val)
+            {
+                o.Add(item.PCSceneObjectPart);
+            }
+            Stack.Push(o);
+            return true;
+        }
+
+        private bool OpLoadScene()
         {
             PCArray o = new PCArray();
 
@@ -270,10 +315,10 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             return new Vector3(v.X/v.W, v.Y/v.W, v.Z/v.W);
         }
 
-        private bool OpSceneTranslate()
+        private bool OpTranslateSnapshot()
         {
             PCObj param;
-            PCObj sceneobjects;
+            PCObj snapshot;
 
             try
             {
@@ -291,30 +336,23 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
 
             try
             {
-                sceneobjects = Stack.Pop();
+                snapshot = Stack.Pop();
             }
             catch (InvalidOperationException)
             {
                 throw new PCEmptyStackException();
             }
-            if (!(sceneobjects is PCArray))
+            if (!(snapshot is PCSceneSnapshot))
             {
-                Stack.Push(sceneobjects);
+                Stack.Push(snapshot);
                 throw new PCTypeCheckException();
-            }
-            foreach (PCObj o in ((PCArray)sceneobjects).val)
-            {
-                if (!(o is PCSceneObjectPart))
-                {
-                    Stack.Push(sceneobjects);
-                    throw new PCTypeCheckException();
-                }
             }
 
             Matrix4 rotm = Matrix4.CreateFromQuaternion(CurrentGraphicState.Rotate);
-            foreach (PCObj o in ((PCArray)sceneobjects).val)
+            foreach (PCSceneSnapshot.SnapshotItem item in ((PCSceneSnapshot)snapshot).val)
             {
-                SceneObjectPart part = ((PCSceneObjectPart)o).var;
+                PCSceneObjectPart pcpart = item.PCSceneObjectPart;
+                SceneObjectPart part = pcpart.val;
                 Vector3 disp = Vector3FromVector4(Vector4.Transform(((PCVector3)param).val, rotm));
                 Vector3 newpos = part.AbsolutePosition + disp;
                 part.UpdateGroupPosition(newpos);
@@ -322,10 +360,10 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             return true;
         }
 
-        private bool OpSceneRotate()
+        private bool OpRotateSnapshot()
         {
             PCObj param;
-            PCObj sceneobjects;
+            PCObj snapshot;
 
             try
             {
@@ -343,33 +381,25 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
 
             try
             {
-                sceneobjects = Stack.Pop();
+                snapshot = Stack.Pop();
             }
             catch (InvalidOperationException)
             {
                 throw new PCEmptyStackException();
             }
-            if (!(sceneobjects is PCArray))
+            if (!(snapshot is PCSceneSnapshot))
             {
-                Stack.Push(sceneobjects);
+                Stack.Push(snapshot);
                 throw new PCTypeCheckException();
-            }
-            foreach (PCObj o in ((PCArray)sceneobjects).val)
-            {
-                if (!(o is PCSceneObjectPart))
-                {
-                    Stack.Push(sceneobjects);
-                    throw new PCTypeCheckException();
-                }
             }
 
             Quaternion rotq = QuaternionFromVector4(((PCVector4)param).val);
             Matrix4 rotm = Matrix4.CreateFromQuaternion(rotq);
             Vector4 origin = Vector4FromVector3(Transform(Vector3.Zero));
-            foreach (PCObj o in ((PCArray)sceneobjects).val)
+            foreach (PCSceneSnapshot.SnapshotItem item in ((PCSceneSnapshot)snapshot).val)
             {
-                PCSceneObjectPart pcpart = ((PCSceneObjectPart)o);
-                SceneObjectPart part = pcpart.var;
+                PCSceneObjectPart pcpart = item.PCSceneObjectPart;
+                SceneObjectPart part = pcpart.val;
                 Vector4 pos = Vector4.Subtract(Vector4FromVector3(part.AbsolutePosition), origin);
                 Vector4 newpos = Vector4.Transform(pos, rotm) + origin;
                 part.UpdateGroupPosition(Vector3FromVector4(newpos));
@@ -379,10 +409,10 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             return true;
         }
 
-        private bool OpSceneSetPosition()
+        private bool OpSetSnapshotPosition()
         {
             PCObj param;
-            PCObj sceneobjects;
+            PCObj snapshot;
 
             try
             {
@@ -400,43 +430,35 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
 
             try
             {
-                sceneobjects = Stack.Pop();
+                snapshot = Stack.Pop();
             }
             catch (InvalidOperationException)
             {
                 throw new PCEmptyStackException();
             }
-            if (!(sceneobjects is PCArray))
+            if (!(snapshot is PCSceneSnapshot))
             {
-                Stack.Push(sceneobjects);
+                Stack.Push(snapshot);
                 throw new PCTypeCheckException();
-            }
-            foreach (PCObj o in ((PCArray)sceneobjects).val)
-            {
-                if (!(o is PCSceneObjectPart))
-                {
-                    Stack.Push(sceneobjects);
-                    throw new PCTypeCheckException();
-                }
             }
 
             Matrix4 rotm = Matrix4.CreateFromQuaternion(CurrentGraphicState.Rotate);
-            foreach (PCObj o in ((PCArray)sceneobjects).val)
+            foreach (PCSceneSnapshot.SnapshotItem item in ((PCSceneSnapshot)snapshot).val)
             {
-                PCSceneObjectPart pcpart = ((PCSceneObjectPart)o);
-                SceneObjectPart part = pcpart.var;
+                PCSceneObjectPart pcpart = item.PCSceneObjectPart;
+                SceneObjectPart part = pcpart.val;
                 Vector3 disp = Vector3FromVector4(Vector4.Transform(((PCVector3)param).val, rotm));
-                Vector3 newpos = pcpart.PositionAtPin + disp;
+                Vector3 newpos = item.Position + disp;
                 part.UpdateGroupPosition(newpos);
             }
             return true;
         }
 
-        private bool OpSceneSetRotate()
+        private bool OpSetSnapshotRotation()
         {
             PCObj param;
-            PCObj sceneobjects;
-
+            PCObj snapshot;
+            
             try
             {
                 param = Stack.Pop();
@@ -453,43 +475,35 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
 
             try
             {
-                sceneobjects = Stack.Pop();
+                snapshot = Stack.Pop();
             }
             catch (InvalidOperationException)
             {
                 throw new PCEmptyStackException();
             }
-            if (!(sceneobjects is PCArray))
+            if (!(snapshot is PCSceneSnapshot))
             {
-                Stack.Push(sceneobjects);
+                Stack.Push(snapshot);
                 throw new PCTypeCheckException();
             }
-            foreach (PCObj o in ((PCArray)sceneobjects).val)
-            {
-                if (!(o is PCSceneObjectPart))
-                {
-                    Stack.Push(sceneobjects);
-                    throw new PCTypeCheckException();
-                }
-            }
-
+            
             Quaternion InverseRotate = Quaternion.Inverse(CurrentGraphicState.Rotate);
             Matrix4 InverseRotateMatrix = Matrix4.CreateFromQuaternion(InverseRotate);
             Matrix4 RotateMatrix = Matrix4.CreateFromQuaternion(CurrentGraphicState.Rotate);
             Quaternion rotq = QuaternionFromVector4(((PCVector4)param).val);
             Matrix4 rotm = Matrix4.CreateFromQuaternion(rotq);
             Vector4 origin = Vector4FromVector3(Transform(Vector3.Zero));
-            foreach (PCObj o in ((PCArray)sceneobjects).val)
+            foreach (PCSceneSnapshot.SnapshotItem item in ((PCSceneSnapshot)snapshot).val)
             {
-                PCSceneObjectPart pcpart = ((PCSceneObjectPart)o);
-                SceneObjectPart part = pcpart.var;
-                Vector4 disp = Vector4.Subtract(Vector4FromVector3(pcpart.PositionAtPin), origin);
+                PCSceneObjectPart pcpart = item.PCSceneObjectPart;
+                SceneObjectPart part = pcpart.val;
+                Vector4 disp = Vector4.Subtract(Vector4FromVector3(item.Position), origin);
                 disp = Vector4.Transform(disp, InverseRotateMatrix);
                 disp = Vector4.Transform(disp, rotm);
                 disp = Vector4.Transform(disp, RotateMatrix);
                 Vector4 newpos = disp + origin;
                 part.UpdateGroupPosition(Vector3FromVector4(newpos));
-                part.UpdateRotation(Rotate(rotq * InverseRotate * pcpart.RotationAtPin));
+                part.UpdateRotation(Rotate(rotq * InverseRotate * item.Rotation));
                 part.ParentGroup.AbsolutePosition = part.ParentGroup.AbsolutePosition;
             }
             return true;
@@ -560,7 +574,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 Stack.Push(part);
                 throw new PCTypeCheckException();
             }
-            Stack.Push(new PCVector3(((PCSceneObjectPart)part).var.ParentGroup.AbsolutePosition));
+            Stack.Push(new PCVector3(((PCSceneObjectPart)part).val.ParentGroup.AbsolutePosition));
             return true;
         }
 
@@ -595,7 +609,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 Stack.Push(part);
                 throw new PCTypeCheckException();
             }
-            SetPosition(((PCSceneObjectPart)part).var, ((PCVector3)param).val);
+            SetPosition(((PCSceneObjectPart)part).val, ((PCVector3)param).val);
             return true;
         }
 
@@ -630,8 +644,8 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 Stack.Push(part);
                 throw new PCTypeCheckException();
             }
-            Vector3 newpos = ((PCSceneObjectPart)part).var.ParentGroup.AbsolutePosition + ((PCVector3)param).val;
-            SetPosition(((PCSceneObjectPart)part).var, newpos);
+            Vector3 newpos = ((PCSceneObjectPart)part).val.ParentGroup.AbsolutePosition + ((PCVector3)param).val;
+            SetPosition(((PCSceneObjectPart)part).val, newpos);
             return true;
         }
 
@@ -667,7 +681,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 throw new PCTypeCheckException();
             }
             Vector4 q = ((PCVector4)param).val;
-            SetRotation(((PCSceneObjectPart)part).var, Rotate(new Quaternion(q.X, q.Y, q.Z, q.W)));
+            SetRotation(((PCSceneObjectPart)part).val, Rotate(new Quaternion(q.X, q.Y, q.Z, q.W)));
             return true;
         }
         
@@ -702,8 +716,8 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 Stack.Push(part);
                 throw new PCTypeCheckException();
             }
-            ((PCSceneObjectPart)part).var.Scale = ((PCVector3)param).val;
-            ((PCSceneObjectPart)part).var.ScheduleFullUpdate();
+            ((PCSceneObjectPart)part).val.Scale = ((PCVector3)param).val;
+            ((PCSceneObjectPart)part).val.ScheduleFullUpdate();
             return true;
         }
 
@@ -740,9 +754,9 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             }
             byte taperx = Util.Clamp<byte>(Convert.ToByte(((((PCVector2)param).val.X) + 1.0f) * 100.0f), 0, 200);
             byte tapery = Util.Clamp<byte>(Convert.ToByte(((((PCVector2)param).val.Y) + 1.0f) * 100.0f), 0, 200);
-            ((PCSceneObjectPart)part).var.Shape.PathScaleX = taperx;
-            ((PCSceneObjectPart)part).var.Shape.PathScaleY = tapery;
-            ((PCSceneObjectPart)part).var.ScheduleFullUpdate();
+            ((PCSceneObjectPart)part).val.Shape.PathScaleX = taperx;
+            ((PCSceneObjectPart)part).val.Shape.PathScaleY = tapery;
+            ((PCSceneObjectPart)part).val.ScheduleFullUpdate();
             return true;
         }
 
@@ -791,7 +805,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 Stack.Push(part);
                 throw new PCTypeCheckException();
             }
-            SetColor(((PCSceneObjectPart)part).var, ((PCVector3)color).val, ((PCConst)face).ToInt());
+            SetColor(((PCSceneObjectPart)part).val, ((PCVector3)color).val, ((PCConst)face).ToInt());
             return true;
         }
 
@@ -840,7 +854,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 Stack.Push(part);
                 throw new PCTypeCheckException();
             }
-            SetTexture(((PCSceneObjectPart)part).var, ((PCUUID)texture).val, ((PCConst)face).ToInt());
+            SetTexture(((PCSceneObjectPart)part).val, ((PCUUID)texture).val, ((PCConst)face).ToInt());
             return true;
         }
         
@@ -889,7 +903,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 Stack.Push(part);
                 throw new PCTypeCheckException();
             }
-            SetGlow(((PCSceneObjectPart)part).var, (((PCConst)glow).ToFloat()), ((PCConst)face).ToInt());
+            SetGlow(((PCSceneObjectPart)part).val, (((PCConst)glow).ToFloat()), ((PCConst)face).ToInt());
             return true;
         }
         
@@ -952,7 +966,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 Stack.Push(part);
                 throw new PCTypeCheckException();
             }
-            SetShiny(((PCSceneObjectPart)part).var, ((PCConst)shiny).ToInt(), (Bumpiness)((PCConst)bump).ToInt(), ((PCConst)face).ToInt());
+            SetShiny(((PCSceneObjectPart)part).val, ((PCConst)shiny).ToInt(), (Bumpiness)((PCConst)bump).ToInt(), ((PCConst)face).ToInt());
             return true;
         }
 
@@ -1001,7 +1015,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 Stack.Push(part);
                 throw new PCTypeCheckException();
             }
-            SetFullBright(((PCSceneObjectPart)part).var, ((PCBool)flag).val, ((PCConst)face).ToInt());
+            SetFullBright(((PCSceneObjectPart)part).val, ((PCBool)flag).val, ((PCConst)face).ToInt());
             return true;
         }
 
@@ -1050,7 +1064,77 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 Stack.Push(part);
                 throw new PCTypeCheckException();
             }
-            SetAlpha(((PCSceneObjectPart)part).var,((PCConst)alpha).ToFloat(),((PCConst)face).ToInt());
+            SetAlpha(((PCSceneObjectPart)part).val,((PCConst)alpha).ToFloat(),((PCConst)face).ToInt());
+            return true;
+        }
+
+        private bool OpSetTemporary()
+        {
+            PCObj param;
+            PCObj part;
+
+            try
+            {
+                param = Stack.Pop();
+            }
+            catch (InvalidOperationException)
+            {
+                throw new PCEmptyStackException();
+            }
+            if (!(param is PCBool))
+            {
+                Stack.Push(param);
+                throw new PCTypeCheckException();
+            }
+            try
+            {
+                part = Stack.Pop();
+            }
+            catch (InvalidOperationException)
+            {
+                throw new PCEmptyStackException();
+            }
+            if (!(part is PCSceneObjectPart))
+            {
+                Stack.Push(part);
+                throw new PCTypeCheckException();
+            }
+            SetTemporary(((PCSceneObjectPart)part).val, ((PCBool)param).val);
+            return true;
+        }
+
+        private bool OpSetPhantom()
+        {
+            PCObj param;
+            PCObj part;
+
+            try
+            {
+                param = Stack.Pop();
+            }
+            catch (InvalidOperationException)
+            {
+                throw new PCEmptyStackException();
+            }
+            if (!(param is PCBool))
+            {
+                Stack.Push(param);
+                throw new PCTypeCheckException();
+            }
+            try
+            {
+                part = Stack.Pop();
+            }
+            catch (InvalidOperationException)
+            {
+                throw new PCEmptyStackException();
+            }
+            if (!(part is PCSceneObjectPart))
+            {
+                Stack.Push(part);
+                throw new PCTypeCheckException();
+            }
+            SetPhantom(((PCSceneObjectPart)part).val, ((PCBool)param).val);
             return true;
         }
 
@@ -1085,7 +1169,66 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 Stack.Push(part);
                 throw new PCTypeCheckException();
             }
-            SetPhysics(((PCSceneObjectPart)part).var, ((PCBool)param).val);
+            SetPhysics(((PCSceneObjectPart)part).val, ((PCBool)param).val);
+            return true;
+        }
+        
+        private bool OpRez()
+        {
+            PCObj uuid;
+
+            try
+            {
+                uuid = Stack.Pop();
+            }
+            catch (InvalidOperationException)
+            {
+                throw new PCEmptyStackException();
+            }
+            if (!(uuid is PCUUID))
+            {
+                Stack.Push(uuid);
+                throw new PCTypeCheckException();
+            }
+
+            AssetBase asset = null;
+            try
+            {
+                asset = m_scene.AssetService.Get(((PCUUID)uuid).val.ToString());
+            }
+            catch (Exception)
+            {
+            }
+
+            if (asset == null)
+            {
+                Stack.Push(uuid);
+                throw new PCNotFoundException(((PCUUID)uuid).val.ToString());
+            }
+            if (asset.Type != (uint)AssetType.Object)
+            {
+                Stack.Push(uuid);
+                throw new PCTypeCheckException();
+            }
+
+            SceneObjectPart root = null;
+            try
+            {
+                string data = Utils.BytesToString(asset.Data);
+                SceneObjectGroup sceneObject = SceneObjectSerializer.FromOriginalXmlFormat(data);
+                root = sceneObject.RootPart;
+                root.ObjectFlags &= ~((uint)PrimFlags.Phantom);
+                root.ObjectFlags |= (uint)PrimFlags.Temporary;
+                sceneObject.SetScene(m_scene);
+                SetPosition(root, CurrentPoint);
+                SetRotation(root,Quaternion.Identity);
+            }
+            catch (Exception)
+            {
+                Stack.Push(uuid);
+                throw new PCTypeCheckException();
+            }
+            Stack.Push(new PCSceneObjectPart(root));
             return true;
         }
 
@@ -1106,16 +1249,15 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 Stack.Push(o);
                 throw new PCTypeCheckException();
             }
-            SceneObjectPart part = ((PCSceneObjectPart)o).var;
+            SceneObjectPart part = ((PCSceneObjectPart)o).val;
             if (m_scene.AddNewSceneObject(part.ParentGroup, false))
             {
-                ((PCSceneObjectPart)o).Pin();
                 m_shownSceneObjectPart.Add((PCSceneObjectPart)o);
                 m_log.InfoFormat("create: part: {0}", part.UUID.ToString());
             }
             return true;
         }
-        
+
         private static PrimitiveShapeFunction CreateSphere = PrimitiveBaseShape.CreateSphere;
         private static PrimitiveShapeFunction CreateBox = PrimitiveBaseShape.CreateBox;
 
@@ -1268,17 +1410,42 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             part.ParentGroup.AbsolutePosition = part.ParentGroup.AbsolutePosition;
         }
 
-        private void SetPhysics(SceneObjectPart part, bool flag)
+        private void SetTemporary(SceneObjectPart part, bool flag)
         {
-            bool isTemporary = (part.ObjectFlags & (uint)PrimFlags.Temporary) != 0;
-
             if (flag)
             {
-                part.UpdatePrimFlags(true, isTemporary, false, part.VolumeDetectActive);
+                part.ObjectFlags |= (uint)PrimFlags.Temporary;
             }
             else
             {
-                part.UpdatePrimFlags(false, isTemporary, true, part.VolumeDetectActive);
+                part.ObjectFlags &= ~((uint)PrimFlags.Phantom);
+            }
+        }
+
+        private void SetPhantom(SceneObjectPart part, bool flag)
+        {
+            if (flag)
+            {
+                part.ObjectFlags |= (uint)PrimFlags.Phantom;
+            }
+            else
+            {
+                part.ObjectFlags &= ~((uint)PrimFlags.Phantom);
+            }
+        }
+
+        private void SetPhysics(SceneObjectPart part, bool flag)
+        {
+            bool isTemporary = (part.ObjectFlags & (uint)PrimFlags.Temporary) != 0;
+            bool isPhantom = (part.ObjectFlags & (uint)PrimFlags.Phantom) != 0;
+
+            if (flag)
+            {
+                part.UpdatePrimFlags(true, isTemporary, isPhantom, part.VolumeDetectActive);
+            }
+            else
+            {
+                part.UpdatePrimFlags(false, isTemporary, isPhantom, part.VolumeDetectActive);
             }
         }
 
