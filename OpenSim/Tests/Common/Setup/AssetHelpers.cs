@@ -25,41 +25,40 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
+using System.Text;
 using OpenMetaverse;
-using OpenSim.Region.Framework.Interfaces;
+using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Region.Framework.Scenes.Serialization;
 
-namespace OpenSim.Region.CoreModules.World.Land
-{
-    public class RegionConnections
+namespace OpenSim.Tests.Common
+{       
+    public class AssetHelpers
     {
         /// <summary>
-        /// Root Region ID
+        /// Create an asset from the given data
         /// </summary>
-        public UUID RegionId;
-
-        /// <summary>
-        /// Root Region Scene
-        /// </summary>
-        public Scene RegionScene;
-
-        /// <summary>
-        /// LargeLandChannel for combined region
-        /// </summary>
-        public ILandChannel RegionLandChannel;
-        public uint X;
-        public uint Y;
-        public int XEnd;
-        public int YEnd;
-        public List<RegionData> ConnectedRegions;
-        public RegionCombinerPermissionModule PermissionModule;
-        public RegionCombinerClientEventForwarder ClientEventForwarder;
-        public void UpdateExtents(Vector3 extents)
+        /// <param name="assetUuid"></param>
+        /// <param name="data"></param>
+        /// <returns></returns>
+        public static AssetBase CreateAsset(UUID assetUuid, string data)
         {
-            XEnd = (int)extents.X;
-            YEnd = (int)extents.Y;
+            AssetBase asset = new AssetBase(assetUuid, assetUuid.ToString(), (sbyte)AssetType.Object);
+            asset.Data = Encoding.ASCII.GetBytes(data);
+            return asset;
+        }
+        
+        /// <summary>
+        /// Create an asset from the given scene object
+        /// </summary>
+        /// <param name="assetUuid"></param>
+        /// <param name="sog"></param>
+        /// <returns></returns>
+        public static AssetBase CreateAsset(UUID assetUuid, SceneObjectGroup sog)
+        {
+            AssetBase asset = new AssetBase(assetUuid, assetUuid.ToString(), (sbyte)AssetType.Object);
+            asset.Data = Encoding.ASCII.GetBytes(SceneObjectSerializer.ToXml2Format(sog));
+            return asset;
         }
     }
 }

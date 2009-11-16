@@ -88,8 +88,18 @@ namespace OpenSim.Region.Framework.Scenes
         protected List<RegionInfo> m_regionRestartNotifyList = new List<RegionInfo>();
         protected List<RegionInfo> m_neighbours = new List<RegionInfo>();
 
-        public volatile bool BordersLocked = false;
-
+        private volatile int m_bordersLocked = 0;
+        public bool BordersLocked
+        {
+            get { return m_bordersLocked == 1; }
+            set
+            {
+                if (value == true)
+                    m_bordersLocked = 1;
+                else
+                    m_bordersLocked = 0;
+            }
+        }
         public List<Border> NorthBorders = new List<Border>();
         public List<Border> EastBorders = new List<Border>();
         public List<Border> SouthBorders = new List<Border>();
@@ -4371,6 +4381,16 @@ namespace OpenSim.Region.Framework.Scenes
         public SceneObjectPart GetSceneObjectPart(UUID fullID)
         {
             return m_sceneGraph.GetSceneObjectPart(fullID);
+        }
+
+        /// <summary>
+        /// Get a scene object group that contains the prim with the given local id
+        /// </summary>
+        /// <param name="localID"></param>
+        /// <returns>null if no scene object group containing that prim is found</returns>
+        public SceneObjectGroup GetGroupByPrim(uint localID)
+        {
+            return m_sceneGraph.GetGroupByPrim(localID);
         }
 
         public bool TryGetAvatar(UUID avatarId, out ScenePresence avatar)
