@@ -77,6 +77,12 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             base("wrong type operand(s)") { }
     }
 
+    public class PCOutOfRangeException : Exception
+    {
+        public PCOutOfRangeException() :
+            base("value is out of range") { }
+    }
+
     public class PCNotFoundException : Exception
     {
         public PCNotFoundException(string name) :
@@ -2368,7 +2374,32 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             system["setrposition"] = new PCOp(OpSetRPosition);
             system["setrotation"] = new PCOp(OpSetRotation);
             system["setsize"] = new PCOp(OpSetSize);
+            system["getpathcut"] = new PCOp(OpGetPathcut);
+            system["setpathcut"] = new PCOp(OpSetPathcut);
+            system["getslice"] = new PCOp(OpGetSlice);
+            system["setslice"] = new PCOp(OpSetSlice);
+            system["getdimple"] = new PCOp(OpGetDimple);
+            system["setdimple"] = new PCOp(OpSetDimple);
+            system["getprofilecut"] = new PCOp(OpGetProfilecut);
+            system["setprofilecut"] = new PCOp(OpSetProfilecut);
+            system["getholeshape"] = new PCOp(OpGetHoleShape);
+            system["setholeshape"] = new PCOp(OpSetHoleShape);
+            system["gethollow"] = new PCOp(OpGetHollow);
+            system["sethollow"] = new PCOp(OpSetHollow);
+            system["getskew"] = new PCOp(OpGetSkew);
+            system["setskew"] = new PCOp(OpSetSkew);
+            system["gettwist"] = new PCOp(OpGetTwist);
+            system["settwist"] = new PCOp(OpSetTwist);
+            system["getholesize"] = new PCOp(OpGetHoleSize);
+            system["setholesize"] = new PCOp(OpSetHoleSize);
+            system["gettaper"] = new PCOp(OpGetTaper);
             system["settaper"] = new PCOp(OpSetTaper);
+            system["getshear"] = new PCOp(OpGetShear);
+            system["setshear"] = new PCOp(OpSetShear);
+            system["getradiusoffset"] = new PCOp(OpGetRadiusOffset);
+            system["setradiusoffset"] = new PCOp(OpSetRadiusOffset);
+            system["getrevolution"] = new PCOp(OpGetRevolution);
+            system["setrevolution"] = new PCOp(OpSetRevolution);
             system["setcolor"] = new PCOp(OpSetColor);
             system["settexture"] = new PCOp(OpSetTexture);
             system["setglow"] = new PCOp(OpSetGlow);
@@ -2382,7 +2413,17 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             system["show"] = new PCOp(OpShow);
             system["createsphere"] = new PCOp(OpCreateSphere);
             system["createbox"] = new PCOp(OpCreateBox);
+            system["createprism"] = new PCOp(OpCreatePrism);
+            system["createpyramid"] = new PCOp(OpCreatePyramid);
+            system["createtetrahedron"] = new PCOp(OpCreateTetrahedron);
             system["createcylinder"] = new PCOp(OpCreateCylinder);
+            system["createhemicylinder"] = new PCOp(OpCreateHemicylinder);
+            system["createcone"] = new PCOp(OpCreateCone);
+            system["createhemicone"] = new PCOp(OpCreateHemicone);
+            system["createhemisphere"] = new PCOp(OpCreateHemisphere);
+            system["createtorus"] = new PCOp(OpCreateTorus);
+            system["createtube"] = new PCOp(OpCreateTube);
+            system["createring"] = new PCOp(OpCreateRing);
             system["currentlinewidth"] = new PCOp(OpCurrentLineWidth);
             system["setlinewidth"] = new PCOp(OpSetCurrentLineWidth);
             system["lineto"] = new PCOp(OpLineTo);
@@ -2392,6 +2433,10 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             system["M_PI"] = new PCFloat((float)Math.PI);
             system["M_E"] = new PCFloat((float)Math.E);
             system["ALL_SIDES"] = new PCInt(ALL_SIDES);
+            system["PRIM_HOLE_DEFAULT"] = new PCInt((int)HollowShape.Same);
+            system["PRIM_HOLE_CIRCLE"] = new PCInt((int)HollowShape.Circle);
+            system["PRIM_HOLE_SQUARE"] = new PCInt((int)HollowShape.Square);
+            system["PRIM_HOLE_TRIANGLE"] = new PCInt((int)HollowShape.Triangle);
         }
 
         public Compiler.Exp CurrentStep()
