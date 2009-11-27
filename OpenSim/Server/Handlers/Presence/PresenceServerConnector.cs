@@ -25,36 +25,37 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using OpenSim.Region.Framework.Scenes;
+using System;
+using Nini.Config;
+using OpenSim.Server.Base;
+using OpenSim.Services.Interfaces;
+using OpenSim.Framework.Servers.HttpServer;
+using OpenSim.Server.Handlers.Base;
 
-namespace OpenSim.Region.CoreModules.Framework.Monitoring.Monitors
+namespace OpenSim.Server.Handlers.Presence
 {
-    class ObjectCountMonitor : IMonitor
+    public class PresenceServiceConnector : ServiceConnector
     {
-        private readonly Scene m_scene;
+        private IPresenceService m_PresenceService;
+        private string m_ConfigName = "PresenceService";
 
-        public ObjectCountMonitor(Scene scene)
+        public PresenceServiceConnector(IConfigSource config, IHttpServer server, string configName) :
+                base(config, server, configName)
         {
-            m_scene = scene;
+            IConfig serverConfig = config.Configs[m_ConfigName];
+            if (serverConfig == null)
+                throw new Exception(String.Format("No section {0} in config file", m_ConfigName));
+
+            string gridService = serverConfig.GetString("LocalServiceModule",
+                    String.Empty);
+
+            if (gridService == String.Empty)
+                throw new Exception("No LocalServiceModule in config file");
+
+            Object[] args = new Object[] { config };
+            m_PresenceService = ServerUtils.LoadPlugin<IPresenceService>(gridService, args);
+
+            server.AddStreamHandler(new PresenceServerPostHandler(m_PresenceService));
         }
-
-        #region Implementation of IMonitor
-
-        public double GetValue()
-        {
-            return m_scene.SceneGraph.GetTotalObjectsCount();
-        }
-
-        public string GetName()
-        {
-            return "Total Objects Count";
-        }
-
-        public string GetFriendlyValue()
-        {
-            return (int)GetValue() + " Object(s)";
-        }
-
-        #endregion
     }
 }

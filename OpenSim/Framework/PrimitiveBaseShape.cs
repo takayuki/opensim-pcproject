@@ -1099,8 +1099,6 @@ namespace OpenSim.Framework
                 prim.Sculpt = new Primitive.SculptData();
                 prim.Sculpt.Type = (OpenMetaverse.SculptType)this.SculptType;
                 prim.Sculpt.SculptTexture = this.SculptTexture;
-
-                return prim;
             }
 
             prim.PrimData.PathShearX = this.PathShearX < 128 ? (float)this.PathShearX * 0.01f : (float)(this.PathShearX - 256) * 0.01f;
@@ -1153,7 +1151,7 @@ namespace OpenSim.Framework
                 prim.Light.Radius = this.LightRadius;
             }
 
-            prim.Textures = new Primitive.TextureEntry(this.TextureEntry, 0, this.TextureEntry.Length);
+            prim.Textures = this.Textures;
 
             prim.Properties = new Primitive.ObjectProperties();
             prim.Properties.Name = "Primitive";

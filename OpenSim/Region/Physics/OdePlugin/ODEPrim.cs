@@ -2099,7 +2099,10 @@ Console.WriteLine(" JointCreateFixed");
                 // Re creates body on size.
                 // EnableBody also does setMass()
                 enableBody();
-                d.BodyEnable(Body);
+                if (Body != IntPtr.Zero)
+                {
+                    d.BodyEnable(Body);
+                }
             }
             _parent_scene.geom_name_map[prim_geom] = oldname;
 
@@ -2126,9 +2129,30 @@ Console.WriteLine(" JointCreateFixed");
                     if (IsPhysical)
                     {
                         Vector3 iforce = Vector3.Zero;
-                        for (int i = 0; i < m_forcelist.Count; i++)
+                        int i = 0;
+                        try
                         {
-                            iforce = iforce + (m_forcelist[i] * 100);
+                            for (i = 0; i < m_forcelist.Count; i++)
+                            {
+
+                                iforce = iforce + (m_forcelist[i] * 100);
+                            }
+                        }
+                        catch (IndexOutOfRangeException)
+                        {
+                            m_forcelist = new List<Vector3>();
+                            m_collisionscore = 0;
+                            m_interpenetrationcount = 0;
+                            m_taintforce = false;
+                            return;
+                        }
+                        catch (ArgumentOutOfRangeException)
+                        {
+                            m_forcelist = new List<Vector3>();
+                            m_collisionscore = 0;
+                            m_interpenetrationcount = 0;
+                            m_taintforce = false;
+                            return;
                         }
                         d.BodyEnable(Body);
                         d.BodyAddForce(Body, iforce.X, iforce.Y, iforce.Z);
@@ -2357,6 +2381,9 @@ Console.WriteLine(" JointCreateFixed");
             {
                 // Averate previous velocity with the new one so
                 // client object interpolation works a 'little' better
+                if (_zeroFlag)
+                    return Vector3.Zero;
+
                 Vector3 returnVelocity = Vector3.Zero;
                 returnVelocity.X = (m_lastVelocity.X + _velocity.X)/2;
                 returnVelocity.Y = (m_lastVelocity.Y + _velocity.Y)/2;
@@ -2459,7 +2486,9 @@ Console.WriteLine(" JointCreateFixed");
         {
             if (force.IsFinite())
             {
-                m_forcelist.Add(force);
+                lock (m_forcelist)
+                    m_forcelist.Add(force);
+
                 m_taintforce = true;
             }
             else
@@ -2643,7 +2672,7 @@ Console.WriteLine(" JointCreateFixed");
                         //outofBounds = true;
                     }
 
-//					float Adiff = 1.0f - Math.Abs(Quaternion.Dot(m_lastorientation, l_orientation));
+					//float Adiff = 1.0f - Math.Abs(Quaternion.Dot(m_lastorientation, l_orientation));
 //Console.WriteLine("Adiff " + m_primName + " = " + Adiff);					
                     if ((Math.Abs(m_lastposition.X - l_position.X) < 0.02)
                         && (Math.Abs(m_lastposition.Y - l_position.Y) < 0.02)
@@ -2659,6 +2688,8 @@ Console.WriteLine(" JointCreateFixed");
                     {
                         //m_log.Debug(Math.Abs(m_lastposition.X - l_position.X).ToString());
                         _zeroFlag = false;
+                        m_lastUpdateSent = false;
+                        //m_throttleUpdates = false;
                     }
 
                     if (_zeroFlag)
@@ -2685,7 +2716,9 @@ Console.WriteLine(" JointCreateFixed");
                             m_rotationalVelocity = pv;
 
                             if (_parent == null)
+                            {
                                 base.RequestPhysicsterseUpdate();
+                            }
 
                             m_lastUpdateSent = true;
                         }
@@ -2695,7 +2728,9 @@ Console.WriteLine(" JointCreateFixed");
                         if (lastZeroFlag != _zeroFlag)
                         {
                             if (_parent == null)
+                            {
                                 base.RequestPhysicsterseUpdate();
+                            }
                         }
 
                         m_lastVelocity = _velocity;
@@ -2728,7 +2763,9 @@ Console.WriteLine(" JointCreateFixed");
                         if (!m_throttleUpdates || throttleCounter > _parent_scene.geomUpdatesPerThrottledUpdate)
                         {
                             if (_parent == null)
+                            {
                                 base.RequestPhysicsterseUpdate();
+                            }
                         }
                         else
                         {

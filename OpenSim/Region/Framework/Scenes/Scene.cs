@@ -387,6 +387,11 @@ namespace OpenSim.Region.Framework.Scenes
         {
             get { return StatsReporter.getLastReportedSimFPS(); }
         }
+		
+		public float[] SimulatorStats
+		{
+			get { return StatsReporter.getLastReportedSimStats(); }
+		}
 
         public string DefaultScriptEngine
         {
@@ -618,7 +623,7 @@ namespace OpenSim.Region.Framework.Scenes
                   startupConfig.GetLong("MaximumTimeBeforePersistenceConsidered", DEFAULT_MAX_TIME_FOR_PERSISTENCE);
                 m_persistAfter *= 10000000;
 
-                m_defaultScriptEngine = startupConfig.GetString("DefaultScriptEngine", "DotNetEngine");
+                m_defaultScriptEngine = startupConfig.GetString("DefaultScriptEngine", "XEngine");
 
                 IConfig packetConfig = m_config.Configs["PacketPool"];
                 if (packetConfig != null)
@@ -1266,7 +1271,7 @@ namespace OpenSim.Region.Framework.Scenes
                         // allocations, and there is no more work to be done until someone logs in
                         GC.Collect();
 
-                        m_log.Debug("[REGION]: Enabling Logins");
+                        m_log.DebugFormat("[REGION]: Enabling logins for {0}", RegionInfo.RegionName);
                         loginsdisabled = false;
                     }
                 }
@@ -1276,24 +1281,25 @@ namespace OpenSim.Region.Framework.Scenes
                 }
                 catch (AccessViolationException e)
                 {
-                    m_log.Error("[Scene]: Failed with exception " + e.ToString() + " On Region: " + RegionInfo.RegionName);
+                    m_log.Error("[REGION]: Failed with exception " + e.ToString() + " On Region: " + RegionInfo.RegionName);
                 }
                 //catch (NullReferenceException e)
                 //{
-                //   m_log.Error("[Scene]: Failed with exception " + e.ToString() + " On Region: " + RegionInfo.RegionName);
+                //   m_log.Error("[REGION]: Failed with exception " + e.ToString() + " On Region: " + RegionInfo.RegionName);
                 //}
                 catch (InvalidOperationException e)
                 {
-                    m_log.Error("[Scene]: Failed with exception " + e.ToString() + " On Region: " + RegionInfo.RegionName);
+                    m_log.Error("[REGION]: Failed with exception " + e.ToString() + " On Region: " + RegionInfo.RegionName);
                 }
                 catch (Exception e)
                 {
-                    m_log.Error("[Scene]: Failed with exception " + e.ToString() + " On Region: " + RegionInfo.RegionName);
+                    m_log.Error("[REGION]: Failed with exception " + e.ToString() + " On Region: " + RegionInfo.RegionName);
                 }
                 finally
                 {
                     m_lastupdate = DateTime.UtcNow;
                 }
+                
                 maintc = Environment.TickCount - maintc;
                 maintc = (int)(m_timespan * 1000) - maintc;
 
@@ -2380,103 +2386,6 @@ namespace OpenSim.Region.Framework.Scenes
             return successYN;
         }
 
-        /// <summary>
-        /// Handle a scene object that is crossing into this region from another.
-        /// NOTE: Unused as of 2009-02-09. Soon to be deleted.
-        /// </summary>
-        /// <param name="regionHandle"></param>
-        /// <param name="primID"></param>
-        /// <param name="objXMLData"></param>
-        /// <param name="XMLMethod"></param>
-        /// <returns></returns>
-        public bool IncomingInterRegionPrimGroup(UUID primID, string objXMLData, int XMLMethod)
-        {
-            if (XMLMethod == 0)
-            {
-                m_log.DebugFormat("[INTERREGION]: A new prim {0} arrived from a neighbor", primID);
-                SceneObjectGroup sceneObject = m_serialiser.DeserializeGroupFromXml2(objXMLData);
-                if (sceneObject.IsAttachment)
-                    sceneObject.RootPart.ObjectFlags |= (uint)PrimFlags.Phantom;
-
-                return AddSceneObject(sceneObject);
-            }
-            else if ((XMLMethod == 100) && m_allowScriptCrossings)
-            {
-                m_log.Warn("[INTERREGION]: Prim state data arrived from a neighbor");
-
-                XmlDocument doc = new XmlDocument();
-                doc.LoadXml(objXMLData);
-
-                XmlNodeList rootL = doc.GetElementsByTagName("ScriptData");
-                if (rootL.Count == 1)
-                {
-                    XmlNode rootNode = rootL[0];
-                    if (rootNode != null)
-                    {
-                        XmlNodeList partL = rootNode.ChildNodes;
-
-                        foreach (XmlNode part in partL)
-                        {
-                            XmlNodeList nodeL = part.ChildNodes;
-
-                            switch (part.Name)
-                            {
-                            case "Assemblies":
-                                foreach (XmlNode asm in nodeL)
-                                {
-                                    string fn = asm.Attributes.GetNamedItem("Filename").Value;
-
-                                    Byte[] filedata = Convert.FromBase64String(asm.InnerText);
-                                    string path = Path.Combine("ScriptEngines", RegionInfo.RegionID.ToString());
-                                    path = Path.Combine(path, fn);
-
-                                    if (!File.Exists(path))
-                                    {
-                                        FileStream fs = File.Create(path);
-                                        fs.Write(filedata, 0, filedata.Length);
-                                        fs.Close();
-                                    }
-                                }
-                                break;
-                            case "ScriptStates":
-                                foreach (XmlNode st in nodeL)
-                                {
-                                    string id = st.Attributes.GetNamedItem("UUID").Value;
-                                    UUID uuid = new UUID(id);
-                                    XmlNode state = st.ChildNodes[0];
-
-                                    XmlDocument sdoc = new XmlDocument();
-                                    XmlNode sxmlnode = sdoc.CreateNode(
-                                            XmlNodeType.XmlDeclaration,
-                                            "", "");
-                                    sdoc.AppendChild(sxmlnode);
-
-                                    XmlNode newnode = sdoc.ImportNode(state, true);
-                                    sdoc.AppendChild(newnode);
-
-                                    string spath = Path.Combine("ScriptEngines", RegionInfo.RegionID.ToString());
-                                    spath = Path.Combine(spath, uuid.ToString());
-                                    FileStream sfs = File.Create(spath + ".state");
-                                    ASCIIEncoding enc = new ASCIIEncoding();
-                                    Byte[] buf = enc.GetBytes(sdoc.InnerXml);
-                                    sfs.Write(buf, 0, buf.Length);
-                                    sfs.Close();
-                                }
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                SceneObjectPart RootPrim = GetSceneObjectPart(primID);
-                RootPrim.ParentGroup.CreateScriptInstances(0, false, DefaultScriptEngine, 1);
-
-                return true;
-            }
-
-            return true;
-        }
-
         public bool IncomingCreateObject(ISceneObject sog)
         {
             //m_log.Debug(" >>> IncomingCreateObject <<< " + ((SceneObjectGroup)sog).AbsolutePosition + " deleted? " + ((SceneObjectGroup)sog).IsDeleted);
@@ -3349,7 +3258,6 @@ namespace OpenSim.Region.Framework.Scenes
             m_sceneGridService.OnCloseAgentConnection += IncomingCloseAgent;
             //m_eventManager.OnRegionUp += OtherRegionUp;
             //m_sceneGridService.OnChildAgentUpdate += IncomingChildAgentDataUpdate;
-            m_sceneGridService.OnExpectPrim += IncomingInterRegionPrimGroup;
             //m_sceneGridService.OnRemoveKnownRegionFromAvatar += HandleRemoveKnownRegionsFromAvatar;
             m_sceneGridService.OnLogOffUser += HandleLogOffUserFromGrid;
             m_sceneGridService.KiPrimitive += SendKillObject;
@@ -3373,7 +3281,6 @@ namespace OpenSim.Region.Framework.Scenes
             m_sceneGridService.KiPrimitive -= SendKillObject;
             m_sceneGridService.OnLogOffUser -= HandleLogOffUserFromGrid;
             //m_sceneGridService.OnRemoveKnownRegionFromAvatar -= HandleRemoveKnownRegionsFromAvatar;
-            m_sceneGridService.OnExpectPrim -= IncomingInterRegionPrimGroup;
             //m_sceneGridService.OnChildAgentUpdate -= IncomingChildAgentDataUpdate;
             //m_eventManager.OnRegionUp -= OtherRegionUp;
             m_sceneGridService.OnExpectUser -= HandleNewUserConnection;
@@ -3469,6 +3376,49 @@ namespace OpenSim.Region.Framework.Scenes
                     agent.startpos.Y = crossedBorder.BorderLine.Z - 1;
                 }
 
+                //Mitigate http://opensimulator.org/mantis/view.php?id=3522
+                // Check if start position is outside of region
+                // If it is, check the Z start position also..   if not, leave it alone.
+                if (BordersLocked)
+                {
+                    lock (EastBorders)
+                    {
+                        if (agent.startpos.X > EastBorders[0].BorderLine.Z)
+                        {
+                            m_log.Warn("FIX AGENT POSITION");
+                            agent.startpos.X = EastBorders[0].BorderLine.Z * 0.5f;
+                            if (agent.startpos.Z > 720)
+                                agent.startpos.Z = 720;
+                        }
+                    }
+                    lock (NorthBorders)
+                    {
+                        if (agent.startpos.Y > NorthBorders[0].BorderLine.Z)
+                        {
+                            m_log.Warn("FIX Agent POSITION");
+                            agent.startpos.Y = NorthBorders[0].BorderLine.Z * 0.5f;
+                            if (agent.startpos.Z > 720)
+                                agent.startpos.Z = 720;
+                        }
+                    }
+                }
+                else
+                {
+                    if (agent.startpos.X > EastBorders[0].BorderLine.Z)
+                    {
+                        m_log.Warn("FIX AGENT POSITION");
+                        agent.startpos.X = EastBorders[0].BorderLine.Z * 0.5f;
+                        if (agent.startpos.Z > 720)
+                            agent.startpos.Z = 720;
+                    }
+                    if (agent.startpos.Y > NorthBorders[0].BorderLine.Z)
+                    {
+                        m_log.Warn("FIX Agent POSITION");
+                        agent.startpos.Y = NorthBorders[0].BorderLine.Z * 0.5f;
+                        if (agent.startpos.Z > 720)
+                            agent.startpos.Z = 720;
+                    }
+                }
                 // Honor parcel landing type and position.
                 ILandObject land = LandChannel.GetLandObject(agent.startpos.X, agent.startpos.Y);
                 if (land != null)

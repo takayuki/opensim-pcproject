@@ -2083,6 +2083,7 @@ namespace OpenSim.Region.Framework.Scenes
         {
             if (PhysActor != null)
             {
+                
                 Vector3 newpos = new Vector3(PhysActor.Position.GetBytes(), 0);
                 
                 if (m_parentGroup.Scene.TestBorderCross(newpos, Cardinals.N) | m_parentGroup.Scene.TestBorderCross(newpos, Cardinals.S) | m_parentGroup.Scene.TestBorderCross(newpos, Cardinals.E) | m_parentGroup.Scene.TestBorderCross(newpos, Cardinals.W))
@@ -2090,6 +2091,7 @@ namespace OpenSim.Region.Framework.Scenes
                     m_parentGroup.AbsolutePosition = newpos;
                     return;
                 }
+                //m_parentGroup.RootPart.m_groupPosition = newpos;
             }
             ScheduleTerseUpdate();
 
@@ -2396,6 +2398,7 @@ namespace OpenSim.Region.Framework.Scenes
                 if (!RotationOffset.ApproxEquals(m_lastRotation, ROTATION_TOLERANCE) ||
                     !Acceleration.Equals(m_lastAcceleration) ||
                     !Velocity.ApproxEquals(m_lastVelocity, VELOCITY_TOLERANCE) ||
+                    Velocity.ApproxEquals(Vector3.Zero, VELOCITY_TOLERANCE) ||
                     !AngularVelocity.ApproxEquals(m_lastAngularVelocity, VELOCITY_TOLERANCE) ||
                     !OffsetPosition.ApproxEquals(m_lastPosition, POSITION_TOLERANCE) ||
                     Environment.TickCount - m_lastTerseSent > TIME_MS_TOLERANCE)
@@ -2428,6 +2431,7 @@ namespace OpenSim.Region.Framework.Scenes
                     ClearUpdateSchedule();
                 }
             }
+            ClearUpdateSchedule();
         }
 
         /// <summary>
@@ -3792,11 +3796,6 @@ namespace OpenSim.Region.Framework.Scenes
             _everyoneMask &= _nextOwnerMask;
 
             Inventory.ApplyNextOwnerPermissions();
-        }
-
-        public bool CanBeDeleted()
-        {
-            return Inventory.CanBeDeleted();
         }
     }
 }

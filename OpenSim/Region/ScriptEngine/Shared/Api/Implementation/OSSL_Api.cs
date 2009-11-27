@@ -636,13 +636,13 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
         }
 
         // Teleport functions
-        public void osTeleportAgent(string agent, uint regionX, uint regionY, LSL_Types.Vector3 position, LSL_Types.Vector3 lookat)
+        public void osTeleportAgent(string agent, int regionX, int regionY, LSL_Types.Vector3 position, LSL_Types.Vector3 lookat)
         {
             // High because there is no security check. High griefer potential
             //
             CheckThreatLevel(ThreatLevel.High, "osTeleportAgent");
 
-            ulong regionHandle = Util.UIntsToLong((regionX * (uint)Constants.RegionSize), (regionY * (uint)Constants.RegionSize));
+            ulong regionHandle = Util.UIntsToLong(((uint)regionX * (uint)Constants.RegionSize), ((uint)regionY * (uint)Constants.RegionSize));
 
             m_host.AddScriptLPS(1);
             UUID agentId = new UUID();
@@ -741,9 +741,9 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                         }
                     }
                     if (animID == UUID.Zero)
-                        target.AddAnimation(animation, m_host.UUID);
+                        target.Animator.AddAnimation(animation, m_host.UUID);
                     else
-                        target.AddAnimation(animID, m_host.UUID);
+                        target.Animator.AddAnimation(animID, m_host.UUID);
                 }
             }
         }
@@ -773,10 +773,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                             }
                         }
                     }
+                    
                     if (animID == UUID.Zero)
-                        target.RemoveAnimation(animation);
+                        target.Animator.RemoveAnimation(animation);
                     else
-                        target.RemoveAnimation(animID);
+                        target.Animator.RemoveAnimation(animID);
                 }
             }
         }
@@ -1947,5 +1948,27 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
             return key.ToString();
         }
+		
+       /// <summary>
+        /// Return information regarding various simulator statistics (sim fps, physics fps, time
+        /// dilation, total number of prims, total number of active scripts, script lps, various
+        /// timing data, packets in/out, etc. Basically much the information that's shown in the
+        /// client's Statistics Bar (Ctrl-Shift-1)
+        /// </summary>
+        /// <returns>List of floats</returns>
+		public LSL_List osGetRegionStats()
+		{
+            CheckThreatLevel(ThreatLevel.Moderate, "osGetRegionStats");
+            m_host.AddScriptLPS(1);
+            LSL_List ret = new LSL_List();
+			float[] stats = World.SimulatorStats;
+			
+			for (int i = 0; i < 21; i++)
+			{
+				ret.Add(new LSL_Float( stats[i] ));
+			}
+			return ret;
+		}
+
     }
 }
