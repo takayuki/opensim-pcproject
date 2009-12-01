@@ -2372,7 +2372,9 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             system["getposition"] = new PCOp(OpGetPosition);
             system["setposition"] = new PCOp(OpSetPosition);
             system["setrposition"] = new PCOp(OpSetRPosition);
+            system["getrotation"] = new PCOp(OpGetRotation);
             system["setrotation"] = new PCOp(OpSetRotation);
+            system["getsize"] = new PCOp(OpGetSize);
             system["setsize"] = new PCOp(OpSetSize);
             system["getpathcut"] = new PCOp(OpGetPathcut);
             system["setpathcut"] = new PCOp(OpSetPathcut);

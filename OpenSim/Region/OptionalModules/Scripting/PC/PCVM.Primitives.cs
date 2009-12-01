@@ -156,6 +156,27 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             return true;
         }
 
+        private bool OpGetSize()
+        {
+            PCObj part;
+
+            try
+            {
+                part = Stack.Pop();
+            }
+            catch (InvalidOperationException)
+            {
+                throw new PCEmptyStackException();
+            }
+            if (!(part is PCSceneObjectPart))
+            {
+                Stack.Push(part);
+                throw new PCTypeCheckException();
+            }
+            Stack.Push(new PCVector3(((PCSceneObjectPart)part).val.Scale));
+            return true;
+        }
+
         private bool OpSetSize()
         {
             PCObj param;
@@ -1781,9 +1802,19 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             return part;
         }
 
+        private Vector3 GetPosition(SceneObjectPart part)
+        {
+            return InverseTransform(part.AbsolutePosition);
+        }
+
         private void SetPosition(SceneObjectPart part, Vector3 pos)
         {
             part.UpdateGroupPosition(Transform(pos));
+        }
+
+        private Quaternion GetRotation(SceneObjectPart part)
+        {
+            return InverseRotate(part.RotationOffset);
         }
 
         private void SetRotation(SceneObjectPart part, Quaternion rot)
