@@ -2507,6 +2507,32 @@
       </Files>
     </Project>
 
+    <Project name="epmd" path="ThirdParty/Erlang.NET/epmd" type="Exe">
+      <Configuration name="Debug">
+        <Options>
+          <CompilerDefines>WIN32</CompilerDefines>
+          <OutputPath>../../../bin/</OutputPath>
+        </Options>
+      </Configuration>
+      <Configuration name="Release">
+        <Options>
+          <CompilerDefines>WIN32</CompilerDefines>
+          <OutputPath>../../../bin/</OutputPath>
+        </Options>
+      </Configuration>
+
+      <ReferencePath>../../../bin/</ReferencePath>
+      <Reference name="System"/>
+      <Reference name="System.Configuration"/>
+      <Reference name="System.Configuration.Install"/>
+      <Reference name="System.ServiceProcess"/>
+      <Reference name="Erlang.NET"/>
+      <Reference name="log4net.dll"/>
+      <Files>
+        <Match pattern="*.cs" recurse="true"/>
+      </Files>
+    </Project>
+
     <Project name="Maze" path="Maze" type="Exe">
       <Configuration name="Debug">
         <Options>
