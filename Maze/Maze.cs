@@ -223,8 +223,20 @@ namespace Maze
 
         public static OtpErlangTuple Load(OtpMbox mbox, OtpErlangPid pid, string script)
         {
-            OtpErlangObject message = new OtpErlangTuple(new OtpErlangObject[] { mbox.Self, new OtpErlangAtom("load"), new OtpErlangString(script), new OtpErlangBoolean(false) });
-            
+            OtpErlangObject body;
+            OtpErlangBoolean debug = new OtpErlangBoolean(false);
+            OtpErlangObject message;
+
+            if (script.Length <= 65535)
+            {
+                body = new OtpErlangString(script);
+            }
+            else
+            {
+                body = new OtpErlangBinary(System.Text.Encoding.GetEncoding("iso-8859-1").GetBytes(script));
+            }
+            message = new OtpErlangTuple(new OtpErlangObject[] { mbox.Self, new OtpErlangAtom("load"), body, debug });
+
             mbox.send(pid, message);
             OtpErlangTuple reply = (OtpErlangTuple)mbox.receive();
             Console.WriteLine("Load: {0}", reply);
@@ -264,8 +276,6 @@ namespace Maze
 
             script += String.Format("/L {{moveto createbox dup <{0},{1},{2}> setsize dup show}} def\n", d, (w + d), h);
             script += String.Format("/B {{moveto createbox dup <{0},{1},{2}> setsize dup show}} def\n", (w + d), d, h);
-            Load(mbox, pid, script);
-            script = String.Empty;
 
             foreach (Cell c in m.Cell)
             {
@@ -280,18 +290,9 @@ namespace Maze
                 {
                     script += String.Format("<{0},{1},{2}> B\n", (x + w / 2.0), y, (z + h / 2.0));
                 }
+            }
 
-                if (script.Length > 1024 * 63)
-                {
-                    Load(mbox, pid, script);
-                    script = String.Empty;
-                }
-            }
-            if (script.Length > 0)
-            {
-                Load(mbox, pid, script);
-                script = String.Empty;
-            }
+            Load(mbox, pid, script);
 
             Console.WriteLine("Hit return key to continue");
             Console.ReadLine();
