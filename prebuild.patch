@@ -1,16 +1,15 @@
-diff --git a/prebuild.xml b/prebuild.xml
-index e236bc1..65175fe 100644
---- a/prebuild.xml
-+++ b/prebuild.xml
-@@ -1655,6 +1655,7 @@
+--- prebuild.xml	2009-12-01 14:31:05.109375000 +0900
++++ prebuild.xml.new	2009-12-01 14:32:47.296875000 +0900
+@@ -1710,6 +1710,8 @@
+       <Reference name="Nini.dll" />
        <Reference name="log4net.dll"/>
        <Reference name="DotNetOpenMail.dll"/>
-       <Reference name="Tools.dll" />
++      <Reference name="Tools.dll" />
 +      <Reference name="Erlang.NET" />
  
  	  
        <Files>
-@@ -2448,6 +2449,48 @@
+@@ -2484,6 +2486,74 @@
        </Files>
      </Project>
  
@@ -29,6 +28,32 @@ index e236bc1..65175fe 100644
 +      <ReferencePath>../../../bin/</ReferencePath>
 +      <Reference name="System"/>
 +      <Reference name="System.Configuration"/>
++      <Reference name="log4net.dll"/>
++      <Files>
++        <Match pattern="*.cs" recurse="true"/>
++      </Files>
++    </Project>
++
++    <Project name="epmd" path="ThirdParty/Erlang.NET/epmd" type="Exe">
++      <Configuration name="Debug">
++        <Options>
++          <CompilerDefines>WIN32</CompilerDefines>
++          <OutputPath>../../../bin/</OutputPath>
++        </Options>
++      </Configuration>
++      <Configuration name="Release">
++        <Options>
++          <CompilerDefines>WIN32</CompilerDefines>
++          <OutputPath>../../../bin/</OutputPath>
++        </Options>
++      </Configuration>
++
++      <ReferencePath>../../../bin/</ReferencePath>
++      <Reference name="System"/>
++      <Reference name="System.Configuration"/>
++      <Reference name="System.Configuration.Install"/>
++      <Reference name="System.ServiceProcess"/>
++      <Reference name="Erlang.NET"/>
 +      <Reference name="log4net.dll"/>
 +      <Files>
 +        <Match pattern="*.cs" recurse="true"/>
