@@ -157,15 +157,33 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             get { return CurrentGraphicState.Transformation; }
         }
 
+        Quaternion CurrentRotate
+        {
+            get { return CurrentGraphicState.Rotate; }
+        }
+
         private Vector3 Transform(Vector3 s)
         {
             Vector4 d = Vector4.Transform(new Vector4(s, 1), CurrentTransformation);
             return new Vector3(d.X/d.W, d.Y/d.W, d.Z/d.W);
         }
 
+        private Vector3 InverseTransform(Vector3 s)
+        {
+            Matrix4 InverseRotateMatrix = Matrix4.CreateFromQuaternion(Quaternion.Inverse(CurrentRotate));
+            Vector3 origin = Transform(Vector3.Zero);
+            Vector4 d = Vector4.Transform(Vector4FromVector3(Vector3.Subtract(s, origin)), InverseRotateMatrix);
+            return new Vector3(d.X / d.W, d.Y / d.W, d.Z / d.W);
+        }
+
         private Quaternion Rotate(Quaternion s)
         {
-            return CurrentGraphicState.Rotate * s;
+            return CurrentRotate * s;
+        }
+
+        private Quaternion InverseRotate(Quaternion s)
+        {
+            return Quaternion.Inverse(CurrentRotate) * s;
         }
 
         private bool OpGSave()
@@ -348,7 +366,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 throw new PCTypeCheckException();
             }
 
-            Matrix4 rotm = Matrix4.CreateFromQuaternion(CurrentGraphicState.Rotate);
+            Matrix4 rotm = Matrix4.CreateFromQuaternion(CurrentRotate);
             foreach (PCSceneSnapshot.SnapshotItem item in ((PCSceneSnapshot)snapshot).val)
             {
                 PCSceneObjectPart pcpart = item.PCSceneObjectPart;
@@ -442,7 +460,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 throw new PCTypeCheckException();
             }
 
-            Matrix4 rotm = Matrix4.CreateFromQuaternion(CurrentGraphicState.Rotate);
+            Matrix4 rotm = Matrix4.CreateFromQuaternion(CurrentRotate);
             foreach (PCSceneSnapshot.SnapshotItem item in ((PCSceneSnapshot)snapshot).val)
             {
                 PCSceneObjectPart pcpart = item.PCSceneObjectPart;
@@ -487,9 +505,9 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 throw new PCTypeCheckException();
             }
             
-            Quaternion InverseRotate = Quaternion.Inverse(CurrentGraphicState.Rotate);
+            Quaternion InverseRotate = Quaternion.Inverse(CurrentRotate);
             Matrix4 InverseRotateMatrix = Matrix4.CreateFromQuaternion(InverseRotate);
-            Matrix4 RotateMatrix = Matrix4.CreateFromQuaternion(CurrentGraphicState.Rotate);
+            Matrix4 RotateMatrix = Matrix4.CreateFromQuaternion(CurrentRotate);
             Quaternion rotq = QuaternionFromVector4(((PCVector4)param).val);
             Matrix4 rotm = Matrix4.CreateFromQuaternion(rotq);
             Vector4 origin = Vector4FromVector3(Transform(Vector3.Zero));
@@ -574,7 +592,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 Stack.Push(part);
                 throw new PCTypeCheckException();
             }
-            Stack.Push(new PCVector3(((PCSceneObjectPart)part).val.ParentGroup.AbsolutePosition));
+            Stack.Push(new PCVector3(GetPosition(((PCSceneObjectPart)part).val)));
             return true;
         }
 
@@ -649,6 +667,28 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             return true;
         }
 
+        private bool OpGetRotation()
+        {
+            PCObj part;
+
+            try
+            {
+                part = Stack.Pop();
+            }
+            catch (InvalidOperationException)
+            {
+                throw new PCEmptyStackException();
+            }
+            if (!(part is PCSceneObjectPart))
+            {
+                Stack.Push(part);
+                throw new PCTypeCheckException();
+            }
+            Quaternion rot = GetRotation(((PCSceneObjectPart)part).val);
+            Stack.Push(new PCVector4(rot.X, rot.Y, rot.Z, rot.W));
+            return true;
+        }
+
         private bool OpSetRotation()
         {
             PCObj param;
@@ -680,8 +720,8 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 Stack.Push(part);
                 throw new PCTypeCheckException();
             }
-            Vector4 q = ((PCVector4)param).val;
-            SetRotation(((PCSceneObjectPart)part).val, Rotate(new Quaternion(q.X, q.Y, q.Z, q.W)));
+            Vector4 rot = ((PCVector4)param).val;
+            SetRotation(((PCSceneObjectPart)part).val, new Quaternion(rot.X, rot.Y, rot.Z, rot.W));
             return true;
         }
         

@@ -297,7 +297,15 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                     if (instr == "load")
                     {
                         Parser parser = PCVM.MakeParser();
-                        string script = ((OtpErlangString)t.elementAt(2)).stringValue();
+                        string script = String.Empty;
+                        if (t.elementAt(2) is OtpErlangString)
+                        {
+                            script = ((OtpErlangString)t.elementAt(2)).stringValue();
+                        }
+                        else
+                        {
+                            script = OtpErlangString.newString(((OtpErlangBinary)t.elementAt(2)).binaryValue());
+                        }
                         bool debug = ((OtpErlangAtom)t.elementAt(3)).boolValue();
 
                         SYMBOL ast = parser.Parse(script);

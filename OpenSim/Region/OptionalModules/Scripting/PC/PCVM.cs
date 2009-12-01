@@ -2372,7 +2372,9 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             system["getposition"] = new PCOp(OpGetPosition);
             system["setposition"] = new PCOp(OpSetPosition);
             system["setrposition"] = new PCOp(OpSetRPosition);
+            system["getrotation"] = new PCOp(OpGetRotation);
             system["setrotation"] = new PCOp(OpSetRotation);
+            system["getsize"] = new PCOp(OpGetSize);
             system["setsize"] = new PCOp(OpSetSize);
             system["getpathcut"] = new PCOp(OpGetPathcut);
             system["setpathcut"] = new PCOp(OpSetPathcut);
@@ -2406,8 +2408,11 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             system["setshiny"] = new PCOp(OpSetShiny);
             system["setfullbright"] = new PCOp(OpSetFullBright);
             system["setalpha"] = new PCOp(OpSetAlpha);
+            system["gettemporary"] = new PCOp(OpGetTemporary);
             system["settemporary"] = new PCOp(OpSetTemporary);
+            system["getphantom"] = new PCOp(OpGetPhantom);
             system["setphantom"] = new PCOp(OpSetPhantom);
+            system["getphysics"] = new PCOp(OpGetPhysics);
             system["setphysics"] = new PCOp(OpSetPhysics);
             system["rez"] = new PCOp(OpRez);
             system["show"] = new PCOp(OpShow);
