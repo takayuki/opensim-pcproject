@@ -755,11 +755,11 @@ namespace OpenSim.Region.Framework.Scenes
         /// </summary>
         public void SendPrimUpdates()
         {
-            m_perfMonMS = Environment.TickCount;
+            m_perfMonMS = Util.EnvironmentTickCount();
 
             m_sceneViewer.SendPrimUpdates();
 
-            m_scene.StatsReporter.AddAgentTime(Environment.TickCount - m_perfMonMS);
+            m_scene.StatsReporter.AddAgentTime(Util.EnvironmentTickCountSubtract(m_perfMonMS));
         }
 
         #region Status Methods
@@ -1148,7 +1148,7 @@ namespace OpenSim.Region.Framework.Scenes
             //    return;
             //}
 
-            m_perfMonMS = Environment.TickCount;
+            m_perfMonMS = Util.EnvironmentTickCount();
 
             ++m_movementUpdateCount;
             if (m_movementUpdateCount < 1)
@@ -1464,7 +1464,7 @@ namespace OpenSim.Region.Framework.Scenes
 
             m_scene.EventManager.TriggerOnClientMovement(this);
 
-            m_scene.StatsReporter.AddAgentTime(Environment.TickCount - m_perfMonMS);
+            m_scene.StatsReporter.AddAgentTime(Util.EnvironmentTickCountSubtract(m_perfMonMS));
         }
 
         public void DoAutoPilot(uint not_used, Vector3 Pos, IClientAPI remote_client)
@@ -1924,7 +1924,7 @@ namespace OpenSim.Region.Framework.Scenes
                 return;
             }
 
-            m_perfMonMS = Environment.TickCount;
+            m_perfMonMS = Util.EnvironmentTickCount();
 
             Rotation = rotation;
             Vector3 direc = vec * rotation;
@@ -1966,7 +1966,7 @@ namespace OpenSim.Region.Framework.Scenes
             // TODO: Add the force instead of only setting it to support multiple forces per frame?
             m_forceToApply = direc;
 
-            m_scene.StatsReporter.AddAgentTime(Environment.TickCount - m_perfMonMS);
+            m_scene.StatsReporter.AddAgentTime(Util.EnvironmentTickCountSubtract(m_perfMonMS));
         }
 
         #endregion
@@ -2032,7 +2032,7 @@ namespace OpenSim.Region.Framework.Scenes
             // server.
             if (remoteClient.IsActive)
             {
-                m_perfMonMS = Environment.TickCount;
+                m_perfMonMS = Util.EnvironmentTickCount();
 
                 PhysicsActor actor = m_physicsActor;
                 Vector3 velocity = (actor != null) ? actor.Velocity : Vector3.Zero;
@@ -2045,7 +2045,7 @@ namespace OpenSim.Region.Framework.Scenes
                 remoteClient.SendAvatarTerseUpdate(new SendAvatarTerseData(m_rootRegionHandle, (ushort)(m_scene.TimeDilation * ushort.MaxValue), LocalId,
                     pos, velocity, Vector3.Zero, m_bodyRot, CollisionPlane, m_uuid, null, GetUpdatePriority(remoteClient)));
 
-                m_scene.StatsReporter.AddAgentTime(Environment.TickCount - m_perfMonMS);
+                m_scene.StatsReporter.AddAgentTime(Util.EnvironmentTickCountSubtract(m_perfMonMS));
                 m_scene.StatsReporter.AddAgentUpdates(1);
             }
         }
@@ -2055,11 +2055,11 @@ namespace OpenSim.Region.Framework.Scenes
         /// </summary>
         public void SendTerseUpdateToAllClients()
         {
-            m_perfMonMS = Environment.TickCount;
+            m_perfMonMS = Util.EnvironmentTickCount();
             
             m_scene.ForEachClient(SendTerseUpdateToClient);
 
-            m_scene.StatsReporter.AddAgentTime(Environment.TickCount - m_perfMonMS);
+            m_scene.StatsReporter.AddAgentTime(Util.EnvironmentTickCountSubtract(m_perfMonMS));
         }
 
         public void SendCoarseLocations()
@@ -2079,7 +2079,7 @@ namespace OpenSim.Region.Framework.Scenes
 
         public void SendCoarseLocationsDefault(UUID sceneId, ScenePresence p)
         {
-            m_perfMonMS = Environment.TickCount;
+            m_perfMonMS = Util.EnvironmentTickCount();
 
             List<Vector3> CoarseLocations = new List<Vector3>();
             List<UUID> AvatarUUIDs = new List<UUID>();
@@ -2115,7 +2115,7 @@ namespace OpenSim.Region.Framework.Scenes
 
             m_controllingClient.SendCoarseLocationUpdate(AvatarUUIDs, CoarseLocations);
 
-            m_scene.StatsReporter.AddAgentTime(Environment.TickCount - m_perfMonMS);
+            m_scene.StatsReporter.AddAgentTime(Util.EnvironmentTickCountSubtract(m_perfMonMS));
         }
 
         public void CoarseLocationChange()
@@ -2152,7 +2152,7 @@ namespace OpenSim.Region.Framework.Scenes
         /// </summary>
         public void SendInitialFullUpdateToAllClients()
         {
-            m_perfMonMS = Environment.TickCount;
+            m_perfMonMS = Util.EnvironmentTickCount();
 
             ScenePresence[] avatars = m_scene.GetScenePresences();
 
@@ -2178,14 +2178,14 @@ namespace OpenSim.Region.Framework.Scenes
             }
 
             m_scene.StatsReporter.AddAgentUpdates(avatars.Length);
-            m_scene.StatsReporter.AddAgentTime(Environment.TickCount - m_perfMonMS);
+            m_scene.StatsReporter.AddAgentTime(Util.EnvironmentTickCountSubtract(m_perfMonMS));
 
             //Animator.SendAnimPack();
         }
 
         public void SendFullUpdateToAllClients()
         {
-            m_perfMonMS = Environment.TickCount;
+            m_perfMonMS = Util.EnvironmentTickCount();
 
             // only send update from root agents to other clients; children are only "listening posts"
             List<ScenePresence> avatars = m_scene.GetAvatars();
@@ -2195,7 +2195,7 @@ namespace OpenSim.Region.Framework.Scenes
 
             }
             m_scene.StatsReporter.AddAgentUpdates(avatars.Count);
-            m_scene.StatsReporter.AddAgentTime(Environment.TickCount - m_perfMonMS);
+            m_scene.StatsReporter.AddAgentTime(Util.EnvironmentTickCountSubtract(m_perfMonMS));
 
             Animator.SendAnimPack();
         }
@@ -2237,7 +2237,7 @@ namespace OpenSim.Region.Framework.Scenes
         /// </summary>
         public void SendAppearanceToAllOtherAgents()
         {
-            m_perfMonMS = Environment.TickCount;
+            m_perfMonMS = Util.EnvironmentTickCount();
 
             m_scene.ForEachScenePresence(delegate(ScenePresence scenePresence)
                                          {
@@ -2246,8 +2246,8 @@ namespace OpenSim.Region.Framework.Scenes
                                                  SendAppearanceToOtherAgent(scenePresence);
                                              }
                                          });
-            
-            m_scene.StatsReporter.AddAgentTime(Environment.TickCount - m_perfMonMS);
+
+            m_scene.StatsReporter.AddAgentTime(Util.EnvironmentTickCountSubtract(m_perfMonMS));
         }
 
         /// <summary>
@@ -3048,6 +3048,8 @@ namespace OpenSim.Region.Framework.Scenes
             m_sceneViewer.Close();
 
             RemoveFromPhysicalScene();
+            m_animator.Close();
+            m_animator = null;
         }
 
         public ScenePresence()
