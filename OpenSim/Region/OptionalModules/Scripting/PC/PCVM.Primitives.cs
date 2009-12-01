@@ -1412,6 +1412,27 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             return true;
         }
 
+        private bool OpGetTemporary()
+        {
+            PCObj part;
+
+            try
+            {
+                part = Stack.Pop();
+            }
+            catch (InvalidOperationException)
+            {
+                throw new PCEmptyStackException();
+            }
+            if (!(part is PCSceneObjectPart))
+            {
+                Stack.Push(part);
+                throw new PCTypeCheckException();
+            }
+            Stack.Push(new PCBool(GetTemporary(((PCSceneObjectPart)part).val)));
+            return true;
+        }
+
         private bool OpSetTemporary()
         {
             PCObj param;
@@ -1447,6 +1468,27 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             return true;
         }
 
+        private bool OpGetPhantom()
+        {
+            PCObj part;
+
+            try
+            {
+                part = Stack.Pop();
+            }
+            catch (InvalidOperationException)
+            {
+                throw new PCEmptyStackException();
+            }
+            if (!(part is PCSceneObjectPart))
+            {
+                Stack.Push(part);
+                throw new PCTypeCheckException();
+            }
+            Stack.Push(new PCBool(GetPhantom(((PCSceneObjectPart)part).val)));
+            return true;
+        }
+
         private bool OpSetPhantom()
         {
             PCObj param;
@@ -1479,6 +1521,27 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
                 throw new PCTypeCheckException();
             }
             SetPhantom(((PCSceneObjectPart)part).val, ((PCBool)param).val);
+            return true;
+        }
+
+        private bool OpGetPhysics()
+        {
+            PCObj part;
+
+            try
+            {
+                part = Stack.Pop();
+            }
+            catch (InvalidOperationException)
+            {
+                throw new PCEmptyStackException();
+            }
+            if (!(part is PCSceneObjectPart))
+            {
+                Stack.Push(part);
+                throw new PCTypeCheckException();
+            }
+            Stack.Push(new PCBool(GetPhysics(((PCSceneObjectPart)part).val)));
             return true;
         }
 
@@ -1823,6 +1886,11 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             part.ParentGroup.AbsolutePosition = part.ParentGroup.AbsolutePosition;
         }
 
+        private bool GetTemporary(SceneObjectPart part)
+        {
+            return (part.ObjectFlags & (uint)PrimFlags.Temporary) != 0;
+        }
+
         private void SetTemporary(SceneObjectPart part, bool flag)
         {
             if (flag)
@@ -1831,8 +1899,13 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             }
             else
             {
-                part.ObjectFlags &= ~((uint)PrimFlags.Phantom);
+                part.ObjectFlags &= ~((uint)PrimFlags.Temporary);
             }
+        }
+
+        private bool GetPhantom(SceneObjectPart part)
+        {
+            return (part.ObjectFlags & (uint)PrimFlags.Phantom) != 0;
         }
 
         private void SetPhantom(SceneObjectPart part, bool flag)
@@ -1847,19 +1920,16 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             }
         }
 
+        private bool GetPhysics(SceneObjectPart part)
+        {
+            return (part.ObjectFlags & (uint)PrimFlags.Physics) != 0;
+        }
+
         private void SetPhysics(SceneObjectPart part, bool flag)
         {
             bool isTemporary = (part.ObjectFlags & (uint)PrimFlags.Temporary) != 0;
             bool isPhantom = (part.ObjectFlags & (uint)PrimFlags.Phantom) != 0;
-
-            if (flag)
-            {
-                part.UpdatePrimFlags(true, isTemporary, isPhantom, part.VolumeDetectActive);
-            }
-            else
-            {
-                part.UpdatePrimFlags(false, isTemporary, isPhantom, part.VolumeDetectActive);
-            }
+            part.UpdatePrimFlags(flag, isTemporary, isPhantom, part.VolumeDetectActive);
         }
 
         static readonly int MAX_SIDES = 9;

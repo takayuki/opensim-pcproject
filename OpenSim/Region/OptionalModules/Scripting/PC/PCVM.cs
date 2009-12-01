@@ -2408,8 +2408,11 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             system["setshiny"] = new PCOp(OpSetShiny);
             system["setfullbright"] = new PCOp(OpSetFullBright);
             system["setalpha"] = new PCOp(OpSetAlpha);
+            system["gettemporary"] = new PCOp(OpGetTemporary);
             system["settemporary"] = new PCOp(OpSetTemporary);
+            system["getphantom"] = new PCOp(OpGetPhantom);
             system["setphantom"] = new PCOp(OpSetPhantom);
+            system["getphysics"] = new PCOp(OpGetPhysics);
             system["setphysics"] = new PCOp(OpSetPhysics);
             system["rez"] = new PCOp(OpRez);
             system["show"] = new PCOp(OpShow);
