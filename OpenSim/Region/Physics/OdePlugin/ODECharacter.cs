@@ -1196,6 +1196,15 @@ namespace OpenSim.Region.Physics.OdePlugin
         public override bool PIDHoverActive { set { return; } }
         public override PIDHoverType PIDHoverType { set { return; } }
         public override float PIDHoverTau { set { return; } }
+        
+        public override Quaternion APIDTarget{ set { return; } }
+
+        public override bool APIDActive{ set { return; } }
+
+        public override float APIDStrength{ set { return; } }
+
+        public override float APIDDamping{ set { return; } }
+
 
         public override void SubscribeEvents(int ms)
         {
@@ -1221,7 +1230,10 @@ namespace OpenSim.Region.Physics.OdePlugin
         {
             if (m_eventsubscription > m_requestedUpdateFrequency)
             {
-                base.SendCollisionUpdate(CollisionEventsThisFrame);
+                if (CollisionEventsThisFrame != null)
+                {
+                    base.SendCollisionUpdate(CollisionEventsThisFrame);
+                }
                 CollisionEventsThisFrame = new CollisionEventUpdate();
                 m_eventsubscription = 0;
             }

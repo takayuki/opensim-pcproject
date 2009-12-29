@@ -332,7 +332,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
         private AgentUpdateArgs lastarg;
         private bool m_IsActive = true;
 
-        protected Dictionary<PacketType, PacketMethod> m_packetHandlers = new Dictionary<PacketType, PacketMethod>();
+        protected Dictionary<PacketType, PacketProcessor> m_packetHandlers = new Dictionary<PacketType, PacketProcessor>();
         protected Dictionary<string, GenericMessage> m_genericPacketHandlers = new Dictionary<string, GenericMessage>(); //PauPaw:Local Generic Message handlers
         protected Scene m_scene;
         protected LLImageManager m_imageManager;
@@ -351,6 +351,9 @@ namespace OpenSim.Region.ClientStack.LindenUDP
         protected IAssetService m_assetService;
         private IHyperAssetService m_hyperAssets;
         private const bool m_checkPackets = true;
+
+        private Timer m_propertiesPacketTimer;
+        private List<ObjectPropertiesPacket.ObjectDataBlock> m_propertiesBlocks = new List<ObjectPropertiesPacket.ObjectDataBlock>();
 
         #endregion Class Members
 
@@ -432,6 +435,9 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             m_udpClient = udpClient;
             m_udpClient.OnQueueEmpty += HandleQueueEmpty;
             m_udpClient.OnPacketStats += PopulateStats;
+
+            m_propertiesPacketTimer = new Timer(100);
+            m_propertiesPacketTimer.Elapsed += ProcessObjectPropertiesPacket;
 
             RegisterLocalPacketHandlers();
         }
@@ -534,12 +540,17 @@ namespace OpenSim.Region.ClientStack.LindenUDP
 
         public bool AddLocalPacketHandler(PacketType packetType, PacketMethod handler)
         {
+            return AddLocalPacketHandler(packetType, handler, true);
+        }
+
+        public bool AddLocalPacketHandler(PacketType packetType, PacketMethod handler, bool async)
+        {
             bool result = false;
             lock (m_packetHandlers)
             {
                 if (!m_packetHandlers.ContainsKey(packetType))
                 {
-                    m_packetHandlers.Add(packetType, handler);
+                    m_packetHandlers.Add(packetType, new PacketProcessor() { method = handler, Async = async });
                     result = true;
                 }
             }
@@ -570,15 +581,25 @@ namespace OpenSim.Region.ClientStack.LindenUDP
         protected virtual bool ProcessPacketMethod(Packet packet)
         {
             bool result = false;
-            PacketMethod method;
-            if (m_packetHandlers.TryGetValue(packet.Type, out method))
+            PacketProcessor pprocessor;
+            if (m_packetHandlers.TryGetValue(packet.Type, out pprocessor))
             {
                 //there is a local handler for this packet type
-                result = method(this, packet);
+                if (pprocessor.Async)
+                {
+                    object obj = new AsyncPacketProcess(this, pprocessor.method, packet);
+                    Util.FireAndForget(ProcessSpecificPacketAsync,obj);
+                    result = true;
+                }
+                else
+                {
+                    result = pprocessor.method(this, packet);
+                }
             }
             else
             {
                 //there is not a local handler so see if there is a Global handler
+                PacketMethod method = null;
                 bool found;
                 lock (PacketHandlers)
                 {
@@ -590,6 +611,13 @@ namespace OpenSim.Region.ClientStack.LindenUDP
                 }
             }
             return result;
+        }
+
+        public void ProcessSpecificPacketAsync(object state)
+        {
+            AsyncPacketProcess packetObject = (AsyncPacketProcess)state;
+            packetObject.result = packetObject.Method(packetObject.ClientView, packetObject.Pack);
+            
         }
 
         #endregion Packet Handling
@@ -3579,42 +3607,88 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             string ItemDescription, uint OwnerMask, uint NextOwnerMask, uint GroupMask, uint EveryoneMask,
             uint BaseMask, byte saleType, int salePrice)
         {
-            ObjectPropertiesPacket proper = (ObjectPropertiesPacket)PacketPool.Instance.GetPacket(PacketType.ObjectProperties);
+            //ObjectPropertiesPacket proper = (ObjectPropertiesPacket)PacketPool.Instance.GetPacket(PacketType.ObjectProperties);
             // TODO: don't create new blocks if recycling an old packet
 
-            proper.ObjectData = new ObjectPropertiesPacket.ObjectDataBlock[1];
-            proper.ObjectData[0] = new ObjectPropertiesPacket.ObjectDataBlock();
-            proper.ObjectData[0].ItemID = ItemID;
-            proper.ObjectData[0].CreationDate = CreationDate;
-            proper.ObjectData[0].CreatorID = CreatorUUID;
-            proper.ObjectData[0].FolderID = FolderUUID;
-            proper.ObjectData[0].FromTaskID = FromTaskUUID;
-            proper.ObjectData[0].GroupID = GroupUUID;
-            proper.ObjectData[0].InventorySerial = InventorySerial;
+            ObjectPropertiesPacket.ObjectDataBlock block =
+                    new ObjectPropertiesPacket.ObjectDataBlock();
 
-            proper.ObjectData[0].LastOwnerID = LastOwnerUUID;
+            block.ItemID = ItemID;
+            block.CreationDate = CreationDate;
+            block.CreatorID = CreatorUUID;
+            block.FolderID = FolderUUID;
+            block.FromTaskID = FromTaskUUID;
+            block.GroupID = GroupUUID;
+            block.InventorySerial = InventorySerial;
+
+            block.LastOwnerID = LastOwnerUUID;
             //            proper.ObjectData[0].LastOwnerID = UUID.Zero;
 
-            proper.ObjectData[0].ObjectID = ObjectUUID;
+            block.ObjectID = ObjectUUID;
             if (OwnerUUID == GroupUUID)
-                proper.ObjectData[0].OwnerID = UUID.Zero;
+                block.OwnerID = UUID.Zero;
             else
-                proper.ObjectData[0].OwnerID = OwnerUUID;
-            proper.ObjectData[0].TouchName = Util.StringToBytes256(TouchTitle);
-            proper.ObjectData[0].TextureID = TextureID;
-            proper.ObjectData[0].SitName = Util.StringToBytes256(SitTitle);
-            proper.ObjectData[0].Name = Util.StringToBytes256(ItemName);
-            proper.ObjectData[0].Description = Util.StringToBytes256(ItemDescription);
-            proper.ObjectData[0].OwnerMask = OwnerMask;
-            proper.ObjectData[0].NextOwnerMask = NextOwnerMask;
-            proper.ObjectData[0].GroupMask = GroupMask;
-            proper.ObjectData[0].EveryoneMask = EveryoneMask;
-            proper.ObjectData[0].BaseMask = BaseMask;
+                block.OwnerID = OwnerUUID;
+            block.TouchName = Util.StringToBytes256(TouchTitle);
+            block.TextureID = TextureID;
+            block.SitName = Util.StringToBytes256(SitTitle);
+            block.Name = Util.StringToBytes256(ItemName);
+            block.Description = Util.StringToBytes256(ItemDescription);
+            block.OwnerMask = OwnerMask;
+            block.NextOwnerMask = NextOwnerMask;
+            block.GroupMask = GroupMask;
+            block.EveryoneMask = EveryoneMask;
+            block.BaseMask = BaseMask;
             //            proper.ObjectData[0].AggregatePerms = 53;
             //            proper.ObjectData[0].AggregatePermTextures = 0;
             //            proper.ObjectData[0].AggregatePermTexturesOwner = 0;
-            proper.ObjectData[0].SaleType = saleType;
-            proper.ObjectData[0].SalePrice = salePrice;
+            block.SaleType = saleType;
+            block.SalePrice = salePrice;
+
+            lock (m_propertiesPacketTimer)
+            {
+                m_propertiesBlocks.Add(block);
+
+                int length = 0;
+                foreach (ObjectPropertiesPacket.ObjectDataBlock b in m_propertiesBlocks)
+                {
+                    length += b.Length;
+                }
+                if (length > 1100) // FIXME: use real MTU
+                {
+                    ProcessObjectPropertiesPacket(null, null);
+                    m_propertiesPacketTimer.Stop();
+                    return;
+                }
+                    
+                m_propertiesPacketTimer.Stop();
+                m_propertiesPacketTimer.Start();
+            }
+
+            //proper.Header.Zerocoded = true;
+            //OutPacket(proper, ThrottleOutPacketType.Task);
+        }
+
+        private void ProcessObjectPropertiesPacket(Object sender, ElapsedEventArgs e)
+        {
+            ObjectPropertiesPacket proper = (ObjectPropertiesPacket)PacketPool.Instance.GetPacket(PacketType.ObjectProperties);
+
+            lock (m_propertiesPacketTimer)
+            {
+                m_propertiesPacketTimer.Stop();
+
+                proper.ObjectData = new ObjectPropertiesPacket.ObjectDataBlock[m_propertiesBlocks.Count];
+
+                int index = 0;
+
+                foreach (ObjectPropertiesPacket.ObjectDataBlock b in m_propertiesBlocks)
+                {
+                    proper.ObjectData[index++] = b;
+                }
+
+                m_propertiesBlocks.Clear();
+            }
+
             proper.Header.Zerocoded = true;
             OutPacket(proper, ThrottleOutPacketType.Task);
         }
@@ -4288,20 +4362,20 @@ namespace OpenSim.Region.ClientStack.LindenUDP
         protected virtual void RegisterLocalPacketHandlers()
         {
             AddLocalPacketHandler(PacketType.LogoutRequest, HandleLogout);
-            AddLocalPacketHandler(PacketType.AgentUpdate, HandleAgentUpdate);
-            AddLocalPacketHandler(PacketType.ViewerEffect, HandleViewerEffect);
-            AddLocalPacketHandler(PacketType.AgentCachedTexture, HandleAgentTextureCached);
-            AddLocalPacketHandler(PacketType.MultipleObjectUpdate, HandleMultipleObjUpdate);
-            AddLocalPacketHandler(PacketType.MoneyTransferRequest, HandleMoneyTransferRequest);
-            AddLocalPacketHandler(PacketType.ParcelBuy, HandleParcelBuyRequest);
-            AddLocalPacketHandler(PacketType.UUIDGroupNameRequest, HandleUUIDGroupNameRequest);
-            AddLocalPacketHandler(PacketType.ObjectGroup, HandleObjectGroupRequest);
+            AddLocalPacketHandler(PacketType.AgentUpdate, HandleAgentUpdate, false);
+            AddLocalPacketHandler(PacketType.ViewerEffect, HandleViewerEffect, false);
+            AddLocalPacketHandler(PacketType.AgentCachedTexture, HandleAgentTextureCached, false);
+            AddLocalPacketHandler(PacketType.MultipleObjectUpdate, HandleMultipleObjUpdate, false);
+            AddLocalPacketHandler(PacketType.MoneyTransferRequest, HandleMoneyTransferRequest, false);
+            AddLocalPacketHandler(PacketType.ParcelBuy, HandleParcelBuyRequest, false);
+            AddLocalPacketHandler(PacketType.UUIDGroupNameRequest, HandleUUIDGroupNameRequest, false);
+            AddLocalPacketHandler(PacketType.ObjectGroup, HandleObjectGroupRequest, false);
             AddLocalPacketHandler(PacketType.GenericMessage, HandleGenericMessage);
             AddLocalPacketHandler(PacketType.AvatarPropertiesRequest, HandleAvatarPropertiesRequest);
             AddLocalPacketHandler(PacketType.ChatFromViewer, HandleChatFromViewer);
             AddLocalPacketHandler(PacketType.AvatarPropertiesUpdate, HandlerAvatarPropertiesUpdate);
             AddLocalPacketHandler(PacketType.ScriptDialogReply, HandlerScriptDialogReply);
-            AddLocalPacketHandler(PacketType.ImprovedInstantMessage, HandlerImprovedInstantMessage);
+            AddLocalPacketHandler(PacketType.ImprovedInstantMessage, HandlerImprovedInstantMessage, false);
             AddLocalPacketHandler(PacketType.AcceptFriendship, HandlerAcceptFriendship);
             AddLocalPacketHandler(PacketType.DeclineFriendship, HandlerDeclineFriendship);
             AddLocalPacketHandler(PacketType.TerminateFriendship, HandlerTerminateFrendship);
@@ -4318,9 +4392,9 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             AddLocalPacketHandler(PacketType.ObjectAttach, HandleObjectAttach);
             AddLocalPacketHandler(PacketType.ObjectDetach, HandleObjectDetach);
             AddLocalPacketHandler(PacketType.ObjectDrop, HandleObjectDrop);
-            AddLocalPacketHandler(PacketType.SetAlwaysRun, HandleSetAlwaysRun);
+            AddLocalPacketHandler(PacketType.SetAlwaysRun, HandleSetAlwaysRun, false);
             AddLocalPacketHandler(PacketType.CompleteAgentMovement, HandleCompleteAgentMovement);
-            AddLocalPacketHandler(PacketType.AgentAnimation, HandleAgentAnimation);
+            AddLocalPacketHandler(PacketType.AgentAnimation, HandleAgentAnimation, false);
             AddLocalPacketHandler(PacketType.AgentRequestSit, HandleAgentRequestSit);
             AddLocalPacketHandler(PacketType.AgentSit, HandleAgentSit);
             AddLocalPacketHandler(PacketType.SoundTrigger, HandleSoundTrigger);
@@ -4329,9 +4403,9 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             AddLocalPacketHandler(PacketType.UserInfoRequest, HandleUserInfoRequest);
             AddLocalPacketHandler(PacketType.UpdateUserInfo, HandleUpdateUserInfo);
             AddLocalPacketHandler(PacketType.SetStartLocationRequest, HandleSetStartLocationRequest);
-            AddLocalPacketHandler(PacketType.AgentThrottle, HandleAgentThrottle);
-            AddLocalPacketHandler(PacketType.AgentPause, HandleAgentPause);
-            AddLocalPacketHandler(PacketType.AgentResume, HandleAgentResume);
+            AddLocalPacketHandler(PacketType.AgentThrottle, HandleAgentThrottle, false);
+            AddLocalPacketHandler(PacketType.AgentPause, HandleAgentPause, false);
+            AddLocalPacketHandler(PacketType.AgentResume, HandleAgentResume, false);
             AddLocalPacketHandler(PacketType.ForceScriptControlRelease, HandleForceScriptControlRelease);
             AddLocalPacketHandler(PacketType.ObjectLink, HandleObjectLink);
             AddLocalPacketHandler(PacketType.ObjectDelink, HandleObjectDelink);
@@ -4347,22 +4421,22 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             AddLocalPacketHandler(PacketType.ObjectRotation, HandleObjectRotation);
             AddLocalPacketHandler(PacketType.ObjectFlagUpdate, HandleObjectFlagUpdate);
             AddLocalPacketHandler(PacketType.ObjectImage, HandleObjectImage);
-            AddLocalPacketHandler(PacketType.ObjectGrab, HandleObjectGrab);
-            AddLocalPacketHandler(PacketType.ObjectGrabUpdate, HandleObjectGrabUpdate);
+            AddLocalPacketHandler(PacketType.ObjectGrab, HandleObjectGrab, false);
+            AddLocalPacketHandler(PacketType.ObjectGrabUpdate, HandleObjectGrabUpdate, false);
             AddLocalPacketHandler(PacketType.ObjectDeGrab, HandleObjectDeGrab);
-            AddLocalPacketHandler(PacketType.ObjectSpinStart, HandleObjectSpinStart);
-            AddLocalPacketHandler(PacketType.ObjectSpinUpdate, HandleObjectSpinUpdate);
-            AddLocalPacketHandler(PacketType.ObjectSpinStop, HandleObjectSpinStop);
-            AddLocalPacketHandler(PacketType.ObjectDescription, HandleObjectDescription);
-            AddLocalPacketHandler(PacketType.ObjectName, HandleObjectName);
-            AddLocalPacketHandler(PacketType.ObjectPermissions, HandleObjectPermissions);
-            AddLocalPacketHandler(PacketType.Undo, HandleUndo);
+            AddLocalPacketHandler(PacketType.ObjectSpinStart, HandleObjectSpinStart, false);
+            AddLocalPacketHandler(PacketType.ObjectSpinUpdate, HandleObjectSpinUpdate, false);
+            AddLocalPacketHandler(PacketType.ObjectSpinStop, HandleObjectSpinStop, false);
+            AddLocalPacketHandler(PacketType.ObjectDescription, HandleObjectDescription, false);
+            AddLocalPacketHandler(PacketType.ObjectName, HandleObjectName, false);
+            AddLocalPacketHandler(PacketType.ObjectPermissions, HandleObjectPermissions, false);
+            AddLocalPacketHandler(PacketType.Undo, HandleUndo, false);
             AddLocalPacketHandler(PacketType.ObjectDuplicateOnRay, HandleObjectDuplicateOnRay);
-            AddLocalPacketHandler(PacketType.RequestObjectPropertiesFamily, HandleRequestObjectPropertiesFamily);
+            AddLocalPacketHandler(PacketType.RequestObjectPropertiesFamily, HandleRequestObjectPropertiesFamily, false);
             AddLocalPacketHandler(PacketType.ObjectIncludeInSearch, HandleObjectIncludeInSearch);
-            AddLocalPacketHandler(PacketType.ScriptAnswerYes, HandleScriptAnswerYes);
-            AddLocalPacketHandler(PacketType.ObjectClickAction, HandleObjectClickAction);
-            AddLocalPacketHandler(PacketType.ObjectMaterial, HandleObjectMaterial);
+            AddLocalPacketHandler(PacketType.ScriptAnswerYes, HandleScriptAnswerYes, false);
+            AddLocalPacketHandler(PacketType.ObjectClickAction, HandleObjectClickAction, false);
+            AddLocalPacketHandler(PacketType.ObjectMaterial, HandleObjectMaterial, false);
             AddLocalPacketHandler(PacketType.RequestImage, HandleRequestImage);
             AddLocalPacketHandler(PacketType.TransferRequest, HandleTransferRequest);
             AddLocalPacketHandler(PacketType.AssetUploadRequest, HandleAssetUploadRequest);
@@ -4388,17 +4462,17 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             AddLocalPacketHandler(PacketType.RemoveTaskInventory, HandleRemoveTaskInventory);
             AddLocalPacketHandler(PacketType.MoveTaskInventory, HandleMoveTaskInventory);
             AddLocalPacketHandler(PacketType.RezScript, HandleRezScript);
-            AddLocalPacketHandler(PacketType.MapLayerRequest, HandleMapLayerRequest);
-            AddLocalPacketHandler(PacketType.MapBlockRequest, HandleMapBlockRequest);
-            AddLocalPacketHandler(PacketType.MapNameRequest, HandleMapNameRequest);
+            AddLocalPacketHandler(PacketType.MapLayerRequest, HandleMapLayerRequest, false);
+            AddLocalPacketHandler(PacketType.MapBlockRequest, HandleMapBlockRequest, false);
+            AddLocalPacketHandler(PacketType.MapNameRequest, HandleMapNameRequest, false);
             AddLocalPacketHandler(PacketType.TeleportLandmarkRequest, HandleTeleportLandmarkRequest);
             AddLocalPacketHandler(PacketType.TeleportLocationRequest, HandleTeleportLocationRequest);
-            AddLocalPacketHandler(PacketType.UUIDNameRequest, HandleUUIDNameRequest);
+            AddLocalPacketHandler(PacketType.UUIDNameRequest, HandleUUIDNameRequest, false);
             AddLocalPacketHandler(PacketType.RegionHandleRequest, HandleRegionHandleRequest);
-            AddLocalPacketHandler(PacketType.ParcelInfoRequest, HandleParcelInfoRequest);
-            AddLocalPacketHandler(PacketType.ParcelAccessListRequest, HandleParcelAccessListRequest);
-            AddLocalPacketHandler(PacketType.ParcelAccessListUpdate, HandleParcelAccessListUpdate);
-            AddLocalPacketHandler(PacketType.ParcelPropertiesRequest, HandleParcelPropertiesRequest);
+            AddLocalPacketHandler(PacketType.ParcelInfoRequest, HandleParcelInfoRequest, false);
+            AddLocalPacketHandler(PacketType.ParcelAccessListRequest, HandleParcelAccessListRequest, false);
+            AddLocalPacketHandler(PacketType.ParcelAccessListUpdate, HandleParcelAccessListUpdate, false);
+            AddLocalPacketHandler(PacketType.ParcelPropertiesRequest, HandleParcelPropertiesRequest, false);
             AddLocalPacketHandler(PacketType.ParcelDivide, HandleParcelDivide);
             AddLocalPacketHandler(PacketType.ParcelJoin, HandleParcelJoin);
             AddLocalPacketHandler(PacketType.ParcelPropertiesUpdate, HandleParcelPropertiesUpdate);
@@ -4412,7 +4486,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             AddLocalPacketHandler(PacketType.LandStatRequest, HandleLandStatRequest);
             AddLocalPacketHandler(PacketType.ParcelDwellRequest, HandleParcelDwellRequest);
             AddLocalPacketHandler(PacketType.EstateOwnerMessage, HandleEstateOwnerMessage);
-            AddLocalPacketHandler(PacketType.RequestRegionInfo, HandleRequestRegionInfo);
+            AddLocalPacketHandler(PacketType.RequestRegionInfo, HandleRequestRegionInfo, false);
             AddLocalPacketHandler(PacketType.EstateCovenantRequest, HandleEstateCovenantRequest);
             AddLocalPacketHandler(PacketType.RequestGodlikePowers, HandleRequestGodlikePowers);
             AddLocalPacketHandler(PacketType.GodKickUser, HandleGodKickUser);
@@ -4427,13 +4501,13 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             AddLocalPacketHandler(PacketType.ActivateGestures, HandleActivateGestures);
             AddLocalPacketHandler(PacketType.DeactivateGestures, HandleDeactivateGestures);
             AddLocalPacketHandler(PacketType.ObjectOwner, HandleObjectOwner);
-            AddLocalPacketHandler(PacketType.AgentFOV, HandleAgentFOV);
+            AddLocalPacketHandler(PacketType.AgentFOV, HandleAgentFOV, false);
             AddLocalPacketHandler(PacketType.ViewerStats, HandleViewerStats);
-            AddLocalPacketHandler(PacketType.MapItemRequest, HandleMapItemRequest);
-            AddLocalPacketHandler(PacketType.TransferAbort, HandleTransferAbort);
-            AddLocalPacketHandler(PacketType.MuteListRequest, HandleMuteListRequest);
+            AddLocalPacketHandler(PacketType.MapItemRequest, HandleMapItemRequest, false);
+            AddLocalPacketHandler(PacketType.TransferAbort, HandleTransferAbort, false);
+            AddLocalPacketHandler(PacketType.MuteListRequest, HandleMuteListRequest, false);
             AddLocalPacketHandler(PacketType.UseCircuitCode, HandleUseCircuitCode);
-            AddLocalPacketHandler(PacketType.AgentHeightWidth, HandleAgentHeightWidth);
+            AddLocalPacketHandler(PacketType.AgentHeightWidth, HandleAgentHeightWidth, false);
             AddLocalPacketHandler(PacketType.InventoryDescendents, HandleInventoryDescendents);
             AddLocalPacketHandler(PacketType.DirPlacesQuery, HandleDirPlacesQuery);
             AddLocalPacketHandler(PacketType.DirFindQuery, HandleDirFindQuery);
@@ -4783,6 +4857,9 @@ namespace OpenSim.Region.ClientStack.LindenUDP
                 UserProfile.FirstLifeImage = Properties.FLImageID;
                 UserProfile.Image = Properties.ImageID;
                 UserProfile.ProfileUrl = Utils.BytesToString(Properties.ProfileURL);
+                UserProfile.UserFlags &= ~3;
+                UserProfile.UserFlags |= Properties.AllowPublish ? 1 : 0;
+                UserProfile.UserFlags |= Properties.MaturePublish ? 2 : 0;
 
                 handlerUpdateAvatarProperties(this, UserProfile);
             }
@@ -5521,6 +5598,24 @@ namespace OpenSim.Region.ClientStack.LindenUDP
 
             if (avSetStartLocationRequestPacket.AgentData.AgentID == AgentId && avSetStartLocationRequestPacket.AgentData.SessionID == SessionId)
             {
+                // Linden Client limitation..     
+                if (avSetStartLocationRequestPacket.StartLocationData.LocationPos.X == 255.5f
+                    || avSetStartLocationRequestPacket.StartLocationData.LocationPos.Y == 255.5f)
+                {
+                    ScenePresence avatar = null;
+                    if (((Scene)m_scene).TryGetAvatar(AgentId, out avatar))
+                    {
+                        if (avSetStartLocationRequestPacket.StartLocationData.LocationPos.X == 255.5f)
+                        {
+                            avSetStartLocationRequestPacket.StartLocationData.LocationPos.X = avatar.AbsolutePosition.X;
+                        }
+                        if (avSetStartLocationRequestPacket.StartLocationData.LocationPos.Y == 255.5f)
+                        {
+                            avSetStartLocationRequestPacket.StartLocationData.LocationPos.Y = avatar.AbsolutePosition.Y;
+                        }
+                    }
+
+                }
                 TeleportLocationRequest handlerSetStartLocationRequest = OnSetStartLocationRequest;
                 if (handlerSetStartLocationRequest != null)
                 {
@@ -15687,6 +15782,26 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             }
             #endregion
         }
+
+        public struct PacketProcessor
+        {
+            public PacketMethod method;
+            public bool Async;
+        }
+        public class AsyncPacketProcess
+        {
+            public bool result = false;
+            public readonly LLClientView ClientView = null;
+            public readonly Packet Pack = null;
+            public readonly PacketMethod Method = null;
+            public AsyncPacketProcess(LLClientView pClientview, PacketMethod pMethod, Packet pPack)
+            {
+                ClientView = pClientview;
+                Method = pMethod;
+                Pack = pPack;
+            }
+        }
+
         #endregion
 
         public static OSD BuildEvent(string eventName, OSD eventBody)
@@ -15696,6 +15811,23 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             osdEvent.Add("body", eventBody);
 
             return osdEvent;
+        }
+
+        public void SendAvatarInterestsReply(UUID avatarID, uint wantMask, string wantText, uint skillsMask, string skillsText, string languages)
+        {
+            AvatarInterestsReplyPacket packet = (AvatarInterestsReplyPacket)PacketPool.Instance.GetPacket(PacketType.AvatarInterestsReply);
+
+            packet.AgentData = new AvatarInterestsReplyPacket.AgentDataBlock();
+            packet.AgentData.AgentID = AgentId;
+            packet.AgentData.AvatarID = avatarID;
+
+            packet.PropertiesData = new AvatarInterestsReplyPacket.PropertiesDataBlock();
+            packet.PropertiesData.WantToMask = wantMask;
+            packet.PropertiesData.WantToText = Utils.StringToBytes(wantText);
+            packet.PropertiesData.SkillsMask = skillsMask;
+            packet.PropertiesData.SkillsText = Utils.StringToBytes(skillsText);
+            packet.PropertiesData.LanguagesText = Utils.StringToBytes(languages);
+            OutPacket(packet, ThrottleOutPacketType.Task);
         }
     }
 }

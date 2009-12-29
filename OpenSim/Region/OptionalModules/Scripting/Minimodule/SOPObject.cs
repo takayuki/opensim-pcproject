@@ -258,26 +258,50 @@ namespace OpenSim.Region.OptionalModules.Scripting.Minimodule
 
         public Vector3 SitTarget
         {
-            get { throw new System.NotImplementedException(); }
-            set { throw new System.NotImplementedException(); }
+            get { return GetSOP().SitTargetPosition; }
+            set 
+            { 
+                if (CanEdit())
+                {
+                    GetSOP().SitTargetPosition = value;
+                }	 
+            }
         }
 
         public string SitTargetText
         {
-            get { throw new System.NotImplementedException(); }
-            set { throw new System.NotImplementedException(); }
+            get { return GetSOP().SitName; }
+            set 
+            { 
+                if (CanEdit())
+                {
+                    GetSOP().SitName = value;
+                }	
+            }
         }
 
         public string TouchText
         {
-            get { throw new System.NotImplementedException(); }
-            set { throw new System.NotImplementedException(); }
+            get { return GetSOP().TouchName; }
+            set 
+            {
+                if (CanEdit())
+                {
+                    GetSOP().TouchName = value;
+                }				
+            }
         }
 
         public string Text
         {
-            get { throw new System.NotImplementedException(); }
-            set { throw new System.NotImplementedException(); }
+            get { return GetSOP().Text; }
+            set 
+            {
+                if (CanEdit())
+                {
+                    GetSOP().SetText(value,new Vector3(1.0f,1.0f,1.0f),1.0f);
+                }
+            }
         }
 
         public bool IsRotationLockedX
@@ -360,6 +384,15 @@ namespace OpenSim.Region.OptionalModules.Scripting.Minimodule
             m_rootScene.SimChat(msg, ChatTypeEnum.Say, sop.AbsolutePosition, sop.Name, sop.UUID, false);
         }
 
+        public void Say(string msg,int channel)		
+        {
+            if (!CanEdit())
+                return;
+
+            SceneObjectPart sop = GetSOP();
+            m_rootScene.SimChat(Utils.StringToBytes(msg), ChatTypeEnum.Say,channel, sop.AbsolutePosition, sop.Name, sop.UUID, false);
+        }
+            	
         #endregion
 
 

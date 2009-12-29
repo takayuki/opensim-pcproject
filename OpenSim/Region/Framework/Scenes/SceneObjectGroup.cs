@@ -1734,6 +1734,45 @@ namespace OpenSim.Region.Framework.Scenes
                 }
             }
         }
+        
+        public void rotLookAt(Quaternion target, float strength, float damping)
+        {
+            SceneObjectPart rootpart = m_rootPart;
+            if (rootpart != null)
+            {
+                if (IsAttachment)
+                {
+                /*
+                    ScenePresence avatar = m_scene.GetScenePresence(rootpart.AttachedAvatar);
+                    if (avatar != null)
+                    {
+                    Rotate the Av?
+                    } */
+                }
+                else
+                {
+                    if (rootpart.PhysActor != null)
+                    {
+                        rootpart.PhysActor.APIDTarget = new Quaternion(target.X, target.Y, target.Z, target.W);
+                        rootpart.PhysActor.APIDStrength = strength;
+                        rootpart.PhysActor.APIDDamping = damping;
+                        rootpart.PhysActor.APIDActive = true;
+                    }
+                }
+            }
+        }
+        public void stopLookAt()
+        {
+            SceneObjectPart rootpart = m_rootPart;
+            if (rootpart != null)
+            {
+                if (rootpart.PhysActor != null)
+                {
+                    rootpart.PhysActor.APIDActive = false;
+                }
+            }
+        
+        }
 
         /// <summary>
         /// Uses a PID to attempt to clamp the object on the Z axis at the given height over tau seconds.
@@ -2114,14 +2153,14 @@ namespace OpenSim.Region.Framework.Scenes
         public void LinkToGroup(SceneObjectGroup objectGroup)
         {
             // Make sure we have sent any pending unlinks or stuff.
-            if (objectGroup.RootPart.UpdateFlag > 0)
-            {
-                m_log.WarnFormat(
-                    "[SCENE OBJECT GROUP]: Forcing send of linkset {0}, {1} to {2}, {3} as its still waiting.",
-                    objectGroup.RootPart.Name, objectGroup.RootPart.UUID, RootPart.Name, RootPart.UUID);
+            //if (objectGroup.RootPart.UpdateFlag > 0)
+            //{
+            //    m_log.WarnFormat(
+            //        "[SCENE OBJECT GROUP]: Forcing send of linkset {0}, {1} to {2}, {3} as its still waiting.",
+            //        objectGroup.RootPart.Name, objectGroup.RootPart.UUID, RootPart.Name, RootPart.UUID);
 
-                objectGroup.RootPart.SendScheduledUpdates();
-            }
+            //    objectGroup.RootPart.SendScheduledUpdates();
+            //}
 
 //            m_log.DebugFormat(
 //                "[SCENE OBJECT GROUP]: Linking group with root part {0}, {1} to group with root part {2}, {3}",
@@ -2207,8 +2246,8 @@ namespace OpenSim.Region.Framework.Scenes
             // unmoved prims!
             ResetChildPrimPhysicsPositions();
 
-            HasGroupChanged = true;
-            ScheduleGroupForFullUpdate();
+            //HasGroupChanged = true;
+            //ScheduleGroupForFullUpdate();
         }
 
         /// <summary>
@@ -2299,8 +2338,8 @@ namespace OpenSim.Region.Framework.Scenes
 
             linkPart.Rezzed = RootPart.Rezzed;
 
-            HasGroupChanged = true;
-            ScheduleGroupForFullUpdate();
+            //HasGroupChanged = true;
+            //ScheduleGroupForFullUpdate();
         }
 
         /// <summary>
@@ -2589,7 +2628,9 @@ namespace OpenSim.Region.Framework.Scenes
                 {
                     foreach (SceneObjectPart part in m_parts.Values)
                     {
-                        if (part.Scale.X > 10.0 || part.Scale.Y > 10.0 || part.Scale.Z > 10.0)
+                        if (part.Scale.X > m_scene.RegionInfo.PhysPrimMax || 
+                            part.Scale.Y > m_scene.RegionInfo.PhysPrimMax ||
+                            part.Scale.Z > m_scene.RegionInfo.PhysPrimMax)
                         {
                             UsePhysics = false; // Reset physics
                             break;

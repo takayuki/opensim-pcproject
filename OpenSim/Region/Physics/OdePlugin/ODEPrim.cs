@@ -723,6 +723,8 @@ namespace OpenSim.Region.Physics.OdePlugin
                         break;
                 }
             }
+            if (returnMass > _parent_scene.maximumMassObject)
+                returnMass = _parent_scene.maximumMassObject;
             return returnMass;
         }// end CalculateMass
 
@@ -733,6 +735,7 @@ namespace OpenSim.Region.Physics.OdePlugin
             if (Body != (IntPtr) 0)
             {
                 float newmass = CalculateMass();
+
                 //m_log.Info("[PHYSICS]: New Mass: " + newmass.ToString());
 
                 d.MassSetBoxTotal(out pMass, newmass, _size.X, _size.Y, _size.Z);
@@ -2824,6 +2827,15 @@ Console.WriteLine(" JointCreateFixed");
         public override bool PIDHoverActive { set { m_useHoverPID = value; } }
         public override PIDHoverType PIDHoverType { set { m_PIDHoverType = value; } }
         public override float PIDHoverTau { set { m_PIDHoverTau = value; } }
+        
+        public override Quaternion APIDTarget{ set { return; } }
+
+        public override bool APIDActive{ set { return; } }
+
+        public override float APIDStrength{ set { return; } }
+
+        public override float APIDDamping{ set { return; } }
+
 
         private void createAMotor(Vector3 axis)
         {

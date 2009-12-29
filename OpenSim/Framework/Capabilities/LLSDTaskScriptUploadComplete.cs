@@ -25,44 +25,30 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using OpenMetaverse;
 using System;
+using System.Collections;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework.Capabilities
 {
-    [Serializable]
-    public class RegionUpData
+    [OSDMap]
+    public class LLSDTaskScriptUploadComplete
     {
-        private string m_ipaddr = "";
-        private int m_port = 0;
-        private uint m_X = 0;
-        private uint m_Y = 0;
+        /// <summary>
+        /// The task inventory item that was updated
+        /// </summary>
+        public UUID new_asset;
 
-        public RegionUpData(uint X, uint Y, string ipaddr, int port)
-        {
-            m_X = X;
-            m_Y = Y;
-            m_ipaddr = ipaddr;
-            m_port = port;
-        }
+        /// <summary>
+        /// Was it compiled?
+        /// </summary>
+        public bool compiled;
 
-        public uint X
-        {
-            get { return m_X; }
-        }
+        /// <summary>
+        /// State of the upload.  So far have only even seen this set to "complete"
+        /// </summary>
+        public string state;
 
-        public uint Y
-        {
-            get { return m_Y; }
-        }
-
-        public string IPADDR
-        {
-            get { return m_ipaddr; }
-        }
-
-        public int PORT
-        {
-            get { return m_port; }
-        }
+        public OSDArray errors;
     }
 }

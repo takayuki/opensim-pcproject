@@ -77,6 +77,8 @@ namespace OpenSim.Region.ScriptEngine.XEngine
         private string m_ScriptErrorMessage;
         private Dictionary<string, string> m_uniqueScripts = new Dictionary<string, string>();
         private bool m_AppDomainLoading;
+        private Dictionary<UUID,ArrayList> m_ScriptErrors =
+                new Dictionary<UUID,ArrayList>();
 
         // disable warning: need to keep a reference to XEngine.EventManager
         // alive to avoid it being garbage collected
@@ -589,87 +591,97 @@ namespace OpenSim.Region.ScriptEngine.XEngine
 
             Dictionary<KeyValuePair<int, int>, KeyValuePair<int, int>> linemap;
 
-            try
-            {
-                lock (m_AddingAssemblies) 
-                {
-                    m_Compiler.PerformScriptCompile(script, assetID.ToString(), item.OwnerID, out assembly, out linemap);
-                    if (!m_AddingAssemblies.ContainsKey(assembly)) {
-                        m_AddingAssemblies[assembly] = 1;
-                    } else {
-                        m_AddingAssemblies[assembly]++;
-                    }
-                }
-
-                string[] warnings = m_Compiler.GetWarnings();
-
-                if (warnings != null && warnings.Length != 0)
-                {
-                    foreach (string warning in warnings)
-                    {
-                        try
-                        {
-                            // DISPLAY WARNING INWORLD
-                            string text = "Warning:\n" + warning;
-                            if (text.Length > 1000)
-                                text = text.Substring(0, 1000);
-                            if (!ShowScriptSaveResponse(item.OwnerID,
-                                    assetID, text, true))
-                            {
-                                if (presence != null && (!postOnRez))
-                                    presence.ControllingClient.SendAgentAlertMessage("Script saved with warnings, check debug window!", false);
-
-                                World.SimChat(Utils.StringToBytes(text),
-                                              ChatTypeEnum.DebugChannel, 2147483647,
-                                              part.AbsolutePosition,
-                                              part.Name, part.UUID, false);
-                            }
-                        }
-                        catch (Exception e2) // LEGIT: User Scripting
-                        {
-                            m_log.Error("[XEngine]: " +
-                                    "Error displaying warning in-world: " +
-                                    e2.ToString());
-                            m_log.Error("[XEngine]: " +
-                                    "Warning:\r\n" +
-                                    warning);
-                        }
-                    }
-                }
-            }
-            catch (Exception e)
+            lock(m_ScriptErrors)
             {
                 try
                 {
-                    // DISPLAY ERROR INWORLD
-                    m_ScriptErrorMessage += "Failed to compile script in object: '" + part.ParentGroup.RootPart.Name + "' Script name: '" + item.Name + "' Error message: " + e.Message.ToString();
-
-                    m_ScriptFailCount++;
-                    string text = "Error compiling script '" + item.Name + "':\n" + e.Message.ToString();
-                    if (text.Length > 1000)
-                        text = text.Substring(0, 1000);
-                    if (!ShowScriptSaveResponse(item.OwnerID,
-                            assetID, text, false))
+                    lock (m_AddingAssemblies) 
                     {
-                        if (presence != null && (!postOnRez))
-                            presence.ControllingClient.SendAgentAlertMessage("Script saved with errors, check debug window!", false);
-                        World.SimChat(Utils.StringToBytes(text),
-                                      ChatTypeEnum.DebugChannel, 2147483647,
-                                      part.AbsolutePosition,
-                                      part.Name, part.UUID, false);
+                        m_Compiler.PerformScriptCompile(script, assetID.ToString(), item.OwnerID, out assembly, out linemap);
+                        if (!m_AddingAssemblies.ContainsKey(assembly)) {
+                            m_AddingAssemblies[assembly] = 1;
+                        } else {
+                            m_AddingAssemblies[assembly]++;
+                        }
+                    }
+
+                    string[] warnings = m_Compiler.GetWarnings();
+
+                    if (warnings != null && warnings.Length != 0)
+                    {
+                        foreach (string warning in warnings)
+                        {
+                            if (!m_ScriptErrors.ContainsKey(itemID))
+                                m_ScriptErrors[itemID] = new ArrayList();
+
+                            m_ScriptErrors[itemID].Add(warning);
+    //                        try
+    //                        {
+    //                            // DISPLAY WARNING INWORLD
+    //                            string text = "Warning:\n" + warning;
+    //                            if (text.Length > 1000)
+    //                                text = text.Substring(0, 1000);
+    //                            if (!ShowScriptSaveResponse(item.OwnerID,
+    //                                    assetID, text, true))
+    //                            {
+    //                                if (presence != null && (!postOnRez))
+    //                                    presence.ControllingClient.SendAgentAlertMessage("Script saved with warnings, check debug window!", false);
+    //
+    //                                World.SimChat(Utils.StringToBytes(text),
+    //                                              ChatTypeEnum.DebugChannel, 2147483647,
+    //                                              part.AbsolutePosition,
+    //                                              part.Name, part.UUID, false);
+    //                            }
+    //                        }
+    //                        catch (Exception e2) // LEGIT: User Scripting
+    //                        {
+    //                            m_log.Error("[XEngine]: " +
+    //                                    "Error displaying warning in-world: " +
+    //                                    e2.ToString());
+    //                            m_log.Error("[XEngine]: " +
+    //                                    "Warning:\r\n" +
+    //                                    warning);
+    //                        }
+                        }
                     }
                 }
-                catch (Exception e2) // LEGIT: User Scripting
+                catch (Exception e)
                 {
-                    m_log.Error("[XEngine]: "+
-                            "Error displaying error in-world: " +
-                            e2.ToString());
-                    m_log.Error("[XEngine]: " +
-                            "Errormessage: Error compiling script:\r\n" +
-                            e.Message.ToString());
-                }
+    //                try
+    //                {
+                        if (!m_ScriptErrors.ContainsKey(itemID))
+                            m_ScriptErrors[itemID] = new ArrayList();
+                        // DISPLAY ERROR INWORLD
+    //                    m_ScriptErrorMessage += "Failed to compile script in object: '" + part.ParentGroup.RootPart.Name + "' Script name: '" + item.Name + "' Error message: " + e.Message.ToString();
+    //
+                        m_ScriptFailCount++;
+                        m_ScriptErrors[itemID].Add(e.Message.ToString());
+    //                    string text = "Error compiling script '" + item.Name + "':\n" + e.Message.ToString();
+    //                    if (text.Length > 1000)
+    //                        text = text.Substring(0, 1000);
+    //                    if (!ShowScriptSaveResponse(item.OwnerID,
+    //                            assetID, text, false))
+    //                    {
+    //                        if (presence != null && (!postOnRez))
+    //                            presence.ControllingClient.SendAgentAlertMessage("Script saved with errors, check debug window!", false);
+    //                        World.SimChat(Utils.StringToBytes(text),
+    //                                      ChatTypeEnum.DebugChannel, 2147483647,
+    //                                      part.AbsolutePosition,
+    //                                      part.Name, part.UUID, false);
+    //                    }
+    //                }
+    //                catch (Exception e2) // LEGIT: User Scripting
+    //                {
+    //                    m_log.Error("[XEngine]: "+
+    //                            "Error displaying error in-world: " +
+    //                            e2.ToString());
+    //                    m_log.Error("[XEngine]: " +
+    //                            "Errormessage: Error compiling script:\r\n" +
+    //                            e.Message.ToString());
+    //                }
 
-                return false;
+                    return false;
+                }
             }
 
             lock (m_Scripts)
@@ -1177,13 +1189,6 @@ namespace OpenSim.Region.ScriptEngine.XEngine
                 return;
             instance.SetState(newState);
         }
-        public string GetState(UUID itemID)
-        {
-            IScriptInstance instance = GetInstance(itemID);
-            if (instance == null)
-                return "default";
-            return instance.State;
-        }
 
         public int GetStartParameter(UUID itemID)
         {
@@ -1266,6 +1271,9 @@ namespace OpenSim.Region.ScriptEngine.XEngine
             XmlAttribute assetID = doc.CreateAttribute("", "Asset", "");
             assetID.Value = instance.AssetID.ToString();
             stateData.Attributes.Append(assetID);
+            XmlAttribute engineName = doc.CreateAttribute("", "Engine", "");
+            engineName.Value = ScriptEngineName;
+            stateData.Attributes.Append(engineName);
             doc.AppendChild(stateData);
 
             // Add <ScriptState>...</ScriptState>
@@ -1365,10 +1373,10 @@ namespace OpenSim.Region.ScriptEngine.XEngine
             return false;
         }
 
-        public void SetXMLState(UUID itemID, string xml)
+        public bool SetXMLState(UUID itemID, string xml)
         {
             if (xml == String.Empty)
-                return;
+                return false;
 
             XmlDocument doc = new XmlDocument();
 
@@ -1379,24 +1387,28 @@ namespace OpenSim.Region.ScriptEngine.XEngine
             catch (Exception)
             {
                 m_log.Error("[XEngine]: Exception decoding XML data from region transfer");
-                return;
+                return false;
             }
 
             XmlNodeList rootL = doc.GetElementsByTagName("State");
             if (rootL.Count < 1)
-                return;
+                return false;
 
             XmlElement rootE = (XmlElement)rootL[0];
 
-            if (rootE.GetAttribute("UUID") != itemID.ToString())
-                return;
+            if (rootE.GetAttribute("Engine") != ScriptEngineName)
+                return false;
 
-//            string assetID = rootE.GetAttribute("Asset");
+//          On rez from inventory, that ID will have changed. It was only
+//          advisory anyway. So we don't check it anymore.
+//
+//            if (rootE.GetAttribute("UUID") != itemID.ToString())
+//                return;
 
             XmlNodeList stateL = rootE.GetElementsByTagName("ScriptState");
 
             if (stateL.Count != 1)
-                return;
+                return false;
 
             XmlElement stateE = (XmlElement)stateL[0];
 
@@ -1405,7 +1417,7 @@ namespace OpenSim.Region.ScriptEngine.XEngine
                 XmlNodeList assemL = rootE.GetElementsByTagName("Assembly");
 
                 if (assemL.Count != 1)
-                    return;
+                    return false;
 
                 XmlElement assemE = (XmlElement)assemL[0];
 
@@ -1445,19 +1457,39 @@ namespace OpenSim.Region.ScriptEngine.XEngine
             sfs.Close();
 
             XmlNodeList mapL = rootE.GetElementsByTagName("LineMap");
-            
-            XmlElement mapE = (XmlElement)mapL[0];
+            if (mapL.Count > 0)
+            {
+                XmlElement mapE = (XmlElement)mapL[0];
 
-            string mappath = Path.Combine("ScriptEngines", World.RegionInfo.RegionID.ToString());
-            mappath = Path.Combine(mappath, mapE.GetAttribute("Filename"));
+                string mappath = Path.Combine("ScriptEngines", World.RegionInfo.RegionID.ToString());
+                mappath = Path.Combine(mappath, mapE.GetAttribute("Filename"));
 
-            FileStream mfs = File.Create(mappath);
-            StreamWriter msw = new StreamWriter(mfs);
+                FileStream mfs = File.Create(mappath);
+                StreamWriter msw = new StreamWriter(mfs);
 
-            msw.Write(mapE.InnerText);
+                msw.Write(mapE.InnerText);
 
-            msw.Close();
-            mfs.Close();
+                msw.Close();
+                mfs.Close();
+            }
+
+            return true;
+        }
+
+        public ArrayList GetScriptErrors(UUID itemID)
+        {
+            System.Threading.Thread.Sleep(1000);
+
+            lock (m_ScriptErrors)
+            {
+                if (m_ScriptErrors.ContainsKey(itemID))
+                {
+                    ArrayList ret = m_ScriptErrors[itemID];
+                    m_ScriptErrors.Remove(itemID);
+                    return ret;
+                }
+                return new ArrayList();
+            }
         }
     }
 }
