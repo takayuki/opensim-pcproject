@@ -2587,6 +2587,29 @@
       </Files>
     </Project>
 
+    <Project name="NBody" path="NBody" type="Exe">
+      <Configuration name="Debug">
+        <Options>
+          <OutputPath>../bin/</OutputPath>
+        </Options>
+      </Configuration>
+      <Configuration name="Release">
+        <Options>
+          <OutputPath>../bin/</OutputPath>
+        </Options>
+      </Configuration>
+
+      <ReferencePath>../bin/</ReferencePath>
+      <Reference name="System"/>
+      <Reference name="Erlang.NET"/>
+      <Reference name="CUDA.NET.dll"/>
+
+      <Files>
+        <Match pattern="*.cs" recurse="false"/>
+        <Match pattern="*.cubin" path="Resources" buildAction="EmbeddedResource"  recurse="false"/>
+      </Files>
+    </Project>
+
     <Project frameworkVersion="v3_5" name="OpenSim.Region.ScriptEngine.Shared" path="OpenSim/Region/ScriptEngine/Shared" type="Library">
       <Configuration name="Debug">
         <Options>
