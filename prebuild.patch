@@ -1,5 +1,5 @@
---- prebuild.xml	2009-12-01 14:31:05.109375000 +0900
-+++ prebuild.xml.new	2009-12-01 14:32:47.296875000 +0900
+--- prebuild.xml	2009-12-29 18:27:50.828125000 +0900
++++ prebuild.xml.new	2009-12-29 18:04:16.453125000 +0900
 @@ -1710,6 +1710,8 @@
        <Reference name="Nini.dll" />
        <Reference name="log4net.dll"/>
@@ -9,7 +9,7 @@
  
  	  
        <Files>
-@@ -2484,6 +2486,74 @@
+@@ -2517,6 +2486,97 @@
        </Files>
      </Project>
  
@@ -78,6 +78,29 @@
 +
 +      <Files>
 +        <Match pattern="*.cs" recurse="false"/>
++      </Files>
++    </Project>
++
++    <Project name="NBody" path="NBody" type="Exe">
++      <Configuration name="Debug">
++        <Options>
++          <OutputPath>../bin/</OutputPath>
++        </Options>
++      </Configuration>
++      <Configuration name="Release">
++        <Options>
++          <OutputPath>../bin/</OutputPath>
++        </Options>
++      </Configuration>
++
++      <ReferencePath>../bin/</ReferencePath>
++      <Reference name="System"/>
++      <Reference name="Erlang.NET"/>
++      <Reference name="CUDA.NET.dll"/>
++
++      <Files>
++        <Match pattern="*.cs" recurse="false"/>
++        <Match pattern="*.cubin" path="Resources" buildAction="EmbeddedResource"  recurse="false"/>
 +      </Files>
 +    </Project>
 +
