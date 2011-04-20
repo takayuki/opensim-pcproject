@@ -69,7 +69,7 @@ namespace Flotsam.RegionModules.AssetCache
 
         private readonly List<char> m_InvalidChars = new List<char>();
 
-        private int m_LogLevel = 1;
+        private int m_LogLevel = 0;
         private ulong m_HitRateDisplay = 1; // How often to display hit statistics, given in requests
 
         private static ulong m_Requests;
@@ -92,9 +92,9 @@ namespace Flotsam.RegionModules.AssetCache
         // Expiration is expressed in hours.
         private const double m_DefaultMemoryExpiration = 1.0; 
         private const double m_DefaultFileExpiration = 48;
-        private TimeSpan m_MemoryExpiration = TimeSpan.Zero;
-        private TimeSpan m_FileExpiration = TimeSpan.Zero;
-        private TimeSpan m_FileExpirationCleanupTimer = TimeSpan.Zero;
+        private TimeSpan m_MemoryExpiration = TimeSpan.FromHours(m_DefaultMemoryExpiration);
+        private TimeSpan m_FileExpiration = TimeSpan.FromHours(m_DefaultFileExpiration);
+        private TimeSpan m_FileExpirationCleanupTimer = TimeSpan.FromHours(m_DefaultFileExpiration);
 
         private static int m_CacheDirectoryTiers = 1;
         private static int m_CacheDirectoryTierLen = 3;
@@ -147,7 +147,7 @@ namespace Flotsam.RegionModules.AssetCache
                     }
 
                     m_CacheDirectory = assetConfig.GetString("CacheDirectory", m_DefaultCacheDirectory);
-                    m_log.InfoFormat("[FLOTSAM ASSET CACHE]: Cache Directory", m_DefaultCacheDirectory);
+                    m_log.InfoFormat("[FLOTSAM ASSET CACHE]: Cache Directory", m_CacheDirectory);
 
                     m_MemoryCacheEnabled = assetConfig.GetBoolean("MemoryCacheEnabled", false);
                     m_MemoryExpiration = TimeSpan.FromHours(assetConfig.GetDouble("MemoryCacheTimeout", m_DefaultMemoryExpiration));
@@ -156,7 +156,7 @@ namespace Flotsam.RegionModules.AssetCache
                     m_WaitOnInprogressTimeout = assetConfig.GetInt("WaitOnInprogressTimeout", 3000);
 #endif
 
-                    m_LogLevel = assetConfig.GetInt("LogLevel", 1);
+                    m_LogLevel = assetConfig.GetInt("LogLevel", 0);
                     m_HitRateDisplay = (ulong)assetConfig.GetInt("HitRateDisplay", 1000);
 
                     m_FileExpiration = TimeSpan.FromHours(assetConfig.GetDouble("FileCacheTimeout", m_DefaultFileExpiration));
@@ -245,16 +245,7 @@ namespace Flotsam.RegionModules.AssetCache
         private void UpdateMemoryCache(string key, AssetBase asset)
         {
             if (m_MemoryCacheEnabled)
-            {
-                if (m_MemoryExpiration > TimeSpan.Zero)
-                {
-                    m_MemoryCache.AddOrUpdate(key, asset, m_MemoryExpiration);
-                }
-                else
-                {
-                    m_MemoryCache.AddOrUpdate(key, asset, DateTime.MaxValue);
-                }
-            }
+                m_MemoryCache.AddOrUpdate(key, asset, m_MemoryExpiration);
         }
 
         public void Cache(AssetBase asset)
@@ -406,6 +397,11 @@ namespace Flotsam.RegionModules.AssetCache
             return asset;
         }
 
+        public AssetBase GetCached(string id)
+        {
+            return Get(id);
+        }
+
         public void Expire(string id)
         {
             if (m_LogLevel >= 2)
@@ -445,7 +441,7 @@ namespace Flotsam.RegionModules.AssetCache
         private void CleanupExpiredFiles(object source, ElapsedEventArgs e)
         {
             if (m_LogLevel >= 2)
-                m_log.DebugFormat("[FLOTSAM ASSET CACHE]: Checking for expired files older then {0}.", m_FileExpiration.ToString());
+                m_log.DebugFormat("[FLOTSAM ASSET CACHE]: Checking for expired files older then {0}.", m_FileExpiration);
 
             // Purge all files last accessed prior to this point
             DateTime purgeLine = DateTime.Now - m_FileExpiration;
@@ -642,7 +638,7 @@ namespace Flotsam.RegionModules.AssetCache
         {
             UuidGatherer gatherer = new UuidGatherer(m_AssetService);
 
-            Dictionary<UUID, int> assets = new Dictionary<UUID, int>();
+            Dictionary<UUID, AssetType> assets = new Dictionary<UUID, AssetType>();
             foreach (Scene s in m_Scenes)
             {
                 StampRegionStatusFile(s.RegionInfo.RegionID);
@@ -762,7 +758,7 @@ namespace Flotsam.RegionModules.AssetCache
                     case "expire":
 
 
-                        if (cmdparams.Length >= 3)
+                        if (cmdparams.Length < 3)
                         {
                             m_log.InfoFormat("[FLOTSAM ASSET CACHE] Invalid parameters for Expire, please specify a valid date & time", cmd);
                             break;

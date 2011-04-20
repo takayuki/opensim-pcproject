@@ -31,34 +31,75 @@ using System.Collections.Generic;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Data;
+using System.Reflection;
+using log4net;
 
 namespace OpenSim.Data.Null
 {
     public class NullRegionData : IRegionData
     {
+        private static NullRegionData Instance = null;
+
+        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
         Dictionary<UUID, RegionData> m_regionData = new Dictionary<UUID, RegionData>();
 
         public NullRegionData(string connectionString, string realm)
         {
+            if (Instance == null)
+                Instance = this;
             //Console.WriteLine("[XXX] NullRegionData constructor");
         }
 
+        private delegate bool Matcher(string value);
+
         public List<RegionData> Get(string regionName, UUID scopeID)
         {
+            if (Instance != this)
+                return Instance.Get(regionName, scopeID);
+
+            string cleanName = regionName.ToLower();
+
+            // Handle SQL wildcards
+            const string wildcard = "%";
+            bool wildcardPrefix = false;
+            bool wildcardSuffix = false;
+            if (cleanName.Equals(wildcard))
+            {
+                wildcardPrefix = wildcardSuffix = true;
+                cleanName = string.Empty;
+            }
+            else
+            {
+                if (cleanName.StartsWith(wildcard))
+                {
+                    wildcardPrefix = true;
+                    cleanName = cleanName.Substring(1);
+                }
+                if (regionName.EndsWith(wildcard))
+                {
+                    wildcardSuffix = true;
+                    cleanName = cleanName.Remove(cleanName.Length - 1);
+                }
+            }
+            Matcher queryMatch;
+            if (wildcardPrefix && wildcardSuffix)
+                queryMatch = delegate(string s) { return s.Contains(cleanName); };
+            else if (wildcardSuffix)
+                queryMatch = delegate(string s) { return s.StartsWith(cleanName); };
+            else if (wildcardPrefix)
+                queryMatch = delegate(string s) { return s.EndsWith(cleanName); };
+            else
+                queryMatch = delegate(string s) { return s.Equals(cleanName); };
+
+            // Find region data
             List<RegionData> ret = new List<RegionData>();
 
             foreach (RegionData r in m_regionData.Values)
             {
-                if (regionName.Contains("%"))
-                {
-                    if (r.RegionName.Contains(regionName.Replace("%", "")))
+                    m_log.DebugFormat("[NULL REGION DATA]: comparing {0} to {1}", cleanName, r.RegionName.ToLower());
+                    if (queryMatch(r.RegionName.ToLower()))
                         ret.Add(r);
-                }
-                else
-                {
-                    if (r.RegionName == regionName)
-                        ret.Add(r);
-                }
             }
 
             if (ret.Count > 0)
@@ -69,6 +110,9 @@ namespace OpenSim.Data.Null
 
         public RegionData Get(int posX, int posY, UUID scopeID)
         {
+            if (Instance != this)
+                return Instance.Get(posX, posY, scopeID);
+
             List<RegionData> ret = new List<RegionData>();
 
             foreach (RegionData r in m_regionData.Values)
@@ -85,6 +129,9 @@ namespace OpenSim.Data.Null
 
         public RegionData Get(UUID regionID, UUID scopeID)
         {
+            if (Instance != this)
+                return Instance.Get(regionID, scopeID);
+
             if (m_regionData.ContainsKey(regionID))
                 return m_regionData[regionID];
 
@@ -93,6 +140,9 @@ namespace OpenSim.Data.Null
 
         public List<RegionData> Get(int startX, int startY, int endX, int endY, UUID scopeID)
         {
+            if (Instance != this)
+                return Instance.Get(startX, startY, endX, endY, scopeID);
+
             List<RegionData> ret = new List<RegionData>();
 
             foreach (RegionData r in m_regionData.Values)
@@ -106,6 +156,9 @@ namespace OpenSim.Data.Null
 
         public bool Store(RegionData data)
         {
+            if (Instance != this)
+                return Instance.Store(data);
+
             m_regionData[data.RegionID] = data;
 
             return true;
@@ -113,6 +166,9 @@ namespace OpenSim.Data.Null
 
         public bool SetDataItem(UUID regionID, string item, string value)
         {
+            if (Instance != this)
+                return Instance.SetDataItem(regionID, item, value);
+
             if (!m_regionData.ContainsKey(regionID))
                 return false;
 
@@ -123,12 +179,49 @@ namespace OpenSim.Data.Null
 
         public bool Delete(UUID regionID)
         {
+            if (Instance != this)
+                return Instance.Delete(regionID);
+
             if (!m_regionData.ContainsKey(regionID))
                 return false;
 
             m_regionData.Remove(regionID);
 
             return true;
+        }
+
+        public List<RegionData> GetDefaultRegions(UUID scopeID)
+        {
+            return Get((int)RegionFlags.DefaultRegion, scopeID);
+        }
+
+        public List<RegionData> GetFallbackRegions(UUID scopeID, int x, int y)
+        {
+            List<RegionData> regions = Get((int)RegionFlags.FallbackRegion, scopeID);
+            RegionDataDistanceCompare distanceComparer = new RegionDataDistanceCompare(x, y);
+            regions.Sort(distanceComparer);
+            return regions;
+        }
+
+        public List<RegionData> GetHyperlinks(UUID scopeID)
+        {
+            return Get((int)RegionFlags.Hyperlink, scopeID);
+        }
+
+        private List<RegionData> Get(int regionFlags, UUID scopeID)
+        {
+            if (Instance != this)
+                return Instance.Get(regionFlags, scopeID);
+
+            List<RegionData> ret = new List<RegionData>();
+
+            foreach (RegionData r in m_regionData.Values)
+            {
+                if ((Convert.ToInt32(r.Data["flags"]) & regionFlags) != 0)
+                    ret.Add(r);
+            }
+
+            return ret;
         }
     }
 }

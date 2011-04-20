@@ -34,7 +34,7 @@ using log4net;
 using Nini.Config;
 using OpenSim.Framework;
 using OpenSim.Framework.Console;
-using OpenSim.Framework.Communications.Cache;
+
 using OpenSim.Region.Framework.Interfaces;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
@@ -136,8 +136,6 @@ namespace OpenSim.Region.Framework.Scenes
             get { return m_permissions; }
         }
 
-        protected string m_datastore;
-
          /* Used by the loadbalancer plugin on GForge */
         protected RegionStatus m_regStatus;
         public RegionStatus RegionStatus
@@ -190,6 +188,21 @@ namespace OpenSim.Region.Framework.Scenes
         /// <param name="agentID"></param>
         public abstract void RemoveClient(UUID agentID);
 
+        public bool TryGetScenePresence(UUID agentID, out object scenePresence)
+        {
+            scenePresence = null;
+            ScenePresence sp = null;
+            if (TryGetScenePresence(agentID, out sp))
+            {
+                scenePresence = sp;
+                return true;
+            }
+
+            return false;
+        }
+
+        public abstract bool TryGetScenePresence(UUID agentID, out ScenePresence scenePresence);
+
         #endregion
 
         /// <summary>
@@ -202,18 +215,6 @@ namespace OpenSim.Region.Framework.Scenes
         }
 
         #region admin stuff
-
-        /// <summary>
-        /// Region Restart - Seconds till restart.
-        /// </summary>
-        /// <param name="seconds"></param>
-        public virtual void Restart(int seconds)
-        {
-            m_log.Error("[REGION]: passing Restart Message up the namespace");
-            restart handlerPhysicsCrash = OnRestart;
-            if (handlerPhysicsCrash != null)
-                handlerPhysicsCrash(RegionInfo);
-        }
 
         public virtual bool PresenceChildStatus(UUID avatarID)
         {
@@ -252,7 +253,7 @@ namespace OpenSim.Region.Framework.Scenes
             }
             catch (Exception e)
             {
-                m_log.Error("[SCENE]: SceneBase.cs: Close() - Failed with exception " + e.ToString());
+                m_log.Error(string.Format("[SCENE]: SceneBase.cs: Close() - Failed with exception ", e));
             }
         }
 
@@ -262,7 +263,7 @@ namespace OpenSim.Region.Framework.Scenes
         /// Returns a new unallocated local ID
         /// </summary>
         /// <returns>A brand new local ID</returns>
-        protected internal uint AllocateLocalId()
+        public uint AllocateLocalId()
         {
             uint myID;
 
@@ -361,6 +362,8 @@ namespace OpenSim.Region.Framework.Scenes
         /// <param name="mod"></param>
         public void RegisterModuleInterface<M>(M mod)
         {
+//            m_log.DebugFormat("[SCENE BASE]: Registering interface {0}", typeof(M));
+            
             List<Object> l = null;
             if (!ModuleInterfaces.TryGetValue(typeof(M), out l))
             {
@@ -483,7 +486,30 @@ namespace OpenSim.Region.Framework.Scenes
             }
         }
 
+        /// <summary>
+        /// Call this from a region module to add a command to the OpenSim console.
+        /// </summary>
+        /// <param name="mod"></param>
+        /// <param name="command"></param>
+        /// <param name="shorthelp"></param>
+        /// <param name="longhelp"></param>
+        /// <param name="callback"></param>
         public void AddCommand(object mod, string command, string shorthelp, string longhelp, CommandDelegate callback)
+        {
+            AddCommand(mod, command, shorthelp, longhelp, string.Empty, callback);
+        }
+
+        /// <summary>
+        /// Call this from a region module to add a command to the OpenSim console.
+        /// </summary>
+        /// <param name="mod"></param>
+        /// <param name="command"></param>
+        /// <param name="shorthelp"></param>
+        /// <param name="longhelp"></param>
+        /// <param name="descriptivehelp"></param>
+        /// <param name="callback"></param>
+        public void AddCommand(
+            object mod, string command, string shorthelp, string longhelp, string descriptivehelp, CommandDelegate callback)
         {
             if (MainConsole.Instance == null)
                 return;
@@ -508,7 +534,28 @@ namespace OpenSim.Region.Framework.Scenes
                 else throw new Exception("AddCommand module parameter must be IRegionModule or IRegionModuleBase");
             }
 
-            MainConsole.Instance.Commands.AddCommand(modulename, shared, command, shorthelp, longhelp, callback);
+            MainConsole.Instance.Commands.AddCommand(
+                modulename, shared, command, shorthelp, longhelp, descriptivehelp, callback);
         }
+
+        public virtual ISceneObject DeserializeObject(string representation)
+        {
+            return null;
+        }
+
+        public virtual bool AllowScriptCrossings
+        {
+            get { return false; }
+        }
+
+        public void Restart()
+        {
+            // This has to be here to fire the event
+            restart handlerPhysicsCrash = OnRestart;
+            if (handlerPhysicsCrash != null)
+                handlerPhysicsCrash(RegionInfo);
+        }
+
+        public abstract bool CheckClient(UUID agentID, System.Net.IPEndPoint ep);
     }
 }

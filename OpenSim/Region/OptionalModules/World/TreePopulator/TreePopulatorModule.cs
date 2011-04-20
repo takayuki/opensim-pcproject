@@ -104,9 +104,9 @@ namespace OpenSim.Region.OptionalModules.World.TreePopulator
                 this.m_name = field[1].Trim();
                 this.m_frozen = (copsedef[0] == 'F');
                 this.m_tree_quantity = int.Parse(field[2]);
-                this.m_treeline_high = float.Parse(field[3]);
-                this.m_treeline_low = float.Parse(field[4]);
-                this.m_range = double.Parse(field[5]);
+                this.m_treeline_high = float.Parse(field[3], Culture.NumberFormatInfo);
+                this.m_treeline_low = float.Parse(field[4], Culture.NumberFormatInfo);
+                this.m_range = double.Parse(field[5], Culture.NumberFormatInfo);
                 this.m_tree_type = (Tree) Enum.Parse(typeof(Tree),field[6]);
                 this.m_seed_point = Vector3.Parse(field[7]);
                 this.m_initial_scale = Vector3.Parse(field[8]);
@@ -306,8 +306,6 @@ namespace OpenSim.Region.OptionalModules.World.TreePopulator
 
             m_log.InfoFormat("[TREES]: New tree planting for copse {0}", copsename);
             UUID uuid = m_scene.RegionInfo.EstateSettings.EstateOwner;
-            if (uuid == UUID.Zero)
-                uuid = m_scene.RegionInfo.MasterAvatarAssignedUUID;
 
             foreach (Copse copse in m_copse)
             {
@@ -570,8 +568,7 @@ namespace OpenSim.Region.OptionalModules.World.TreePopulator
         {
             m_copse = new List<Copse>();
 
-            List<EntityBase> objs = m_scene.GetEntities();
-
+            EntityBase[] objs = m_scene.GetEntities();
             foreach (EntityBase obj in objs)
             {
                 if (obj is SceneObjectGroup)
@@ -760,8 +757,6 @@ namespace OpenSim.Region.OptionalModules.World.TreePopulator
                 Util.GetDistanceTo(position, copse.m_seed_point) <= copse.m_range)
             {
                 UUID uuid = m_scene.RegionInfo.EstateSettings.EstateOwner;
-                if (uuid == UUID.Zero)
-                    uuid = m_scene.RegionInfo.MasterAvatarAssignedUUID;
 
                 CreateTree(uuid, copse, position);
             }

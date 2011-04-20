@@ -49,6 +49,7 @@ namespace OpenSim.Server.Base
         protected uint m_Port = 0;
         protected Dictionary<uint, BaseHttpServer> m_Servers =
             new Dictionary<uint, BaseHttpServer>();
+        protected uint m_consolePort = 0;
 
         public IHttpServer HttpServer
         {
@@ -70,6 +71,8 @@ namespace OpenSim.Server.Base
                 return m_Servers[port];
 
             m_Servers[port] = new BaseHttpServer(port);
+            
+            m_Log.InfoFormat("[SERVER]: Starting new HTTP server on port {0}", port);
             m_Servers[port].Start();
 
             return m_Servers[port];
@@ -98,6 +101,7 @@ namespace OpenSim.Server.Base
                 Thread.CurrentThread.Abort();
             }
 
+            m_consolePort = (uint)networkConfig.GetInt("ConsolePort", 0);
             m_Port = port;
 
             m_HttpServer = new BaseHttpServer(port);
@@ -107,11 +111,15 @@ namespace OpenSim.Server.Base
 
         protected override void Initialise()
         {
+            m_Log.InfoFormat("[SERVER]: Starting HTTP server on port {0}", m_HttpServer.Port);
             m_HttpServer.Start();
 
             if (MainConsole.Instance is RemoteConsole)
             {
-                ((RemoteConsole)MainConsole.Instance).SetServer(m_HttpServer);
+                if (m_consolePort == 0)
+                    ((RemoteConsole)MainConsole.Instance).SetServer(m_HttpServer);
+                else
+                    ((RemoteConsole)MainConsole.Instance).SetServer(GetHttpServer(m_consolePort));
             }
         }
     }

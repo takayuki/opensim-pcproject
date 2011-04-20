@@ -39,6 +39,7 @@ using OpenMetaverse.Packets;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes.Scripting;
+using OpenSim.Region.Framework.Scenes.Serialization;
 using OpenSim.Region.Physics.Manager;
 
 namespace OpenSim.Region.Framework.Scenes
@@ -56,9 +57,11 @@ namespace OpenSim.Region.Framework.Scenes
         LINK = 32,
         ALLOWED_DROP = 64,
         OWNER = 128,
-        REGION_RESTART = 256,
-        REGION = 512,
-        TELEPORT = 1024
+        REGION = 256,
+        TELEPORT = 512,
+        REGION_RESTART = 1024,
+        MEDIA = 2048,
+        ANIMATION = 16384
     }
 
     // I don't really know where to put this except here.
@@ -90,56 +93,114 @@ namespace OpenSim.Region.Framework.Scenes
         SCALE = 0x40
     }
 
+    public enum PrimType : int
+    {
+        BOX = 0,
+        CYLINDER = 1,
+        PRISM = 2,
+        SPHERE = 3,
+        TORUS = 4,
+        TUBE = 5,
+        RING = 6,
+        SCULPT = 7
+    }
+
     #endregion Enumerations
 
-    public class SceneObjectPart : IScriptHost
+    public class SceneObjectPart : IScriptHost, ISceneEntity
     {
+        /// <value>
+        /// Denote all sides of the prim
+        /// </value>
+        public const int ALL_SIDES = -1;
+        
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        // use only one serializer to give the runtime a chance to optimize it (it won't do that if you
-        // use a new instance every time)
-        private static XmlSerializer serializer = new XmlSerializer(typeof (SceneObjectPart));
+        /// <value>
+        /// Is this sop a root part?
+        /// </value>
+        
+        public bool IsRoot 
+        {
+           get { return ParentGroup.RootPart == this; } 
+        }
 
         #region Fields
 
         public bool AllowedDrop;
 
-        [XmlIgnore]
+        
         public bool DIE_AT_EDGE;
 
+        
+        public bool RETURN_AT_EDGE;
+
+        
+        public bool BlockGrab;
+
+        
+        public bool StatusSandbox;
+
+        
+        public Vector3 StatusSandboxPos;
+
         // TODO: This needs to be persisted in next XML version update!
-        [XmlIgnore]
+        
         public readonly int[] PayPrice = {-2,-2,-2,-2,-2};
-        [XmlIgnore]
-        public PhysicsActor PhysActor;
+        
+        
+        public PhysicsActor PhysActor
+        {
+            get { return m_physActor; }
+            set
+            {
+//                m_log.DebugFormat("[SOP]: PhysActor set to {0} for {1} {2}", value, Name, UUID);
+                m_physActor = value;
+            }
+        }
 
         //Xantor 20080528 Sound stuff:
         //  Note: This isn't persisted in the database right now, as the fields for that aren't just there yet.
         //        Not a big problem as long as the script that sets it remains in the prim on startup.
         //        for SL compatibility it should be persisted though (set sound / displaytext / particlesystem, kill script)
-        [XmlIgnore]
+        
         public UUID Sound;
         
-        [XmlIgnore]
+        
         public byte SoundFlags;
         
-        [XmlIgnore]
+        
         public double SoundGain;
         
-        [XmlIgnore]
+        
         public double SoundRadius;
         
-        [XmlIgnore]
+        
         public uint TimeStampFull;
         
-        [XmlIgnore]
+        
         public uint TimeStampLastActivity; // Will be used for AutoReturn
         
-        [XmlIgnore]
+        
         public uint TimeStampTerse;
 
-        [XmlIgnore]
+        
         public UUID FromItemID;
+
+        
+        public UUID FromFolderID;
+
+        
+        public int STATUS_ROTATE_X;
+
+        
+        public int STATUS_ROTATE_Y;
+
+        
+        public int STATUS_ROTATE_Z;
+        
+        
+        private Dictionary<int, string> m_CollisionFilter = new Dictionary<int, string>();
                
         /// <value>
         /// The UUID of the user inventory item from which this object was rezzed if this is a root part.
@@ -147,56 +208,68 @@ namespace OpenSim.Region.Framework.Scenes
         /// </value>
         private UUID m_fromUserInventoryItemID;
         
-        [XmlIgnore]
+        
         public UUID FromUserInventoryItemID
         {
             get { return m_fromUserInventoryItemID; }
         }
 
-        [XmlIgnore]
+        
         public bool IsAttachment;
 
-        [XmlIgnore]
+        
         public scriptEvents AggregateScriptEvents;
 
-        [XmlIgnore]
+        
         public UUID AttachedAvatar;
 
-        [XmlIgnore]
+        
         public Vector3 AttachedPos;
 
-        [XmlIgnore]
+        
         public uint AttachmentPoint;
 
-        [XmlIgnore]
+        
         public Vector3 RotationAxis = Vector3.One;
 
-        [XmlIgnore]
+        
         public bool VolumeDetectActive; // XmlIgnore set to avoid problems with persistance until I come to care for this
                                         // Certainly this must be a persistant setting finally
 
-        [XmlIgnore]
+        
         public bool IsWaitingForFirstSpinUpdatePacket;
 
-        [XmlIgnore]
+        
         public Quaternion SpinOldOrientation = Quaternion.Identity;
+
+        
+        public Quaternion m_APIDTarget = Quaternion.Identity;
+
+        
+        public float m_APIDDamp = 0;
+
+        
+        public float m_APIDStrength = 0;
 
         /// <summary>
         /// This part's inventory
         /// </summary>
-        [XmlIgnore]
+        
         public IEntityInventory Inventory
         {
             get { return m_inventory; }
         }
         protected SceneObjectPartInventory m_inventory;
 
-        [XmlIgnore]
+        
         public bool Undoing;
 
-        [XmlIgnore]
+        
+        public bool IgnoreUndoUpdate = false;
+
+        
         private PrimFlags LocalFlags;
-        [XmlIgnore]
+        
         private float m_damage = -1.0f;
         private byte[] m_TextureAnimation;
         private byte m_clickAction;
@@ -204,9 +277,9 @@ namespace OpenSim.Region.Framework.Scenes
         private string m_description = String.Empty;
         private readonly List<uint> m_lastColliders = new List<uint>();
         private int m_linkNum;
-        [XmlIgnore]
+        
         private int m_scriptAccessPin;
-        [XmlIgnore]
+        
         private readonly Dictionary<UUID, scriptEvents> m_scriptEvents = new Dictionary<UUID, scriptEvents>();
         private string m_sitName = String.Empty;
         private Quaternion m_sitTargetOrientation = Quaternion.Identity;
@@ -215,6 +288,7 @@ namespace OpenSim.Region.Framework.Scenes
         private string m_text = String.Empty;
         private string m_touchName = String.Empty;
         private readonly UndoStack<UndoState> m_undo = new UndoStack<UndoState>(5);
+        private readonly UndoStack<UndoState> m_redo = new UndoStack<UndoState>(5);
         private UUID _creatorID;
 
         private bool m_passTouches;
@@ -229,6 +303,7 @@ namespace OpenSim.Region.Framework.Scenes
         /// </summary>
         private byte m_updateFlag;
 
+        private PhysicsActor m_physActor;
         protected Vector3 m_acceleration;
         protected Vector3 m_angularVelocity;
 
@@ -254,6 +329,11 @@ namespace OpenSim.Region.Framework.Scenes
         protected Vector3 m_lastAcceleration;
         protected Vector3 m_lastAngularVelocity;
         protected int m_lastTerseSent;
+        
+        /// <summary>
+        /// Stores media texture data
+        /// </summary>
+        protected string m_mediaUrl;
 
         // TODO: Those have to be changed into persistent properties at some later point,
         // or sit-camera on vehicles will break on sim-crossing.
@@ -323,8 +403,8 @@ namespace OpenSim.Region.Framework.Scenes
             // this appears to have the same UUID (!) as the prim.  If this isn't the case, one can't drag items from
             // the prim into an agent inventory (Linden client reports that the "Object not found for drop" in its log
 
-            _flags = 0;
-            _flags |= PrimFlags.CreateSelected;
+            Flags = 0;
+            CreateSelected = true;
 
             TrimPermissions();
             //m_undo = new UndoStack<UndoState>(ParentGroup.GetSceneMaxUndo());
@@ -351,9 +431,11 @@ namespace OpenSim.Region.Framework.Scenes
         private uint _groupMask = (uint)PermissionMask.None;
         private uint _everyoneMask = (uint)PermissionMask.None;
         private uint _nextOwnerMask = (uint)PermissionMask.All;
-        private PrimFlags _flags = 0;
+        private PrimFlags _flags = PrimFlags.None;
         private DateTime m_expires;
         private DateTime m_rezzed;
+        private bool m_createSelected = false;
+        private string m_creatorData = string.Empty;
 
         public UUID CreatorID 
         {
@@ -364,6 +446,64 @@ namespace OpenSim.Region.Framework.Scenes
             set
             {
                 _creatorID = value;
+            }
+        }
+
+        /// <summary>
+        /// Data about the creator in the form profile_url;name
+        /// </summary>
+        public string CreatorData 
+        {
+            get { return m_creatorData; }
+            set { m_creatorData = value; }
+        }
+
+        /// <summary>
+        /// Used by the DB layer to retrieve / store the entire user identification.
+        /// The identification can either be a simple UUID or a string of the form
+        /// uuid[;profile_url[;name]]
+        /// </summary>
+        public string CreatorIdentification
+        {
+            get
+            {
+                if (m_creatorData != null && m_creatorData != string.Empty)
+                    return _creatorID.ToString() + ';' + m_creatorData;
+                else
+                    return _creatorID.ToString();
+            }
+            set
+            {
+                if ((value == null) || (value != null && value == string.Empty))
+                {
+                    m_creatorData = string.Empty;
+                    return;
+                }
+
+                if (!value.Contains(";")) // plain UUID
+                {
+                    UUID uuid = UUID.Zero;
+                    UUID.TryParse(value, out uuid);
+                    _creatorID = uuid;
+                }
+                else // <uuid>[;<endpoint>[;name]]
+                {
+                    string name = "Unknown User";
+                    string[] parts = value.Split(';');
+                    if (parts.Length >= 1)
+                    {
+                        UUID uuid = UUID.Zero;
+                        UUID.TryParse(parts[0], out uuid);
+                        _creatorID = uuid;
+                    }
+                    if (parts.Length >= 2)
+                        m_creatorData = parts[1];
+                    if (parts.Length >= 3)
+                        name = parts[2];
+
+                    m_creatorData += ';' + name;
+                    
+                }
             }
         }
 
@@ -397,16 +537,27 @@ namespace OpenSim.Region.Framework.Scenes
             set { m_inventory.Items = value; }
         }
 
+        /// <summary>
+        /// This is idential to the Flags property, except that the returned value is uint rather than PrimFlags
+        /// </summary>
+        [Obsolete("Use Flags property instead")]
         public uint ObjectFlags
         {
-            get { return (uint)_flags; }
-            set { _flags = (PrimFlags)value; }
+            get { return (uint)Flags; }
+            set { Flags = (PrimFlags)value; }
         }
 
         public UUID UUID
         {
             get { return m_uuid; }
-            set { m_uuid = value; }
+            set 
+            { 
+                m_uuid = value; 
+                
+                // This is necessary so that TaskInventoryItem parent ids correctly reference the new uuid of this part
+                if (Inventory != null)
+                    Inventory.ResetObjectID();
+            }
         }
 
         public uint LocalId
@@ -452,6 +603,38 @@ namespace OpenSim.Region.Framework.Scenes
             }
         }
 
+        
+        
+        public Dictionary<int, string> CollisionFilter
+        {
+            get { return m_CollisionFilter; }
+            set
+            {
+                m_CollisionFilter = value;
+            }
+        }
+
+        
+        public Quaternion APIDTarget
+        {
+            get { return m_APIDTarget; }
+            set { m_APIDTarget = value; }
+        }
+
+        
+        public float APIDDamp
+        {
+            get { return m_APIDDamp; }
+            set { m_APIDDamp = value; }
+        }
+
+        
+        public float APIDStrength
+        {
+            get { return m_APIDStrength; }
+            set { m_APIDStrength = value; }
+        }
+
         public ulong RegionHandle
         {
             get { return m_regionHandle; }
@@ -463,36 +646,63 @@ namespace OpenSim.Region.Framework.Scenes
             get { return m_scriptAccessPin; }
             set { m_scriptAccessPin = (int)value; }
         }
+        private SceneObjectPart m_PlaySoundMasterPrim = null;
+        public SceneObjectPart PlaySoundMasterPrim
+        {
+            get { return m_PlaySoundMasterPrim; }
+            set { m_PlaySoundMasterPrim = value; }
+        }
 
-        [XmlIgnore]
+        private List<SceneObjectPart> m_PlaySoundSlavePrims = new List<SceneObjectPart>();
+        public List<SceneObjectPart> PlaySoundSlavePrims
+        {
+            get { return m_PlaySoundSlavePrims; }
+            set { m_PlaySoundSlavePrims = value; }
+        }
+
+        private SceneObjectPart m_LoopSoundMasterPrim = null;
+        public SceneObjectPart LoopSoundMasterPrim
+        {
+            get { return m_LoopSoundMasterPrim; }
+            set { m_LoopSoundMasterPrim = value; }
+        }
+
+        private List<SceneObjectPart> m_LoopSoundSlavePrims = new List<SceneObjectPart>();
+        public List<SceneObjectPart> LoopSoundSlavePrims
+        {
+            get { return m_LoopSoundSlavePrims; }
+            set { m_LoopSoundSlavePrims = value; }
+        }
+
+        
         public Byte[] TextureAnimation
         {
             get { return m_TextureAnimation; }
             set { m_TextureAnimation = value; }
         }
 
-        [XmlIgnore]
+        
         public Byte[] ParticleSystem
         {
             get { return m_particleSystem; }
             set { m_particleSystem = value; }
         }
 
-        [XmlIgnore]
+        
         public DateTime Expires
         {
             get { return m_expires; }
             set { m_expires = value; }
         }
 
-        [XmlIgnore]
+        
         public DateTime Rezzed
         {
             get { return m_rezzed; }
             set { m_rezzed = value; }
         }
 
-        [XmlIgnore]
+        
         public float Damage
         {
             get { return m_damage; }
@@ -524,8 +734,6 @@ namespace OpenSim.Region.Framework.Scenes
             }
             set
             {
-                StoreUndoState();
-
                 m_groupPosition = value;
 
                 PhysicsActor actor = PhysActor;
@@ -560,7 +768,7 @@ namespace OpenSim.Region.Framework.Scenes
                     if (m_parentGroup != null) // TODO can there be a SOP without a SOG?
                     {
                         ScenePresence avatar;
-                        if (m_parentGroup.Scene.TryGetAvatar(m_sitTargetAvatar, out avatar))
+                        if (m_parentGroup.Scene.TryGetScenePresence(m_sitTargetAvatar, out avatar))
                         {
                             avatar.ParentPosition = GetWorldPosition();
                         }
@@ -588,6 +796,24 @@ namespace OpenSim.Region.Framework.Scenes
                         // Tell the physics engines that this prim changed.
                         m_parentGroup.Scene.PhysicsScene.AddPhysicsActorTaint(actor);
                     }
+                }
+            }
+        }
+
+        public Vector3 RelativePosition
+        {
+            get
+            {
+                if (IsRoot)
+                {
+                    if (IsAttachment)
+                        return AttachedPos;
+                    else
+                        return AbsolutePosition;
+                }
+                else
+                {
+                    return OffsetPosition;
                 }
             }
         }
@@ -714,13 +940,15 @@ namespace OpenSim.Region.Framework.Scenes
             }
         }
 
+        /// <value>
+        /// Text color.
+        /// </value>
         public Color Color
         {
             get { return m_color; }
             set
             {
                 m_color = value;
-                TriggerScriptChangedEvent(Changed.COLOR);
 
                 /* ScheduleFullUpdate() need not be called b/c after
                  * setting the color, the text will be set, so then
@@ -777,21 +1005,7 @@ namespace OpenSim.Region.Framework.Scenes
         public PrimitiveBaseShape Shape
         {
             get { return m_shape; }
-            set
-            {
-                bool shape_changed = false;
-                // TODO: this should really be restricted to the right
-                // set of attributes on shape change.  For instance,
-                // changing the lighting on a shape shouldn't cause
-                // this.
-                if (m_shape != null)
-                    shape_changed = true;
-
-                m_shape = value;
-
-                if (shape_changed)
-                    TriggerScriptChangedEvent(Changed.SHAPE);
-            }
+            set { m_shape = value; }
         }
         
         public Vector3 Scale
@@ -820,10 +1034,42 @@ namespace OpenSim.Region.Framework.Scenes
                 TriggerScriptChangedEvent(Changed.SCALE);
             }
         }
+        
         public byte UpdateFlag
         {
             get { return m_updateFlag; }
             set { m_updateFlag = value; }
+        }
+        
+        /// <summary>
+        /// Used for media on a prim.
+        /// </summary>
+        /// Do not change this value directly - always do it through an IMoapModule.
+        public string MediaUrl 
+        { 
+            get
+            {
+                return m_mediaUrl; 
+            }
+            
+            set
+            {
+                m_mediaUrl = value;
+                
+                if (ParentGroup != null)
+                    ParentGroup.HasGroupChanged = true;
+            }
+        }
+
+        
+        public bool CreateSelected
+        {
+            get { return m_createSelected; }
+            set 
+            { 
+//                m_log.DebugFormat("[SOP]: Setting CreateSelected to {0} for {1} {2}", value, Name, UUID);
+                m_createSelected = value; 
+            }
         }
 
         #endregion
@@ -849,7 +1095,6 @@ namespace OpenSim.Region.Framework.Scenes
         {
             get { return AggregateScriptEvents; }
         }
-
 
         public Quaternion SitTargetOrientation
         {
@@ -984,20 +1229,28 @@ namespace OpenSim.Region.Framework.Scenes
             set { _nextOwnerMask = value; }
         }
 
+        /// <summary>
+        /// Property flags.  See OpenMetaverse.PrimFlags 
+        /// </summary>
+        /// Example properties are PrimFlags.Phantom and PrimFlags.DieAtEdge
         public PrimFlags Flags
         {
             get { return _flags; }
-            set { _flags = value; }
+            set 
+            { 
+//                m_log.DebugFormat("[SOP]: Setting flags for {0} {1} to {2}", UUID, Name, value);
+                _flags = value; 
+            }
         }
 
-        [XmlIgnore]
+        
         public UUID SitTargetAvatar
         {
             get { return m_sitTargetAvatar; }
             set { m_sitTargetAvatar = value; }
         }
 
-        [XmlIgnore]
+        
         public virtual UUID RegionID
         {
             get
@@ -1011,7 +1264,7 @@ namespace OpenSim.Region.Framework.Scenes
         }
 
         private UUID _parentUUID = UUID.Zero;
-        [XmlIgnore]
+        
         public UUID ParentUUID
         {
             get
@@ -1025,7 +1278,7 @@ namespace OpenSim.Region.Framework.Scenes
             set { _parentUUID = value; }
         }
 
-        [XmlIgnore]
+        
         public string SitAnimation
         {
             get { return m_sitAnimation; }
@@ -1074,15 +1327,14 @@ namespace OpenSim.Region.Framework.Scenes
 
         private void SendObjectPropertiesToClient(UUID AgentID)
         {
-            ScenePresence[] avatars = m_parentGroup.Scene.GetScenePresences();
-            for (int i = 0; i < avatars.Length; i++)
+            m_parentGroup.Scene.ForEachScenePresence(delegate(ScenePresence avatar)
             {
                 // Ugly reference :(
-                if (avatars[i].UUID == AgentID)
+                if (avatar.UUID == AgentID)
                 {
-                    m_parentGroup.GetProperties(avatars[i].ControllingClient);
+                    m_parentGroup.GetProperties(avatar.ControllingClient);
                 }
-            }
+            });
         }
 
         // TODO: unused:
@@ -1121,10 +1373,10 @@ namespace OpenSim.Region.Framework.Scenes
         public void AddFlag(PrimFlags flag)
         {
             // PrimFlags prevflag = Flags;
-            if ((ObjectFlags & (uint) flag) == 0)
+            if ((Flags & flag) == 0)
             {
                 //m_log.Debug("Adding flag: " + ((PrimFlags) flag).ToString());
-                _flags |= flag;
+                Flags |= flag;
 
                 if (flag == PrimFlags.TemporaryOnRez)
                     ResetExpire();
@@ -1137,13 +1389,15 @@ namespace OpenSim.Region.Framework.Scenes
         /// </summary>
         public void AddFullUpdateToAllAvatars()
         {
-            ScenePresence[] avatars = m_parentGroup.Scene.GetScenePresences();
-            for (int i = 0; i < avatars.Length; i++)
+            m_parentGroup.Scene.ForEachScenePresence(delegate(ScenePresence avatar)
             {
-                avatars[i].SceneViewer.QueuePartForUpdate(this);
-            }
+                AddFullUpdateToAvatar(avatar);
+            });
         }
 
+        /// <summary>
+        /// Tell the scene presence that it should send updates for this part to its client
+        /// </summary>
         public void AddFullUpdateToAvatar(ScenePresence presence)
         {
             presence.SceneViewer.QueuePartForUpdate(this);
@@ -1162,11 +1416,10 @@ namespace OpenSim.Region.Framework.Scenes
         /// Terse updates
         public void AddTerseUpdateToAllAvatars()
         {
-            ScenePresence[] avatars = m_parentGroup.Scene.GetScenePresences();
-            for (int i = 0; i < avatars.Length; i++)
+            m_parentGroup.Scene.ForEachScenePresence(delegate(ScenePresence avatar)
             {
-                avatars[i].SceneViewer.QueuePartForUpdate(this);
-            }
+                AddTerseUpdateToAvatar(avatar);
+            });
         }
 
         public void AddTerseUpdateToAvatar(ScenePresence presence)
@@ -1201,11 +1454,11 @@ namespace OpenSim.Region.Framework.Scenes
             if (volume < 0)
                 volume = 0;
 
-            List<ScenePresence> avatarts = m_parentGroup.Scene.GetAvatars();
-            foreach (ScenePresence p in avatarts)
+            m_parentGroup.Scene.ForEachScenePresence(delegate(ScenePresence sp)
             {
-                p.ControllingClient.SendAttachedSoundGainChange(UUID, (float)volume);
-            }
+                if (!sp.IsChildAgent)
+                    sp.ControllingClient.SendAttachedSoundGainChange(UUID, (float)volume);
+            });
         }
 
         /// <summary>
@@ -1323,7 +1576,7 @@ namespace OpenSim.Region.Framework.Scenes
                 if (!isPhantom && !IsAttachment && !(Shape.PathCurve == (byte) Extrusion.Flexible))
                 {
                     PhysActor = m_parentGroup.Scene.PhysicsScene.AddPrimShape(
-                        Name,
+                        string.Format("{0}/{1}", Name, UUID),
                         Shape,
                         AbsolutePosition,
                         Scale,
@@ -1339,6 +1592,10 @@ namespace OpenSim.Region.Framework.Scenes
                         DoPhysicsPropertyUpdate(RigidBody, true);
                         PhysActor.SetVolumeDetect(VolumeDetectActive ? 1 : 0);
                     }
+                    else
+                    {
+                        m_log.DebugFormat("[SOP]: physics actor is null for {0} with parent {1}", UUID, this.ParentGroup.UUID);
+                    }
                 }
             }
         }
@@ -1348,6 +1605,10 @@ namespace OpenSim.Region.Framework.Scenes
             lock (m_undo)
             {
                 m_undo.Clear();
+            }
+            lock (m_redo)
+            {
+                m_redo.Clear();
             }
             StoreUndoState();
         }
@@ -1368,6 +1629,11 @@ namespace OpenSim.Region.Framework.Scenes
         /// <summary>
         /// Duplicates this part.
         /// </summary>
+        /// <param name="localID"></param>
+        /// <param name="AgentID"></param>
+        /// <param name="GroupID"></param>
+        /// <param name="linkNum"></param>
+        /// <param name="userExposed">True if the duplicate will immediately be in the scene, false otherwise</param>
         /// <returns></returns>
         public SceneObjectPart Copy(uint localID, UUID AgentID, UUID GroupID, int linkNum, bool userExposed)
         {
@@ -1390,7 +1656,7 @@ namespace OpenSim.Region.Framework.Scenes
             dupe.Velocity = new Vector3(0, 0, 0);
             dupe.Acceleration = new Vector3(0, 0, 0);
             dupe.AngularVelocity = new Vector3(0, 0, 0);
-            dupe.ObjectFlags = ObjectFlags;
+            dupe.Flags = Flags;
 
             dupe._ownershipCost = _ownershipCost;
             dupe._objectSaleType = _objectSaleType;
@@ -1427,10 +1693,14 @@ namespace OpenSim.Region.Framework.Scenes
                     m_parentGroup.Scene.AssetService.Get(dupe.m_shape.SculptTexture.ToString(), dupe, AssetReceived); 
                 }
                 
-                bool UsePhysics = ((dupe.ObjectFlags & (uint)PrimFlags.Physics) != 0);
+                bool UsePhysics = ((dupe.Flags & PrimFlags.Physics) != 0);
                 dupe.DoPhysicsPropertyUpdate(UsePhysics, true);
             }
             
+            ParentGroup.Scene.EventManager.TriggerOnSceneObjectPartCopy(dupe, this, userExposed);
+
+//            m_log.DebugFormat("[SCENE OBJECT PART]: Clone of {0} {1} finished", Name, UUID);
+                          
             return dupe;
         }
 
@@ -1594,7 +1864,7 @@ namespace OpenSim.Region.Framework.Scenes
                         /// that's not wholesome.  Had to make Scene public
                         //PhysActor = null;
 
-                        if ((ObjectFlags & (uint)PrimFlags.Phantom) == 0)
+                        if ((Flags & PrimFlags.Phantom) == 0)
                         {
                             if (UsePhysics)
                             {
@@ -1622,7 +1892,7 @@ namespace OpenSim.Region.Framework.Scenes
         /// </summary>
         /// <param name="xmlReader"></param>
         /// <returns></returns>
-        public static SceneObjectPart FromXml(XmlReader xmlReader)
+        public static SceneObjectPart FromXml(XmlTextReader xmlReader)
         {
             return FromXml(UUID.Zero, xmlReader);
         }
@@ -1633,9 +1903,9 @@ namespace OpenSim.Region.Framework.Scenes
         /// <param name="fromUserInventoryItemId">The inventory id from which this part came, if applicable</param>
         /// <param name="xmlReader"></param>
         /// <returns></returns>
-        public static SceneObjectPart FromXml(UUID fromUserInventoryItemId, XmlReader xmlReader)
+        public static SceneObjectPart FromXml(UUID fromUserInventoryItemId, XmlTextReader xmlReader)
         {
-            SceneObjectPart part = (SceneObjectPart)serializer.Deserialize(xmlReader);
+            SceneObjectPart part = SceneObjectSerializer.Xml2ToSOP(xmlReader);
             part.m_fromUserInventoryItemID = fromUserInventoryItemId;
 
             // for tempOnRez objects, we have to fix the Expire date.
@@ -1659,6 +1929,79 @@ namespace OpenSim.Region.Framework.Scenes
             return m_parentGroup.RootPart.DIE_AT_EDGE;
         }
 
+        public bool GetReturnAtEdge()
+        {
+            if (m_parentGroup == null)
+                return false;
+            if (m_parentGroup.IsDeleted)
+                return false;
+
+            return m_parentGroup.RootPart.RETURN_AT_EDGE;
+        }
+
+        public void SetReturnAtEdge(bool p)
+        {
+            if (m_parentGroup == null)
+                return;
+            if (m_parentGroup.IsDeleted)
+                return;
+
+            m_parentGroup.RootPart.RETURN_AT_EDGE = p;
+        }
+
+        public bool GetBlockGrab()
+        {
+            if (m_parentGroup == null)
+                return false;
+            if (m_parentGroup.IsDeleted)
+                return false;
+
+            return m_parentGroup.RootPart.BlockGrab;
+        }
+
+        public void SetBlockGrab(bool p)
+        {
+            if (m_parentGroup == null)
+                return;
+            if (m_parentGroup.IsDeleted)
+                return;
+
+            m_parentGroup.RootPart.BlockGrab = p;
+        }
+
+        public void SetStatusSandbox(bool p)
+        {
+            if (m_parentGroup == null)
+                return;
+            if (m_parentGroup.IsDeleted)
+                return;
+            StatusSandboxPos = m_parentGroup.RootPart.AbsolutePosition;
+            m_parentGroup.RootPart.StatusSandbox = p;
+        }
+
+        public bool GetStatusSandbox()
+        {
+            if (m_parentGroup == null)
+                return false;
+            if (m_parentGroup.IsDeleted)
+                return false;
+
+            return m_parentGroup.RootPart.StatusSandbox;
+        }
+
+        public int GetAxisRotation(int axis)
+        {
+            //Cannot use ScriptBaseClass constants as no referance to it currently.
+            if (axis == 2)//STATUS_ROTATE_X
+                return STATUS_ROTATE_X;
+            if (axis == 4)//STATUS_ROTATE_Y
+                return STATUS_ROTATE_Y;
+            if (axis == 8)//STATUS_ROTATE_Z
+                return STATUS_ROTATE_Z;
+
+            return 0;
+        }
+
         public double GetDistanceTo(Vector3 a, Vector3 b)
         {
             float dx = a.X - b.X;
@@ -1669,11 +2012,13 @@ namespace OpenSim.Region.Framework.Scenes
 
         public uint GetEffectiveObjectFlags()
         {
-            PrimFlags f = _flags;
-            if (m_parentGroup == null || m_parentGroup.RootPart == this)
-                f &= ~(PrimFlags.Touch | PrimFlags.Money);
+            // Commenting this section of code out since it doesn't actually do anything, as enums are handled by 
+            // value rather than reference
+//            PrimFlags f = _flags;
+//            if (m_parentGroup == null || m_parentGroup.RootPart == this)
+//                f &= ~(PrimFlags.Touch | PrimFlags.Money);
 
-            return (uint)_flags | (uint)LocalFlags;
+            return (uint)Flags | (uint)LocalFlags;
         }
 
         public Vector3 GetGeometricCenter()
@@ -1710,14 +2055,7 @@ namespace OpenSim.Region.Framework.Scenes
 
         public void GetProperties(IClientAPI client)
         {
-            client.SendObjectPropertiesReply(
-                m_fromUserInventoryItemID, (ulong)_creationDate, _creatorID, UUID.Zero, UUID.Zero,
-                _groupID, (short)InventorySerial, _lastOwnerID, UUID, _ownerID,
-                ParentGroup.RootPart.TouchName, new byte[0], ParentGroup.RootPart.SitName, Name, Description,
-                ParentGroup.RootPart._ownerMask, ParentGroup.RootPart._nextOwnerMask, ParentGroup.RootPart._groupMask, ParentGroup.RootPart._everyoneMask,
-                ParentGroup.RootPart._baseMask,
-                ParentGroup.RootPart.ObjectSaleType,
-                ParentGroup.RootPart.SalePrice);
+            client.SendObjectPropertiesReply(this);
         }
 
         public UUID GetRootPartUUID()
@@ -1742,7 +2080,14 @@ namespace OpenSim.Region.Framework.Scenes
 
             axPos *= parentRot;
             Vector3 translationOffsetPosition = axPos;
-            return GroupPosition + translationOffsetPosition;
+            
+//            m_log.DebugFormat("[SCENE OBJECT PART]: Found group pos {0} for part {1}", GroupPosition, Name);
+            
+            Vector3 worldPos = GroupPosition + translationOffsetPosition;
+                
+//            m_log.DebugFormat("[SCENE OBJECT PART]: Found world pos {0} for part {1}", worldPos, Name);
+            
+            return worldPos;
         }
 
         /// <summary>
@@ -1753,7 +2098,7 @@ namespace OpenSim.Region.Framework.Scenes
         {
             Quaternion newRot;
 
-            if (this.LinkNum == 0)
+            if (this.LinkNum == 0 || this.LinkNum == 1)
             {
                 newRot = RotationOffset;
             }
@@ -1817,16 +2162,12 @@ namespace OpenSim.Region.Framework.Scenes
             // and build up list of colliders this time
             foreach (uint localid in collissionswith.Keys)
             {
-                if (localid != 0)
+                thisHitColliders.Add(localid);
+                if (!m_lastColliders.Contains(localid))
                 {
-                    thisHitColliders.Add(localid);
-                    if (!m_lastColliders.Contains(localid))
-                    {
-                        startedColliders.Add(localid);
-                    }
-
-                    //m_log.Debug("[OBJECT]: Collided with:" + localid.ToString() + " at depth of: " + collissionswith[localid].ToString());
+                    startedColliders.Add(localid);
                 }
+                //m_log.Debug("[OBJECT]: Collided with:" + localid.ToString() + " at depth of: " + collissionswith[localid].ToString());
             }
 
             // calculate things that ended colliding
@@ -1848,6 +2189,7 @@ namespace OpenSim.Region.Framework.Scenes
             {
                 m_lastColliders.Remove(localID);
             }
+
             if (m_parentGroup == null)
                 return;
             if (m_parentGroup.IsDeleted)
@@ -1856,7 +2198,7 @@ namespace OpenSim.Region.Framework.Scenes
             // play the sound.
             if (startedColliders.Count > 0 && CollisionSound != UUID.Zero && CollisionSoundVolume > 0.0f)
             {
-                SendSound(CollisionSound.ToString(), CollisionSoundVolume, true, (byte)0);
+                SendSound(CollisionSound.ToString(), CollisionSoundVolume, true, (byte)0, 0, false, false);
             }
 
             if ((m_parentGroup.RootPart.ScriptEvents & scriptEvents.collision_start) != 0)
@@ -1868,6 +2210,8 @@ namespace OpenSim.Region.Framework.Scenes
                     List<DetectedObject> colliding = new List<DetectedObject>();
                     foreach (uint localId in startedColliders)
                     {
+                        if (localId == 0)
+                            continue;
                         // always running this check because if the user deletes the object it would return a null reference.
                         if (m_parentGroup == null)
                             return;
@@ -1876,41 +2220,99 @@ namespace OpenSim.Region.Framework.Scenes
                             return;
                         
                         SceneObjectPart obj = m_parentGroup.Scene.GetSceneObjectPart(localId);
+                        string data = "";
                         if (obj != null)
                         {
-                            DetectedObject detobj = new DetectedObject();
-                            detobj.keyUUID = obj.UUID;
-                            detobj.nameStr = obj.Name;
-                            detobj.ownerUUID = obj._ownerID;
-                            detobj.posVector = obj.AbsolutePosition;
-                            detobj.rotQuat = obj.GetWorldRotation();
-                            detobj.velVector = obj.Velocity;
-                            detobj.colliderType = 0;
-                            detobj.groupUUID = obj._groupID;
-                            colliding.Add(detobj);
-                        }
-                        else
-                        {
-                            ScenePresence[] avlist = m_parentGroup.Scene.GetScenePresences();
-
-                            for (int i = 0; i < avlist.Length; i++)
+                            if (m_parentGroup.RootPart.CollisionFilter.ContainsValue(obj.UUID.ToString()) || m_parentGroup.RootPart.CollisionFilter.ContainsValue(obj.Name))
                             {
-                                ScenePresence av = avlist[i];
-
-                                if (av.LocalId == localId)
+                                bool found = m_parentGroup.RootPart.CollisionFilter.TryGetValue(1,out data);
+                                //If it is 1, it is to accept ONLY collisions from this object
+                                if (found)
                                 {
                                     DetectedObject detobj = new DetectedObject();
-                                    detobj.keyUUID = av.UUID;
-                                    detobj.nameStr = av.ControllingClient.Name;
-                                    detobj.ownerUUID = av.UUID;
-                                    detobj.posVector = av.AbsolutePosition;
-                                    detobj.rotQuat = av.Rotation;
-                                    detobj.velVector = av.Velocity;
+                                    detobj.keyUUID = obj.UUID;
+                                    detobj.nameStr = obj.Name;
+                                    detobj.ownerUUID = obj._ownerID;
+                                    detobj.posVector = obj.AbsolutePosition;
+                                    detobj.rotQuat = obj.GetWorldRotation();
+                                    detobj.velVector = obj.Velocity;
                                     detobj.colliderType = 0;
-                                    detobj.groupUUID = av.ControllingClient.ActiveGroupId;
+                                    detobj.groupUUID = obj._groupID;
+                                    colliding.Add(detobj);
+                                }
+                                //If it is 0, it is to not accept collisions from this object
+                                else
+                                {
+                                }
+                            }
+                            else
+                            {
+                                bool found = m_parentGroup.RootPart.CollisionFilter.TryGetValue(1,out data);
+                                //If it is 1, it is to accept ONLY collisions from this object, so this other object will not work
+                                if (!found)
+                                {
+                                    DetectedObject detobj = new DetectedObject();
+                                    detobj.keyUUID = obj.UUID;
+                                    detobj.nameStr = obj.Name;
+                                    detobj.ownerUUID = obj._ownerID;
+                                    detobj.posVector = obj.AbsolutePosition;
+                                    detobj.rotQuat = obj.GetWorldRotation();
+                                    detobj.velVector = obj.Velocity;
+                                    detobj.colliderType = 0;
+                                    detobj.groupUUID = obj._groupID;
                                     colliding.Add(detobj);
                                 }
                             }
+                        }
+                        else
+                        {
+                            m_parentGroup.Scene.ForEachScenePresence(delegate(ScenePresence av)
+                            {
+                                if (av.LocalId == localId)
+                                {
+                                    if (m_parentGroup.RootPart.CollisionFilter.ContainsValue(av.UUID.ToString()) || m_parentGroup.RootPart.CollisionFilter.ContainsValue(av.Name))
+                                    {
+                                        bool found = m_parentGroup.RootPart.CollisionFilter.TryGetValue(1, out data);
+                                        //If it is 1, it is to accept ONLY collisions from this avatar
+                                        if (found)
+                                        {
+                                            DetectedObject detobj = new DetectedObject();
+                                            detobj.keyUUID = av.UUID;
+                                            detobj.nameStr = av.ControllingClient.Name;
+                                            detobj.ownerUUID = av.UUID;
+                                            detobj.posVector = av.AbsolutePosition;
+                                            detobj.rotQuat = av.Rotation;
+                                            detobj.velVector = av.Velocity;
+                                            detobj.colliderType = 0;
+                                            detobj.groupUUID = av.ControllingClient.ActiveGroupId;
+                                            colliding.Add(detobj);
+                                        }
+                                        //If it is 0, it is to not accept collisions from this avatar
+                                        else
+                                        {
+                                        }
+                                    }
+                                    else
+                                    {
+                                        bool found = m_parentGroup.RootPart.CollisionFilter.TryGetValue(1, out data);
+                                        //If it is 1, it is to accept ONLY collisions from this avatar, so this other avatar will not work
+                                        if (!found)
+                                        {
+                                            DetectedObject detobj = new DetectedObject();
+                                            detobj.keyUUID = av.UUID;
+                                            detobj.nameStr = av.ControllingClient.Name;
+                                            detobj.ownerUUID = av.UUID;
+                                            detobj.posVector = av.AbsolutePosition;
+                                            detobj.rotQuat = av.Rotation;
+                                            detobj.velVector = av.Velocity;
+                                            detobj.colliderType = 0;
+                                            detobj.groupUUID = av.ControllingClient.ActiveGroupId;
+                                            colliding.Add(detobj);
+                                        }
+                                    }
+
+                                }
+                            });
                         }
                     }
                     if (colliding.Count > 0)
@@ -1922,7 +2324,10 @@ namespace OpenSim.Region.Framework.Scenes
                         
                         if (m_parentGroup.Scene == null)
                             return;
-                        
+                        if (m_parentGroup.PassCollision == true)
+                        {
+                            //TODO: Add pass to root prim!
+                        }
                         m_parentGroup.Scene.EventManager.TriggerScriptCollidingStart(LocalId, StartCollidingMessage);
                     }
                 }
@@ -1947,41 +2352,99 @@ namespace OpenSim.Region.Framework.Scenes
                             return;
                         
                         SceneObjectPart obj = m_parentGroup.Scene.GetSceneObjectPart(localId);
+                        string data = "";
                         if (obj != null)
                         {
-                            DetectedObject detobj = new DetectedObject();
-                            detobj.keyUUID = obj.UUID;
-                            detobj.nameStr = obj.Name;
-                            detobj.ownerUUID = obj._ownerID;
-                            detobj.posVector = obj.AbsolutePosition;
-                            detobj.rotQuat = obj.GetWorldRotation();
-                            detobj.velVector = obj.Velocity;
-                            detobj.colliderType = 0;
-                            detobj.groupUUID = obj._groupID;
-                            colliding.Add(detobj);
-                        }
-                        else
-                        {
-                            ScenePresence[] avlist = m_parentGroup.Scene.GetScenePresences();
-                            
-                            for (int i = 0; i < avlist.Length; i++)
+                            if (m_parentGroup.RootPart.CollisionFilter.ContainsValue(obj.UUID.ToString()) || m_parentGroup.RootPart.CollisionFilter.ContainsValue(obj.Name))
                             {
-                                ScenePresence av = avlist[i];
-
-                                if (av.LocalId == localId)
+                                bool found = m_parentGroup.RootPart.CollisionFilter.TryGetValue(1,out data);
+                                //If it is 1, it is to accept ONLY collisions from this object
+                                if (found)
                                 {
                                     DetectedObject detobj = new DetectedObject();
-                                    detobj.keyUUID = av.UUID;
-                                    detobj.nameStr = av.Name;
-                                    detobj.ownerUUID = av.UUID;
-                                    detobj.posVector = av.AbsolutePosition;
-                                    detobj.rotQuat = av.Rotation;
-                                    detobj.velVector = av.Velocity;
+                                    detobj.keyUUID = obj.UUID;
+                                    detobj.nameStr = obj.Name;
+                                    detobj.ownerUUID = obj._ownerID;
+                                    detobj.posVector = obj.AbsolutePosition;
+                                    detobj.rotQuat = obj.GetWorldRotation();
+                                    detobj.velVector = obj.Velocity;
                                     detobj.colliderType = 0;
-                                    detobj.groupUUID = av.ControllingClient.ActiveGroupId;
+                                    detobj.groupUUID = obj._groupID;
+                                    colliding.Add(detobj);
+                                }
+                                //If it is 0, it is to not accept collisions from this object
+                                else
+                                {
+                                }
+                            }
+                            else
+                            {
+                                bool found = m_parentGroup.RootPart.CollisionFilter.TryGetValue(1,out data);
+                                //If it is 1, it is to accept ONLY collisions from this object, so this other object will not work
+                                if (!found)
+                                {
+                                    DetectedObject detobj = new DetectedObject();
+                                    detobj.keyUUID = obj.UUID;
+                                    detobj.nameStr = obj.Name;
+                                    detobj.ownerUUID = obj._ownerID;
+                                    detobj.posVector = obj.AbsolutePosition;
+                                    detobj.rotQuat = obj.GetWorldRotation();
+                                    detobj.velVector = obj.Velocity;
+                                    detobj.colliderType = 0;
+                                    detobj.groupUUID = obj._groupID;
                                     colliding.Add(detobj);
                                 }
                             }
+                        }
+                        else
+                        {
+                            m_parentGroup.Scene.ForEachScenePresence(delegate(ScenePresence av)
+                            {
+                                if (av.LocalId == localId)
+                                {
+                                    if (m_parentGroup.RootPart.CollisionFilter.ContainsValue(av.UUID.ToString()) || m_parentGroup.RootPart.CollisionFilter.ContainsValue(av.Name))
+                                    {
+                                        bool found = m_parentGroup.RootPart.CollisionFilter.TryGetValue(1, out data);
+                                        //If it is 1, it is to accept ONLY collisions from this avatar
+                                        if (found)
+                                        {
+                                            DetectedObject detobj = new DetectedObject();
+                                            detobj.keyUUID = av.UUID;
+                                            detobj.nameStr = av.ControllingClient.Name;
+                                            detobj.ownerUUID = av.UUID;
+                                            detobj.posVector = av.AbsolutePosition;
+                                            detobj.rotQuat = av.Rotation;
+                                            detobj.velVector = av.Velocity;
+                                            detobj.colliderType = 0;
+                                            detobj.groupUUID = av.ControllingClient.ActiveGroupId;
+                                            colliding.Add(detobj);
+                                        }
+                                        //If it is 0, it is to not accept collisions from this avatar
+                                        else
+                                        {
+                                        }
+                                    }
+                                    else
+                                    {
+                                        bool found = m_parentGroup.RootPart.CollisionFilter.TryGetValue(1, out data);
+                                        //If it is 1, it is to accept ONLY collisions from this avatar, so this other avatar will not work
+                                        if (!found)
+                                        {
+                                            DetectedObject detobj = new DetectedObject();
+                                            detobj.keyUUID = av.UUID;
+                                            detobj.nameStr = av.ControllingClient.Name;
+                                            detobj.ownerUUID = av.UUID;
+                                            detobj.posVector = av.AbsolutePosition;
+                                            detobj.rotQuat = av.Rotation;
+                                            detobj.velVector = av.Velocity;
+                                            detobj.colliderType = 0;
+                                            detobj.groupUUID = av.ControllingClient.ActiveGroupId;
+                                            colliding.Add(detobj);
+                                        }
+                                    }
+
+                                }
+                            });
                         }
                     }
                     if (colliding.Count > 0)
@@ -2016,41 +2479,99 @@ namespace OpenSim.Region.Framework.Scenes
                         if (m_parentGroup.Scene == null)
                             return;
                         SceneObjectPart obj = m_parentGroup.Scene.GetSceneObjectPart(localId);
+                        string data = "";
                         if (obj != null)
                         {
-                            DetectedObject detobj = new DetectedObject();
-                            detobj.keyUUID = obj.UUID;
-                            detobj.nameStr = obj.Name;
-                            detobj.ownerUUID = obj._ownerID;
-                            detobj.posVector = obj.AbsolutePosition;
-                            detobj.rotQuat = obj.GetWorldRotation();
-                            detobj.velVector = obj.Velocity;
-                            detobj.colliderType = 0;
-                            detobj.groupUUID = obj._groupID;
-                            colliding.Add(detobj);
-                        }
-                        else
-                        {
-                            ScenePresence[] avlist = m_parentGroup.Scene.GetScenePresences();
-
-                            for (int i = 0; i < avlist.Length; i++)
+                            if (m_parentGroup.RootPart.CollisionFilter.ContainsValue(obj.UUID.ToString()) || m_parentGroup.RootPart.CollisionFilter.ContainsValue(obj.Name))
                             {
-                                ScenePresence av = avlist[i];
-
-                                if (av.LocalId == localId)
+                                bool found = m_parentGroup.RootPart.CollisionFilter.TryGetValue(1,out data);
+                                //If it is 1, it is to accept ONLY collisions from this object
+                                if (found)
                                 {
                                     DetectedObject detobj = new DetectedObject();
-                                    detobj.keyUUID = av.UUID;
-                                    detobj.nameStr = av.Name;
-                                    detobj.ownerUUID = av.UUID;
-                                    detobj.posVector = av.AbsolutePosition;
-                                    detobj.rotQuat = av.Rotation;
-                                    detobj.velVector = av.Velocity;
+                                    detobj.keyUUID = obj.UUID;
+                                    detobj.nameStr = obj.Name;
+                                    detobj.ownerUUID = obj._ownerID;
+                                    detobj.posVector = obj.AbsolutePosition;
+                                    detobj.rotQuat = obj.GetWorldRotation();
+                                    detobj.velVector = obj.Velocity;
                                     detobj.colliderType = 0;
-                                    detobj.groupUUID = av.ControllingClient.ActiveGroupId;
+                                    detobj.groupUUID = obj._groupID;
+                                    colliding.Add(detobj);
+                                }
+                                //If it is 0, it is to not accept collisions from this object
+                                else
+                                {
+                                }
+                            }
+                            else
+                            {
+                                bool found = m_parentGroup.RootPart.CollisionFilter.TryGetValue(1,out data);
+                                //If it is 1, it is to accept ONLY collisions from this object, so this other object will not work
+                                if (!found)
+                                {
+                                    DetectedObject detobj = new DetectedObject();
+                                    detobj.keyUUID = obj.UUID;
+                                    detobj.nameStr = obj.Name;
+                                    detobj.ownerUUID = obj._ownerID;
+                                    detobj.posVector = obj.AbsolutePosition;
+                                    detobj.rotQuat = obj.GetWorldRotation();
+                                    detobj.velVector = obj.Velocity;
+                                    detobj.colliderType = 0;
+                                    detobj.groupUUID = obj._groupID;
                                     colliding.Add(detobj);
                                 }
                             }
+                        }
+                        else
+                        {
+                            m_parentGroup.Scene.ForEachScenePresence(delegate(ScenePresence av)
+                            {
+                                if (av.LocalId == localId)
+                                {
+                                    if (m_parentGroup.RootPart.CollisionFilter.ContainsValue(av.UUID.ToString()) || m_parentGroup.RootPart.CollisionFilter.ContainsValue(av.Name))
+                                    {
+                                        bool found = m_parentGroup.RootPart.CollisionFilter.TryGetValue(1, out data);
+                                        //If it is 1, it is to accept ONLY collisions from this avatar
+                                        if (found)
+                                        {
+                                            DetectedObject detobj = new DetectedObject();
+                                            detobj.keyUUID = av.UUID;
+                                            detobj.nameStr = av.ControllingClient.Name;
+                                            detobj.ownerUUID = av.UUID;
+                                            detobj.posVector = av.AbsolutePosition;
+                                            detobj.rotQuat = av.Rotation;
+                                            detobj.velVector = av.Velocity;
+                                            detobj.colliderType = 0;
+                                            detobj.groupUUID = av.ControllingClient.ActiveGroupId;
+                                            colliding.Add(detobj);
+                                        }
+                                        //If it is 0, it is to not accept collisions from this avatar
+                                        else
+                                        {
+                                        }
+                                    }
+                                    else
+                                    {
+                                        bool found = m_parentGroup.RootPart.CollisionFilter.TryGetValue(1, out data);
+                                        //If it is 1, it is to accept ONLY collisions from this avatar, so this other avatar will not work
+                                        if (!found)
+                                        {
+                                            DetectedObject detobj = new DetectedObject();
+                                            detobj.keyUUID = av.UUID;
+                                            detobj.nameStr = av.ControllingClient.Name;
+                                            detobj.ownerUUID = av.UUID;
+                                            detobj.posVector = av.AbsolutePosition;
+                                            detobj.rotQuat = av.Rotation;
+                                            detobj.velVector = av.Velocity;
+                                            detobj.colliderType = 0;
+                                            detobj.groupUUID = av.ControllingClient.ActiveGroupId;
+                                            colliding.Add(detobj);
+                                        }
+                                    }
+
+                                }
+                            });
                         }
                     }
                     
@@ -2065,6 +2586,120 @@ namespace OpenSim.Region.Framework.Scenes
                             return;
                         
                         m_parentGroup.Scene.EventManager.TriggerScriptCollidingEnd(LocalId, EndCollidingMessage);
+                    }
+                }
+            }
+            if ((m_parentGroup.RootPart.ScriptEvents & scriptEvents.land_collision_start) != 0)
+            {
+                if (startedColliders.Count > 0)
+                {
+                    ColliderArgs LandStartCollidingMessage = new ColliderArgs();
+                    List<DetectedObject> colliding = new List<DetectedObject>();
+                    foreach (uint localId in startedColliders)
+                    {
+                        if (localId == 0)
+                        {
+                            //Hope that all is left is ground!
+                            DetectedObject detobj = new DetectedObject();
+                            detobj.keyUUID = UUID.Zero;
+                            detobj.nameStr = "";
+                            detobj.ownerUUID = UUID.Zero;
+                            detobj.posVector = m_parentGroup.RootPart.AbsolutePosition;
+                            detobj.rotQuat = Quaternion.Identity;
+                            detobj.velVector = Vector3.Zero;
+                            detobj.colliderType = 0;
+                            detobj.groupUUID = UUID.Zero;
+                            colliding.Add(detobj);
+                        }
+                    }
+
+                    if (colliding.Count > 0)
+                    {
+                        LandStartCollidingMessage.Colliders = colliding;
+                        // always running this check because if the user deletes the object it would return a null reference.
+                        if (m_parentGroup == null)
+                            return;
+
+                        if (m_parentGroup.Scene == null)
+                            return;
+
+                        m_parentGroup.Scene.EventManager.TriggerScriptLandCollidingStart(LocalId, LandStartCollidingMessage);
+                    }
+                }
+            }
+            if ((m_parentGroup.RootPart.ScriptEvents & scriptEvents.land_collision) != 0)
+            {
+                if (m_lastColliders.Count > 0)
+                {
+                    ColliderArgs LandCollidingMessage = new ColliderArgs();
+                    List<DetectedObject> colliding = new List<DetectedObject>();
+                    foreach (uint localId in startedColliders)
+                    {
+                        if (localId == 0)
+                        {
+                            //Hope that all is left is ground!
+                            DetectedObject detobj = new DetectedObject();
+                            detobj.keyUUID = UUID.Zero;
+                            detobj.nameStr = "";
+                            detobj.ownerUUID = UUID.Zero;
+                            detobj.posVector = m_parentGroup.RootPart.AbsolutePosition;
+                            detobj.rotQuat = Quaternion.Identity;
+                            detobj.velVector = Vector3.Zero;
+                            detobj.colliderType = 0;
+                            detobj.groupUUID = UUID.Zero;
+                            colliding.Add(detobj);
+                        }
+                    }
+
+                    if (colliding.Count > 0)
+                    {
+                        LandCollidingMessage.Colliders = colliding;
+                        // always running this check because if the user deletes the object it would return a null reference.
+                        if (m_parentGroup == null)
+                            return;
+
+                        if (m_parentGroup.Scene == null)
+                            return;
+
+                        m_parentGroup.Scene.EventManager.TriggerScriptLandColliding(LocalId, LandCollidingMessage);
+                    }
+                }
+            }
+            if ((m_parentGroup.RootPart.ScriptEvents & scriptEvents.land_collision_end) != 0)
+            {
+                if (endedColliders.Count > 0)
+                {
+                    ColliderArgs LandEndCollidingMessage = new ColliderArgs();
+                    List<DetectedObject> colliding = new List<DetectedObject>();
+                    foreach (uint localId in startedColliders)
+                    {
+                        if (localId == 0)
+                        {
+                            //Hope that all is left is ground!
+                            DetectedObject detobj = new DetectedObject();
+                            detobj.keyUUID = UUID.Zero;
+                            detobj.nameStr = "";
+                            detobj.ownerUUID = UUID.Zero;
+                            detobj.posVector = m_parentGroup.RootPart.AbsolutePosition;
+                            detobj.rotQuat = Quaternion.Identity;
+                            detobj.velVector = Vector3.Zero;
+                            detobj.colliderType = 0;
+                            detobj.groupUUID = UUID.Zero;
+                            colliding.Add(detobj);
+                        }
+                    }
+
+                    if (colliding.Count > 0)
+                    {
+                        LandEndCollidingMessage.Colliders = colliding;
+                        // always running this check because if the user deletes the object it would return a null reference.
+                        if (m_parentGroup == null)
+                            return;
+
+                        if (m_parentGroup.Scene == null)
+                            return;
+
+                        m_parentGroup.Scene.EventManager.TriggerScriptLandCollidingEnd(LocalId, LandEndCollidingMessage);
                     }
                 }
             }
@@ -2101,7 +2736,7 @@ namespace OpenSim.Region.Framework.Scenes
         public void PreloadSound(string sound)
         {
             // UUID ownerID = OwnerID;
-            UUID objectID = UUID;
+            UUID objectID = ParentGroup.RootPart.UUID;
             UUID soundID = UUID.Zero;
 
             if (!UUID.TryParse(sound, out soundID))
@@ -2122,27 +2757,27 @@ namespace OpenSim.Region.Framework.Scenes
                 }
             }
 
-            List<ScenePresence> avatarts = m_parentGroup.Scene.GetAvatars();
-            foreach (ScenePresence p in avatarts)
+            m_parentGroup.Scene.ForEachScenePresence(delegate(ScenePresence sp)
             {
-                // TODO: some filtering by distance of avatar
-
-                p.ControllingClient.SendPreLoadSound(objectID, objectID, soundID);
-            }
+                if (sp.IsChildAgent)
+                    return;
+                if (!(Util.GetDistanceTo(sp.AbsolutePosition, AbsolutePosition) >= 100))
+                    sp.ControllingClient.SendPreLoadSound(objectID, objectID, soundID);
+            });
         }
 
         public void RemFlag(PrimFlags flag)
         {
             // PrimFlags prevflag = Flags;
-            if ((ObjectFlags & (uint) flag) != 0)
+            if ((Flags & flag) != 0)
             {
                 //m_log.Debug("Removing flag: " + ((PrimFlags)flag).ToString());
-                _flags &= ~flag;
+                Flags &= ~flag;
             }
             //m_log.Debug("prev: " + prevflag.ToString() + " curr: " + Flags.ToString());
             //ScheduleFullUpdate();
         }
-
+        
         public void RemoveScriptEvents(UUID scriptid)
         {
             lock (m_scriptEvents)
@@ -2188,7 +2823,38 @@ namespace OpenSim.Region.Framework.Scenes
         
         public void RotLookAt(Quaternion target, float strength, float damping)
         {
-            m_parentGroup.rotLookAt(target, strength, damping);
+            rotLookAt(target, strength, damping);
+        }
+
+        public void rotLookAt(Quaternion target, float strength, float damping)
+        {
+            if (IsAttachment)
+            {
+                /*
+                    ScenePresence avatar = m_scene.GetScenePresence(rootpart.AttachedAvatar);
+                    if (avatar != null)
+                    {
+                    Rotate the Av?
+                    } */
+            }
+            else
+            {
+                APIDDamp = damping;
+                APIDStrength = strength;
+                APIDTarget = target;
+            }
+        }
+
+        public void startLookAt(Quaternion rot, float damp, float strength)
+        {
+            APIDDamp = damp;
+            APIDStrength = strength;
+            APIDTarget = rot;
+        }
+
+        public void stopLookAt()
+        {
+            APIDTarget = Quaternion.Identity;
         }
 
         /// <summary>
@@ -2196,6 +2862,8 @@ namespace OpenSim.Region.Framework.Scenes
         /// </summary>
         public void ScheduleFullUpdate()
         {
+//            m_log.DebugFormat("[SCENE OBJECT PART]: Scheduling full update for {0} {1}", Name, LocalId);
+            
             if (m_parentGroup != null)
             {
                 m_parentGroup.QueueForUpdateCheck();
@@ -2301,41 +2969,66 @@ namespace OpenSim.Region.Framework.Scenes
             }
         }
 
+//        /// <summary>
+//        ///
+//        /// </summary>
+//        /// <param name="remoteClient"></param>
+//        public void SendFullUpdate(IClientAPI remoteClient, uint clientFlags)
+//        {
+//            m_parentGroup.SendPartFullUpdate(remoteClient, this, clientFlags);
+//        }
+
+
         /// <summary>
-        ///
+        /// Send a full update to the client for the given part
         /// </summary>
         /// <param name="remoteClient"></param>
-        public void SendFullUpdate(IClientAPI remoteClient, uint clientFlags)
+        /// <param name="clientFlags"></param>
+        protected internal void SendFullUpdate(IClientAPI remoteClient, uint clientFlags)
         {
-            m_parentGroup.SendPartFullUpdate(remoteClient, this, clientFlags);
+//            m_log.DebugFormat(
+//                "[SOG]: Sendinging part full update to {0} for {1} {2}", remoteClient.Name, part.Name, part.LocalId);
+            
+            if (IsRoot)
+            {
+                if (IsAttachment)
+                {
+                    SendFullUpdateToClient(remoteClient, AttachedPos, clientFlags);
+                }
+                else
+                {
+                    SendFullUpdateToClient(remoteClient, AbsolutePosition, clientFlags);
+                }
+            }
+            else
+            {
+                SendFullUpdateToClient(remoteClient, clientFlags);
+            }
         }
 
         /// <summary>
-        ///
+        /// Send a full update for this part to all clients.
         /// </summary>
         public void SendFullUpdateToAllClients()
         {
-            ScenePresence[] avatars = m_parentGroup.Scene.GetScenePresences();
-            for (int i = 0; i < avatars.Length; i++)
+            m_parentGroup.Scene.ForEachScenePresence(delegate(ScenePresence avatar)
             {
-                // Ugly reference :(
-                m_parentGroup.SendPartFullUpdate(avatars[i].ControllingClient, this,
-                                                 avatars[i].GenerateClientFlags(UUID));
-            }
+                SendFullUpdate(avatar.ControllingClient, avatar.GenerateClientFlags(UUID));
+            });
         }
 
+        /// <summary>
+        /// Send a full update to all clients except the one nominated.
+        /// </summary>
+        /// <param name="agentID"></param>
         public void SendFullUpdateToAllClientsExcept(UUID agentID)
         {
-            ScenePresence[] avatars = m_parentGroup.Scene.GetScenePresences();
-            for (int i = 0; i < avatars.Length; i++)
+            m_parentGroup.Scene.ForEachScenePresence(delegate(ScenePresence avatar)
             {
                 // Ugly reference :(
-                if (avatars[i].UUID != agentID)
-                {
-                    m_parentGroup.SendPartFullUpdate(avatars[i].ControllingClient, this,
-                                                    avatars[i].GenerateClientFlags(UUID));
-                }
-            }
+                if (avatar.UUID != agentID)
+                    SendFullUpdate(avatar.ControllingClient, avatar.GenerateClientFlags(UUID));
+            });
         }
 
         /// <summary>
@@ -2370,21 +3063,17 @@ namespace OpenSim.Region.Framework.Scenes
 
             if (remoteClient.AgentId == _ownerID)
             {
-                if ((uint) (_flags & PrimFlags.CreateSelected) != 0)
+                if ((Flags & PrimFlags.CreateSelected) != 0)
                 {
                     clientFlags |= (uint) PrimFlags.CreateSelected;
-                    _flags &= ~PrimFlags.CreateSelected;
+                    Flags &= ~PrimFlags.CreateSelected;
                 }
             }
             //bool isattachment = IsAttachment;
             //if (LocalId != ParentGroup.RootPart.LocalId)
                 //isattachment = ParentGroup.RootPart.IsAttachment;
 
-            byte[] color = new byte[] {m_color.R, m_color.G, m_color.B, m_color.A};
-            remoteClient.SendPrimitiveToClient(new SendPrimitiveData(m_regionHandle, m_parentGroup.GetTimeDilation(), LocalId, m_shape,
-                                               lPos, Velocity, Acceleration, RotationOffset, AngularVelocity, clientFlags, m_uuid, _ownerID,
-                                               m_text, color, _parentID, m_particleSystem, m_clickAction, (byte)m_material, m_TextureAnimation, IsAttachment,
-                                               AttachmentPoint,FromItemID, Sound, SoundGain, SoundFlags, SoundRadius, ParentGroup.GetUpdatePriority(remoteClient)));
+            remoteClient.SendPrimUpdate(this, PrimUpdateFlags.FullUpdate);
         }
 
         /// <summary>
@@ -2446,7 +3135,7 @@ namespace OpenSim.Region.Framework.Scenes
         /// <param name="volume"></param>
         /// <param name="triggered"></param>
         /// <param name="flags"></param>
-        public void SendSound(string sound, double volume, bool triggered, byte flags)
+        public void SendSound(string sound, double volume, bool triggered, byte flags, float radius, bool useMaster, bool isMaster)
         {
             if (volume > 1)
                 volume = 1;
@@ -2454,8 +3143,9 @@ namespace OpenSim.Region.Framework.Scenes
                 volume = 0;
 
             UUID ownerID = _ownerID;
-            UUID objectID = UUID;
+            UUID objectID = ParentGroup.RootPart.UUID;
             UUID parentID = GetRootPartUUID();
+
             UUID soundID = UUID.Zero;
             Vector3 position = AbsolutePosition; // region local
             ulong regionHandle = m_parentGroup.Scene.RegionInfo.RegionHandle;
@@ -2482,10 +3172,51 @@ namespace OpenSim.Region.Framework.Scenes
             ISoundModule soundModule = m_parentGroup.Scene.RequestModuleInterface<ISoundModule>();
             if (soundModule != null)
             {
-                if (triggered)
-                    soundModule.TriggerSound(soundID, ownerID, objectID, parentID, volume, position, regionHandle);
+                if (useMaster)
+                {
+                    if (isMaster)
+                    {
+                        if (triggered)
+                            soundModule.TriggerSound(soundID, ownerID, objectID, parentID, volume, position, regionHandle, radius);
+                        else
+                            soundModule.PlayAttachedSound(soundID, ownerID, objectID, volume, position, flags, radius);
+                        ParentGroup.PlaySoundMasterPrim = this;
+                        ownerID = _ownerID;
+                        objectID = ParentGroup.RootPart.UUID;
+                        parentID = GetRootPartUUID();
+                        position = AbsolutePosition; // region local
+                        regionHandle = ParentGroup.Scene.RegionInfo.RegionHandle;
+                        if (triggered)
+                            soundModule.TriggerSound(soundID, ownerID, objectID, parentID, volume, position, regionHandle, radius);
+                        else
+                            soundModule.PlayAttachedSound(soundID, ownerID, objectID, volume, position, flags, radius);
+                        foreach (SceneObjectPart prim in ParentGroup.PlaySoundSlavePrims)
+                        {
+                            ownerID = prim._ownerID;
+                            objectID = prim.ParentGroup.RootPart.UUID;
+                            parentID = prim.GetRootPartUUID();
+                            position = prim.AbsolutePosition; // region local
+                            regionHandle = prim.ParentGroup.Scene.RegionInfo.RegionHandle;
+                            if (triggered)
+                                soundModule.TriggerSound(soundID, ownerID, objectID, parentID, volume, position, regionHandle, radius);
+                            else
+                                soundModule.PlayAttachedSound(soundID, ownerID, objectID, volume, position, flags, radius);
+                        }
+                        ParentGroup.PlaySoundSlavePrims.Clear();
+                        ParentGroup.PlaySoundMasterPrim = null;
+                    }
+                    else
+                    {
+                        ParentGroup.PlaySoundSlavePrims.Add(this);
+                    }
+                }
                 else
-                    soundModule.PlayAttachedSound(soundID, ownerID, objectID, volume, position, flags);
+                {
+                    if (triggered)
+                        soundModule.TriggerSound(soundID, ownerID, objectID, parentID, volume, position, regionHandle, radius);
+                    else
+                        soundModule.PlayAttachedSound(soundID, ownerID, objectID, volume, position, flags, radius);
+                }
             }
         }
 
@@ -2494,11 +3225,10 @@ namespace OpenSim.Region.Framework.Scenes
         /// </summary>
         public void SendTerseUpdateToAllClients()
         {
-            ScenePresence[] avatars = m_parentGroup.Scene.GetScenePresences();
-            for (int i = 0; i < avatars.Length; i++)
+            m_parentGroup.Scene.ForEachScenePresence(delegate(ScenePresence avatar)
             {
-                SendTerseUpdateToClient(avatars[i].ControllingClient);
-            }
+                SendTerseUpdateToClient(avatar.ControllingClient);
+            });
         }
 
         public void SetAttachmentPoint(uint AttachmentPoint)
@@ -2521,19 +3251,19 @@ namespace OpenSim.Region.Framework.Scenes
             //}
         }
 
-        public void SetAvatarOnSitTarget(UUID avatarID)
-        {
-            m_sitTargetAvatar = avatarID;
-            if (ParentGroup != null)
-                ParentGroup.TriggerScriptChangedEvent(Changed.LINK);
-        }
-
         public void SetAxisRotation(int axis, int rotate)
         {
             if (m_parentGroup != null)
             {
                 m_parentGroup.SetAxisRotation(axis, rotate);
             }
+            //Cannot use ScriptBaseClass constants as no referance to it currently.
+            if (axis == 2)//STATUS_ROTATE_X
+                STATUS_ROTATE_X = rotate;
+            if (axis == 4)//STATUS_ROTATE_Y
+                STATUS_ROTATE_Y = rotate;
+            if (axis == 8)//STATUS_ROTATE_Z
+                STATUS_ROTATE_Z = rotate;
         }
 
         public void SetBuoyancy(float fvalue)
@@ -2609,6 +3339,188 @@ namespace OpenSim.Region.Framework.Scenes
             }
         }
 
+        /// <summary>
+        /// Set the color of prim faces
+        /// </summary>
+        /// <param name="color"></param>
+        /// <param name="face"></param>
+        public void SetFaceColor(Vector3 color, int face)
+        {
+            Primitive.TextureEntry tex = Shape.Textures;
+            Color4 texcolor;
+            if (face >= 0 && face < GetNumberOfSides())
+            {
+                texcolor = tex.CreateFace((uint)face).RGBA;
+                texcolor.R = Util.Clip((float)color.X, 0.0f, 1.0f);
+                texcolor.G = Util.Clip((float)color.Y, 0.0f, 1.0f);
+                texcolor.B = Util.Clip((float)color.Z, 0.0f, 1.0f);
+                tex.FaceTextures[face].RGBA = texcolor;
+                UpdateTexture(tex);
+                TriggerScriptChangedEvent(Changed.COLOR);
+                return;
+            }
+            else if (face == ALL_SIDES)
+            {
+                for (uint i = 0; i < GetNumberOfSides(); i++)
+                {
+                    if (tex.FaceTextures[i] != null)
+                    {
+                        texcolor = tex.FaceTextures[i].RGBA;
+                        texcolor.R = Util.Clip((float)color.X, 0.0f, 1.0f);
+                        texcolor.G = Util.Clip((float)color.Y, 0.0f, 1.0f);
+                        texcolor.B = Util.Clip((float)color.Z, 0.0f, 1.0f);
+                        tex.FaceTextures[i].RGBA = texcolor;
+                    }
+                    texcolor = tex.DefaultTexture.RGBA;
+                    texcolor.R = Util.Clip((float)color.X, 0.0f, 1.0f);
+                    texcolor.G = Util.Clip((float)color.Y, 0.0f, 1.0f);
+                    texcolor.B = Util.Clip((float)color.Z, 0.0f, 1.0f);
+                    tex.DefaultTexture.RGBA = texcolor;
+                }
+                UpdateTexture(tex);
+                TriggerScriptChangedEvent(Changed.COLOR);
+                return;
+            }
+        }
+
+        /// <summary>
+        /// Get the number of sides that this part has.
+        /// </summary>
+        /// <returns></returns>
+        public int GetNumberOfSides()
+        {
+            int ret = 0;
+            bool hasCut;
+            bool hasHollow;
+            bool hasDimple;
+            bool hasProfileCut;
+
+            PrimType primType = GetPrimType();
+            HasCutHollowDimpleProfileCut(primType, Shape, out hasCut, out hasHollow, out hasDimple, out hasProfileCut);
+
+            switch (primType)
+            {
+                case PrimType.BOX:
+                    ret = 6;
+                    if (hasCut) ret += 2;
+                    if (hasHollow) ret += 1;
+                    break;
+                case PrimType.CYLINDER:
+                    ret = 3;
+                    if (hasCut) ret += 2;
+                    if (hasHollow) ret += 1;
+                    break;
+                case PrimType.PRISM:
+                    ret = 5;
+                    if (hasCut) ret += 2;
+                    if (hasHollow) ret += 1;
+                    break;
+                case PrimType.SPHERE:
+                    ret = 1;
+                    if (hasCut) ret += 2;
+                    if (hasDimple) ret += 2;
+                    if (hasHollow) ret += 1;
+                    break;
+                case PrimType.TORUS:
+                    ret = 1;
+                    if (hasCut) ret += 2;
+                    if (hasProfileCut) ret += 2;
+                    if (hasHollow) ret += 1;
+                    break;
+                case PrimType.TUBE:
+                    ret = 4;
+                    if (hasCut) ret += 2;
+                    if (hasProfileCut) ret += 2;
+                    if (hasHollow) ret += 1;
+                    break;
+                case PrimType.RING:
+                    ret = 3;
+                    if (hasCut) ret += 2;
+                    if (hasProfileCut) ret += 2;
+                    if (hasHollow) ret += 1;
+                    break;
+                case PrimType.SCULPT:
+                    ret = 1;
+                    break;
+            }
+            return ret;
+        }
+
+        /// <summary>
+        /// Tell us what type this prim is
+        /// </summary>
+        /// <param name="primShape"></param>
+        /// <returns></returns>
+        public PrimType GetPrimType()
+        {
+            if (Shape.SculptEntry)
+                return PrimType.SCULPT;
+            if ((Shape.ProfileCurve & 0x07) == (byte)ProfileShape.Square)
+            {
+                if (Shape.PathCurve == (byte)Extrusion.Straight)
+                    return PrimType.BOX;
+                else if (Shape.PathCurve == (byte)Extrusion.Curve1)
+                    return PrimType.TUBE;
+            }
+            else if ((Shape.ProfileCurve & 0x07) == (byte)ProfileShape.Circle)
+            {
+                if (Shape.PathCurve == (byte)Extrusion.Straight)
+                    return PrimType.CYLINDER;
+                // ProfileCurve seems to combine hole shape and profile curve so we need to only compare against the lower 3 bits
+                else if (Shape.PathCurve == (byte)Extrusion.Curve1)
+                    return PrimType.TORUS;
+            }
+            else if ((Shape.ProfileCurve & 0x07) == (byte)ProfileShape.HalfCircle)
+            {
+                if (Shape.PathCurve == (byte)Extrusion.Curve1 || Shape.PathCurve == (byte)Extrusion.Curve2)
+                    return PrimType.SPHERE;
+            }
+            else if ((Shape.ProfileCurve & 0x07) == (byte)ProfileShape.EquilateralTriangle)
+            {
+                if (Shape.PathCurve == (byte)Extrusion.Straight)
+                    return PrimType.PRISM;
+                else if (Shape.PathCurve == (byte)Extrusion.Curve1)
+                    return PrimType.RING;
+            }
+            
+            return PrimType.BOX;
+        }
+        
+        /// <summary>
+        /// Tell us if this object has cut, hollow, dimple, and other factors affecting the number of faces 
+        /// </summary>
+        /// <param name="primType"></param>
+        /// <param name="shape"></param>
+        /// <param name="hasCut"></param>
+        /// <param name="hasHollow"></param>
+        /// <param name="hasDimple"></param>
+        /// <param name="hasProfileCut"></param>
+        protected static void HasCutHollowDimpleProfileCut(PrimType primType, PrimitiveBaseShape shape, out bool hasCut, out bool hasHollow,
+            out bool hasDimple, out bool hasProfileCut)
+        {
+            if (primType == PrimType.BOX
+                ||
+                primType == PrimType.CYLINDER
+                ||
+                primType == PrimType.PRISM)
+
+                hasCut = (shape.ProfileBegin > 0) || (shape.ProfileEnd > 0);
+            else
+                hasCut = (shape.PathBegin > 0) || (shape.PathEnd > 0);
+
+            hasHollow = shape.ProfileHollow > 0;
+            hasDimple = (shape.ProfileBegin > 0) || (shape.ProfileEnd > 0); // taken from llSetPrimitiveParms
+            hasProfileCut = hasDimple; // is it the same thing?
+        }
+        
+        public void SetVehicleFlags(int param, bool remove)
+        {
+            if (PhysActor != null)
+            {
+                PhysActor.VehicleFlags(param, remove);
+            }
+        }
+
         public void SetGroup(UUID groupID, IClientAPI client)
         {
             _groupID = groupID;
@@ -2640,6 +3552,11 @@ namespace OpenSim.Region.Framework.Scenes
             }
         }
 
+        /// <summary>
+        /// Set the events that this part will pass on to listeners.
+        /// </summary>
+        /// <param name="scriptid"></param>
+        /// <param name="events"></param>
         public void SetScriptEvents(UUID scriptid, int events)
         {
             // scriptEvents oldparts;
@@ -2678,8 +3595,8 @@ namespace OpenSim.Region.Framework.Scenes
         {
             m_parentGroup.stopLookAt();
 
-            m_parentGroup.ScheduleGroupForTerseUpdate();        
-        }        
+            m_parentGroup.ScheduleGroupForTerseUpdate();
+        }
         
         /// <summary>
         /// Set the text displayed for this part.
@@ -2689,7 +3606,7 @@ namespace OpenSim.Region.Framework.Scenes
         /// <param name="alpha"></param>
         public void SetText(string text, Vector3 color, double alpha)
         {
-            Color = Color.FromArgb(0xff - (int) (alpha*0xff),
+            Color = Color.FromArgb((int) (alpha*0xff),
                                    (int) (color.X*0xff),
                                    (int) (color.Y*0xff),
                                    (int) (color.Z*0xff));
@@ -2708,27 +3625,30 @@ namespace OpenSim.Region.Framework.Scenes
         {
             if (!Undoing)
             {
-                if (m_parentGroup != null)
+                if (!IgnoreUndoUpdate)
                 {
-                    lock (m_undo)
+                    if (m_parentGroup != null)
                     {
-                        if (m_undo.Count > 0)
+                        lock (m_undo)
                         {
-                            UndoState last = m_undo.Peek();
-                            if (last != null)
+                            if (m_undo.Count > 0)
                             {
-                                if (last.Compare(this))
-                                    return;
+                                UndoState last = m_undo.Peek();
+                                if (last != null)
+                                {
+                                    if (last.Compare(this))
+                                        return;
+                                }
                             }
+
+                            if (m_parentGroup.GetSceneMaxUndo() > 0)
+                            {
+                                UndoState nUndo = new UndoState(this);
+
+                                m_undo.Push(nUndo);
+                            }
+
                         }
-
-                        if (m_parentGroup.GetSceneMaxUndo() > 0)
-                        {
-                            UndoState nUndo = new UndoState(this);
-
-                            m_undo.Push(nUndo);
-                        }
-
                     }
                 }
             }
@@ -3174,9 +4094,9 @@ namespace OpenSim.Region.Framework.Scenes
         /// Serialize this part to xml.
         /// </summary>
         /// <param name="xmlWriter"></param>
-        public void ToXml(XmlWriter xmlWriter)
+        public void ToXml(XmlTextWriter xmlWriter)
         {
-            serializer.Serialize(xmlWriter, this);
+            SceneObjectSerializer.SOPToXml2(xmlWriter, this, new Dictionary<string, object>());
         }
 
         public void TriggerScriptChangedEvent(Changed val)
@@ -3199,11 +4119,36 @@ namespace OpenSim.Region.Framework.Scenes
             lock (m_undo)
             {
                 if (m_undo.Count > 0)
+                {
+                    UndoState nUndo = null;
+                    if (m_parentGroup.GetSceneMaxUndo() > 0)
                     {
-                        UndoState goback = m_undo.Pop();
-                        if (goback != null)
-                            goback.PlaybackState(this);
+                        nUndo = new UndoState(this);
+                    }
+                    UndoState goback = m_undo.Pop();
+                    if (goback != null)
+                    {
+                        goback.PlaybackState(this);
+                        if (nUndo != null)
+                            m_redo.Push(nUndo);
+                    }
                 }
+            }
+        }
+
+        public void Redo()
+        {
+            lock (m_redo)
+            {
+                if (m_parentGroup.GetSceneMaxUndo() > 0)
+                {
+                    UndoState nUndo = new UndoState(this);
+
+                    m_undo.Push(nUndo);
+                }
+                UndoState gofwd = m_redo.Pop();
+                if (gofwd != null)
+                    gofwd.PlayfwdState(this);
             }
         }
 
@@ -3250,6 +4195,18 @@ namespace OpenSim.Region.Framework.Scenes
                 (pos.Z != OffsetPosition.Z))
             {
                 Vector3 newPos = new Vector3(pos.X, pos.Y, pos.Z);
+
+                if (ParentGroup.RootPart.GetStatusSandbox())
+                {
+                    if (Util.GetDistanceTo(ParentGroup.RootPart.StatusSandboxPos, newPos) > 10)
+                    {
+                        ParentGroup.RootPart.ScriptSetPhysicsStatus(false);
+                        newPos = OffsetPosition;
+                        ParentGroup.Scene.SimChat(Utils.StringToBytes("Hit Sandbox Limit"),
+                              ChatTypeEnum.DebugChannel, 0x7FFFFFFF, ParentGroup.RootPart.AbsolutePosition, Name, UUID, false);
+                    }
+                }
+
                 OffsetPosition = newPos;
                 ScheduleTerseUpdate();
             }
@@ -3292,6 +4249,13 @@ namespace OpenSim.Region.Framework.Scenes
                     case 16:
                         _nextOwnerMask = ApplyMask(_nextOwnerMask, set, mask) &
                                 baseMask;
+                        // Prevent the client from creating no mod, no copy
+                        // objects
+                        if ((_nextOwnerMask & (uint)PermissionMask.Copy) == 0)
+                            _nextOwnerMask |= (uint)PermissionMask.Transfer;
+
+                        _nextOwnerMask |= (uint)PermissionMask.Move;
+
                         break;
                 }
                 SendFullUpdateToAllClients();
@@ -3350,9 +4314,9 @@ namespace OpenSim.Region.Framework.Scenes
 
         public void UpdatePrimFlags(bool UsePhysics, bool IsTemporary, bool IsPhantom, bool IsVD)
         {
-            bool wasUsingPhysics = ((ObjectFlags & (uint) PrimFlags.Physics) != 0);
-            bool wasTemporary = ((ObjectFlags & (uint)PrimFlags.TemporaryOnRez) != 0);
-            bool wasPhantom = ((ObjectFlags & (uint)PrimFlags.Phantom) != 0);
+            bool wasUsingPhysics = ((Flags & PrimFlags.Physics) != 0);
+            bool wasTemporary = ((Flags & PrimFlags.TemporaryOnRez) != 0);
+            bool wasPhantom = ((Flags & PrimFlags.Phantom) != 0);
             bool wasVD = VolumeDetectActive;
 
             if ((UsePhysics == wasUsingPhysics) && (wasTemporary == IsTemporary) && (wasPhantom == IsPhantom) && (IsVD==wasVD))
@@ -3440,7 +4404,7 @@ namespace OpenSim.Region.Framework.Scenes
                 {
                     // It's not phantom anymore. So make sure the physics engine get's knowledge of it
                     PhysActor = m_parentGroup.Scene.PhysicsScene.AddPrimShape(
-                        Name,
+                        string.Format("{0}/{1}", Name, UUID),
                         Shape,
                         AbsolutePosition,
                         Scale,
@@ -3466,6 +4430,9 @@ namespace OpenSim.Region.Framework.Scenes
                             ((AggregateScriptEvents & scriptEvents.collision) != 0) ||
                             ((AggregateScriptEvents & scriptEvents.collision_end) != 0) ||
                             ((AggregateScriptEvents & scriptEvents.collision_start) != 0) ||
+                            ((AggregateScriptEvents & scriptEvents.land_collision_start) != 0) ||
+                            ((AggregateScriptEvents & scriptEvents.land_collision) != 0) ||
+                            ((AggregateScriptEvents & scriptEvents.land_collision_end) != 0) ||
                             (CollisionSound != UUID.Zero)
                             )
                         {
@@ -3539,7 +4506,6 @@ namespace OpenSim.Region.Framework.Scenes
                 (rot.Z != RotationOffset.Z) ||
                 (rot.W != RotationOffset.W))
             {
-                //StoreUndoState();
                 RotationOffset = rot;
                 ParentGroup.HasGroupChanged = true;
                 ScheduleTerseUpdate();
@@ -3586,12 +4552,17 @@ namespace OpenSim.Region.Framework.Scenes
                 ParentGroup.RootPart.Rezzed = DateTime.UtcNow;
 
             ParentGroup.HasGroupChanged = true;
+            TriggerScriptChangedEvent(Changed.SHAPE);
             ScheduleFullUpdate();
         }
 
-        // Added to handle bug in libsecondlife's TextureEntry.ToBytes()
-        // not handling RGBA properly. Cycles through, and "fixes" the color
-        // info
+        /// <summary>
+        /// Update the textures on the part.
+        /// </summary>
+        /// Added to handle bug in libsecondlife's TextureEntry.ToBytes()
+        /// not handling RGBA properly. Cycles through, and "fixes" the color
+        /// info
+        /// <param name="tex"></param>
         public void UpdateTexture(Primitive.TextureEntry tex)
         {
             //Color4 tmpcolor;
@@ -3670,6 +4641,9 @@ namespace OpenSim.Region.Framework.Scenes
                 ((AggregateScriptEvents & scriptEvents.collision) != 0) ||
                 ((AggregateScriptEvents & scriptEvents.collision_end) != 0) ||
                 ((AggregateScriptEvents & scriptEvents.collision_start) != 0) ||
+                ((AggregateScriptEvents & scriptEvents.land_collision_start) != 0) ||
+                ((AggregateScriptEvents & scriptEvents.land_collision) != 0) ||
+                ((AggregateScriptEvents & scriptEvents.land_collision_end) != 0) ||
                 (CollisionSound != UUID.Zero)
                 )
             {
@@ -3692,6 +4666,8 @@ namespace OpenSim.Region.Framework.Scenes
 
             if (m_parentGroup == null)
             {
+//                m_log.DebugFormat(
+//                    "[SCENE OBJECT PART]: Scheduling part {0} {1} for full update in aggregateScriptEvents() since m_parentGroup == null", Name, LocalId);
                 ScheduleFullUpdate();
                 return;
             }
@@ -3708,9 +4684,15 @@ namespace OpenSim.Region.Framework.Scenes
             LocalFlags=(PrimFlags)objectflagupdate;
 
             if (m_parentGroup != null && m_parentGroup.RootPart == this)
+            {
                 m_parentGroup.aggregateScriptEvents();
+            }
             else
+            {
+//                m_log.DebugFormat(
+//                    "[SCENE OBJECT PART]: Scheduling part {0} {1} for full update in aggregateScriptEvents()", Name, LocalId);
                 ScheduleFullUpdate();
+            }
         }
 
         public int registerTargetWaypoint(Vector3 target, float tolerance)
@@ -3727,6 +4709,23 @@ namespace OpenSim.Region.Framework.Scenes
             if (m_parentGroup != null)
             {
                 m_parentGroup.unregisterTargetWaypoint(handle);
+            }
+        }
+
+        public int registerRotTargetWaypoint(Quaternion target, float tolerance)
+        {
+            if (m_parentGroup != null)
+            {
+                return m_parentGroup.registerRotTargetWaypoint(target, tolerance);
+            }
+            return 0;
+        }
+
+        public void unregisterRotTargetWaypoint(int handle)
+        {
+            if (m_parentGroup != null)
+            {
+                m_parentGroup.unregisterRotTargetWaypoint(handle);
             }
         }
 
@@ -3772,28 +4771,12 @@ namespace OpenSim.Region.Framework.Scenes
             if (ParentGroup == null || ParentGroup.IsDeleted)
                 return;
 
-            Vector3 lPos = OffsetPosition;
-
-            if (IsAttachment)
-            {
-                if (ParentGroup.RootPart != this)
-                    return;
-
-                lPos = ParentGroup.RootPart.AttachedPos;
-            }
-            else
-            {
-                if (ParentGroup.RootPart == this)
-                    lPos = AbsolutePosition;
-            }
+            if (IsAttachment && ParentGroup.RootPart != this)
+                return;
             
             // Causes this thread to dig into the Client Thread Data.
             // Remember your locking here!
-            remoteClient.SendPrimTerseUpdate(new SendPrimitiveTerseData(m_regionHandle,
-                    m_parentGroup.GetTimeDilation(), LocalId, lPos,
-                    RotationOffset, Velocity, Acceleration,
-                    AngularVelocity, FromItemID,
-                    OwnerID, (int)AttachmentPoint, null, ParentGroup.GetUpdatePriority(remoteClient)));
+            remoteClient.SendPrimUpdate(this, PrimUpdateFlags.Position | PrimUpdateFlags.Rotation | PrimUpdateFlags.Velocity | PrimUpdateFlags.Acceleration | PrimUpdateFlags.AngularVelocity);
         }
                 
         public void AddScriptLPS(int count)
@@ -3808,6 +4791,43 @@ namespace OpenSim.Region.Framework.Scenes
             _everyoneMask &= _nextOwnerMask;
 
             Inventory.ApplyNextOwnerPermissions();
+        }
+        public void UpdateLookAt()
+        {
+            try
+            {
+                if (APIDTarget != Quaternion.Identity)
+                {
+                    if (Single.IsNaN(APIDTarget.W) == true)
+                    {
+                        APIDTarget = Quaternion.Identity;
+                        return;
+                    }
+                    Quaternion rot = RotationOffset;
+                    Quaternion dir = (rot - APIDTarget);
+                    float speed = ((APIDStrength / APIDDamp) * (float)(Math.PI / 180.0f));
+                    if (dir.Z > speed)
+                    {
+                        rot.Z -= speed;
+                    }
+                    if (dir.Z < -speed)
+                    {
+                        rot.Z += speed;
+                    }
+                    rot.Normalize();
+                    UpdateRotation(rot);
+                }
+            }
+            catch (Exception ex)
+            {
+                m_log.Error("[Physics] " + ex);
+            }
+        }
+
+        public Color4 GetTextColor()
+        {
+            Color color = Color;
+            return new Color4(color.R, color.G, color.B, (byte)(0xFF - color.A));
         }
     }
 }

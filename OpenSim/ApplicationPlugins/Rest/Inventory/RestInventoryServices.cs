@@ -36,7 +36,7 @@ using System.Xml;
 using OpenMetaverse;
 using OpenMetaverse.Imaging;
 using OpenSim.Framework;
-using OpenSim.Framework.Communications.Cache;
+
 using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
 using Timer=System.Timers.Timer;
@@ -45,13 +45,13 @@ namespace OpenSim.ApplicationPlugins.Rest.Inventory
 {
     public class RestInventoryServices : IRest
     {
-        private static readonly int PARM_USERID = 0;
-        private static readonly int PARM_PATH   = 1;
+//        private static readonly int PARM_USERID = 0;
+//        private static readonly int PARM_PATH   = 1;
 
-        private bool       enabled = false;
+//        private bool       enabled = false;
         private string     qPrefix = "inventory";
 
-        private static readonly string PRIVATE_ROOT_NAME = "My Inventory";
+//        private static readonly string PRIVATE_ROOT_NAME = "My Inventory";
 
         /// <summary>
         /// The constructor makes sure that the service prefix is absolute
@@ -79,7 +79,7 @@ namespace OpenSim.ApplicationPlugins.Rest.Inventory
 
             // Activate if everything went OK
 
-            enabled = true;
+//            enabled = true;
 
             Rest.Log.InfoFormat("{0} Inventory services initialization complete", MsgId);
         }
@@ -100,7 +100,7 @@ namespace OpenSim.ApplicationPlugins.Rest.Inventory
 
         public void Close()
         {
-            enabled = false;
+//            enabled = false;
             Rest.Log.InfoFormat("{0} Inventory services closing down", MsgId);
         }
 
@@ -139,207 +139,209 @@ namespace OpenSim.ApplicationPlugins.Rest.Inventory
         /// <param name=hdata>A consolidated HTTP request work area</param>
         private void DoInventory(RequestData hdata)
         {
-            InventoryRequestData rdata = (InventoryRequestData) hdata;
+//            InventoryRequestData rdata = (InventoryRequestData) hdata;
 
             Rest.Log.DebugFormat("{0} DoInventory ENTRY", MsgId);
 
-            // If we're disabled, do nothing.
+            // !!! REFACTORING PROBLEM
 
-            if (!enabled)
-            {
-                return;
-            }
+            //// If we're disabled, do nothing.
 
-            // Now that we know this is a serious attempt to
-            // access inventory data, we should find out who
-            // is asking, and make sure they are authorized
-            // to do so. We need to validate the caller's
-            // identity before revealing anything about the
-            // status quo. Authenticate throws an exception
-            // via Fail if no identity information is present.
-            //
-            // With the present HTTP server we can't use the
-            // builtin authentication mechanisms because they
-            // would be enforced for all in-bound requests.
-            // Instead we look at the headers ourselves and
-            // handle authentication directly.
+            //if (!enabled)
+            //{
+            //    return;
+            //}
 
-            try
-            {
-                if (!rdata.IsAuthenticated)
-                {
-                    rdata.Fail(Rest.HttpStatusCodeNotAuthorized,String.Format("user \"{0}\" could not be authenticated", rdata.userName));
-                }
-            }
-            catch (RestException e)
-            {
-                if (e.statusCode == Rest.HttpStatusCodeNotAuthorized)
-                {
-                    Rest.Log.WarnFormat("{0} User not authenticated", MsgId);
-                    Rest.Log.DebugFormat("{0} Authorization header: {1}", MsgId, rdata.request.Headers.Get("Authorization"));
-                }
-                else
-                {
-                    Rest.Log.ErrorFormat("{0} User authentication failed", MsgId);
-                    Rest.Log.DebugFormat("{0} Authorization header: {1}", MsgId, rdata.request.Headers.Get("Authorization"));
-                }
-                throw (e);
-            }
+            //// Now that we know this is a serious attempt to
+            //// access inventory data, we should find out who
+            //// is asking, and make sure they are authorized
+            //// to do so. We need to validate the caller's
+            //// identity before revealing anything about the
+            //// status quo. Authenticate throws an exception
+            //// via Fail if no identity information is present.
+            ////
+            //// With the present HTTP server we can't use the
+            //// builtin authentication mechanisms because they
+            //// would be enforced for all in-bound requests.
+            //// Instead we look at the headers ourselves and
+            //// handle authentication directly.
 
-            Rest.Log.DebugFormat("{0} Authenticated {1}", MsgId, rdata.userName);
+            //try
+            //{
+            //    if (!rdata.IsAuthenticated)
+            //    {
+            //        rdata.Fail(Rest.HttpStatusCodeNotAuthorized,String.Format("user \"{0}\" could not be authenticated", rdata.userName));
+            //    }
+            //}
+            //catch (RestException e)
+            //{
+            //    if (e.statusCode == Rest.HttpStatusCodeNotAuthorized)
+            //    {
+            //        Rest.Log.WarnFormat("{0} User not authenticated", MsgId);
+            //        Rest.Log.DebugFormat("{0} Authorization header: {1}", MsgId, rdata.request.Headers.Get("Authorization"));
+            //    }
+            //    else
+            //    {
+            //        Rest.Log.ErrorFormat("{0} User authentication failed", MsgId);
+            //        Rest.Log.DebugFormat("{0} Authorization header: {1}", MsgId, rdata.request.Headers.Get("Authorization"));
+            //    }
+            //    throw (e);
+            //}
 
-            // We can only get here if we are authorized
-            //
-            // The requestor may have specified an UUID or
-            // a conjoined FirstName LastName string. We'll
-            // try both. If we fail with the first, UUID,
-            // attempt, we try the other. As an example, the
-            // URI for a valid inventory request might be:
-            //
-            // http://<host>:<port>/admin/inventory/Arthur Dent
-            //
-            // Indicating that this is an inventory request for
-            // an avatar named Arthur Dent. This is ALL that is
-            // required to designate a GET for an entire
-            // inventory.
-            //
+            //Rest.Log.DebugFormat("{0} Authenticated {1}", MsgId, rdata.userName);
+
+            //// We can only get here if we are authorized
+            ////
+            //// The requestor may have specified an UUID or
+            //// a conjoined FirstName LastName string. We'll
+            //// try both. If we fail with the first, UUID,
+            //// attempt, we try the other. As an example, the
+            //// URI for a valid inventory request might be:
+            ////
+            //// http://<host>:<port>/admin/inventory/Arthur Dent
+            ////
+            //// Indicating that this is an inventory request for
+            //// an avatar named Arthur Dent. This is ALL that is
+            //// required to designate a GET for an entire
+            //// inventory.
+            ////
 
 
-            // Do we have at least a user agent name?
+            //// Do we have at least a user agent name?
 
-            if (rdata.Parameters.Length < 1)
-            {
-                Rest.Log.WarnFormat("{0} Inventory: No user agent identifier specified", MsgId);
-                rdata.Fail(Rest.HttpStatusCodeBadRequest, "no user identity specified");
-            }
+            //if (rdata.Parameters.Length < 1)
+            //{
+            //    Rest.Log.WarnFormat("{0} Inventory: No user agent identifier specified", MsgId);
+            //    rdata.Fail(Rest.HttpStatusCodeBadRequest, "no user identity specified");
+            //}
 
-            // The first parameter MUST be the agent identification, either an UUID
-            // or a space-separated First-name Last-Name specification. We check for
-            // an UUID first, if anyone names their character using a valid UUID
-            // that identifies another existing avatar will cause this a problem...
+            //// The first parameter MUST be the agent identification, either an UUID
+            //// or a space-separated First-name Last-Name specification. We check for
+            //// an UUID first, if anyone names their character using a valid UUID
+            //// that identifies another existing avatar will cause this a problem...
 
-            try
-            {
-                rdata.uuid = new UUID(rdata.Parameters[PARM_USERID]);
-                Rest.Log.DebugFormat("{0} UUID supplied", MsgId);
-                rdata.userProfile = Rest.UserServices.GetUserProfile(rdata.uuid);
-            }
-            catch
-            {
-                string[] names = rdata.Parameters[PARM_USERID].Split(Rest.CA_SPACE);
-                if (names.Length == 2)
-                {
-                    Rest.Log.DebugFormat("{0} Agent Name supplied [2]", MsgId);
-                    rdata.userProfile = Rest.UserServices.GetUserProfile(names[0],names[1]);
-                }
-                else
-                {
-                    Rest.Log.WarnFormat("{0} A Valid UUID or both first and last names must be specified", MsgId);
-                    rdata.Fail(Rest.HttpStatusCodeBadRequest, "invalid user identity");
-                }
-            }
+            //try
+            //{
+            //    rdata.uuid = new UUID(rdata.Parameters[PARM_USERID]);
+            //    Rest.Log.DebugFormat("{0} UUID supplied", MsgId);
+            //    rdata.userProfile = Rest.UserServices.GetUserProfile(rdata.uuid);
+            //}
+            //catch
+            //{
+            //    string[] names = rdata.Parameters[PARM_USERID].Split(Rest.CA_SPACE);
+            //    if (names.Length == 2)
+            //    {
+            //        Rest.Log.DebugFormat("{0} Agent Name supplied [2]", MsgId);
+            //        rdata.userProfile = Rest.UserServices.GetUserProfile(names[0],names[1]);
+            //    }
+            //    else
+            //    {
+            //        Rest.Log.WarnFormat("{0} A Valid UUID or both first and last names must be specified", MsgId);
+            //        rdata.Fail(Rest.HttpStatusCodeBadRequest, "invalid user identity");
+            //    }
+            //}
 
-            // If the user profile is null then either the server is broken, or the
-            // user is not known. We always assume the latter case.
+            //// If the user profile is null then either the server is broken, or the
+            //// user is not known. We always assume the latter case.
 
-            if (rdata.userProfile != null)
-            {
-                Rest.Log.DebugFormat("{0} Profile obtained for agent {1} {2}",
-                                     MsgId, rdata.userProfile.FirstName, rdata.userProfile.SurName);
-            }
-            else
-            {
-                Rest.Log.WarnFormat("{0} No profile for {1}", MsgId, rdata.path);
-                rdata.Fail(Rest.HttpStatusCodeNotFound, "unrecognized user identity");
-            }
+            //if (rdata.userProfile != null)
+            //{
+            //    Rest.Log.DebugFormat("{0} Profile obtained for agent {1} {2}",
+            //                         MsgId, rdata.userProfile.FirstName, rdata.userProfile.SurName);
+            //}
+            //else
+            //{
+            //    Rest.Log.WarnFormat("{0} No profile for {1}", MsgId, rdata.path);
+            //    rdata.Fail(Rest.HttpStatusCodeNotFound, "unrecognized user identity");
+            //}
 
-            // If we get to here, then we have effectively validated the user's
-            // identity. Now we need to get the inventory. If the server does not
-            // have the inventory, we reject the request with an appropriate explanation.
-            //
-            // Note that inventory retrieval is an asynchronous event, we use the rdata
-            // class instance as the basis for our synchronization.
-            //
+            //// If we get to here, then we have effectively validated the user's
+            //// identity. Now we need to get the inventory. If the server does not
+            //// have the inventory, we reject the request with an appropriate explanation.
+            ////
+            //// Note that inventory retrieval is an asynchronous event, we use the rdata
+            //// class instance as the basis for our synchronization.
+            ////
 
-            rdata.uuid = rdata.userProfile.ID;
+            //rdata.uuid = rdata.userProfile.ID;
 
-            if (Rest.InventoryServices.HasInventoryForUser(rdata.uuid))
-            {
-                rdata.root = Rest.InventoryServices.GetRootFolder(rdata.uuid);
+            //if (Rest.InventoryServices.HasInventoryForUser(rdata.uuid))
+            //{
+            //    rdata.root = Rest.InventoryServices.GetRootFolder(rdata.uuid);
 
-                Rest.Log.DebugFormat("{0} Inventory Root retrieved for {1} {2}",
-                                     MsgId, rdata.userProfile.FirstName, rdata.userProfile.SurName);
+            //    Rest.Log.DebugFormat("{0} Inventory Root retrieved for {1} {2}",
+            //                         MsgId, rdata.userProfile.FirstName, rdata.userProfile.SurName);
 
-                Rest.InventoryServices.GetUserInventory(rdata.uuid, rdata.GetUserInventory);
+            //    Rest.InventoryServices.GetUserInventory(rdata.uuid, rdata.GetUserInventory);
 
-                Rest.Log.DebugFormat("{0} Inventory catalog requested for {1} {2}",
-                                     MsgId, rdata.userProfile.FirstName, rdata.userProfile.SurName);
+            //    Rest.Log.DebugFormat("{0} Inventory catalog requested for {1} {2}",
+            //                         MsgId, rdata.userProfile.FirstName, rdata.userProfile.SurName);
 
-                lock (rdata)
-                {
-                    if (!rdata.HaveInventory)
-                    {
-                        rdata.startWD(1000);
-                        rdata.timeout = false;
-                        Monitor.Wait(rdata);
-                    }
-                }
+            //    lock (rdata)
+            //    {
+            //        if (!rdata.HaveInventory)
+            //        {
+            //            rdata.startWD(1000);
+            //            rdata.timeout = false;
+            //            Monitor.Wait(rdata);
+            //        }
+            //    }
 
-                if (rdata.timeout)
-                {
-                    Rest.Log.WarnFormat("{0} Inventory not available for {1} {2}. No response from service.",
-                                         MsgId, rdata.userProfile.FirstName, rdata.userProfile.SurName);
-                    rdata.Fail(Rest.HttpStatusCodeServerError, "inventory server not responding");
-                }
+            //    if (rdata.timeout)
+            //    {
+            //        Rest.Log.WarnFormat("{0} Inventory not available for {1} {2}. No response from service.",
+            //                             MsgId, rdata.userProfile.FirstName, rdata.userProfile.SurName);
+            //        rdata.Fail(Rest.HttpStatusCodeServerError, "inventory server not responding");
+            //    }
 
-                if (rdata.root == null)
-                {
-                    Rest.Log.WarnFormat("{0} Inventory is not available [1] for agent {1} {2}",
-                                         MsgId, rdata.userProfile.FirstName, rdata.userProfile.SurName);
-                    rdata.Fail(Rest.HttpStatusCodeServerError, "inventory retrieval failed");
-                }
+            //    if (rdata.root == null)
+            //    {
+            //        Rest.Log.WarnFormat("{0} Inventory is not available [1] for agent {1} {2}",
+            //                             MsgId, rdata.userProfile.FirstName, rdata.userProfile.SurName);
+            //        rdata.Fail(Rest.HttpStatusCodeServerError, "inventory retrieval failed");
+            //    }
 
-            }
-            else
-            {
-                Rest.Log.WarnFormat("{0} Inventory is not locally available for agent {1} {2}",
-                                     MsgId, rdata.userProfile.FirstName, rdata.userProfile.SurName);
-                rdata.Fail(Rest.HttpStatusCodeNotFound, "no local inventory for user");
-            }
+            //}
+            //else
+            //{
+            //    Rest.Log.WarnFormat("{0} Inventory is not locally available for agent {1} {2}",
+            //                         MsgId, rdata.userProfile.FirstName, rdata.userProfile.SurName);
+            //    rdata.Fail(Rest.HttpStatusCodeNotFound, "no local inventory for user");
+            //}
 
-            // If we get here, then we have successfully retrieved the user's information
-            // and inventory information is now available locally.
+            //// If we get here, then we have successfully retrieved the user's information
+            //// and inventory information is now available locally.
 
-            switch (rdata.method)
-            {
-                case Rest.HEAD   : // Do the processing, set the status code, suppress entity
-                    DoGet(rdata);
-                    rdata.buffer = null;
-                    break;
+            //switch (rdata.method)
+            //{
+            //    case Rest.HEAD   : // Do the processing, set the status code, suppress entity
+            //        DoGet(rdata);
+            //        rdata.buffer = null;
+            //        break;
 
-                case Rest.GET    : // Do the processing, set the status code, return entity
-                    DoGet(rdata);
-                    break;
+            //    case Rest.GET    : // Do the processing, set the status code, return entity
+            //        DoGet(rdata);
+            //        break;
 
-                case Rest.PUT    : // Update named element
-                    DoUpdate(rdata);
-                    break;
+            //    case Rest.PUT    : // Update named element
+            //        DoUpdate(rdata);
+            //        break;
 
-                case Rest.POST   : // Add new information to identified context.
-                    DoExtend(rdata);
-                    break;
+            //    case Rest.POST   : // Add new information to identified context.
+            //        DoExtend(rdata);
+            //        break;
 
-                case Rest.DELETE : // Delete information
-                    DoDelete(rdata);
-                    break;
+            //    case Rest.DELETE : // Delete information
+            //        DoDelete(rdata);
+            //        break;
 
-                default :
-                    Rest.Log.WarnFormat("{0} Method {1} not supported for {2}",
-                                        MsgId, rdata.method, rdata.path);
-                    rdata.Fail(Rest.HttpStatusCodeMethodNotAllowed,
-                               String.Format("{0} not supported", rdata.method));
-                    break;
-            }
+            //    default :
+            //        Rest.Log.WarnFormat("{0} Method {1} not supported for {2}",
+            //                            MsgId, rdata.method, rdata.path);
+            //        rdata.Fail(Rest.HttpStatusCodeMethodNotAllowed,
+            //                   String.Format("{0} not supported", rdata.method));
+            //        break;
+            //}
         }
 
         #endregion Interface
@@ -352,32 +354,32 @@ namespace OpenSim.ApplicationPlugins.Rest.Inventory
         /// corresponding subtree based upon node name.
         /// </summary>
         /// <param name=rdata>HTTP service request work area</param>
-        private void DoGet(InventoryRequestData rdata)
-        {
-            rdata.initXmlWriter();
-
-            rdata.writer.WriteStartElement(String.Empty,"Inventory",String.Empty);
-
-            // If there are additional parameters, then these represent
-            // a path relative to the root of the inventory. This path
-            // must be traversed before we format the sub-tree thus
-            // identified.
-
-            traverse(rdata, rdata.root, PARM_PATH);
-
-            // Close all open elements
-
-            rdata.writer.WriteFullEndElement();
-
-            // Indicate a successful request
-
-            rdata.Complete();
-
-            // Send the response to the user. The body will be implicitly
-            // constructed from the result of the XML writer.
-
-            rdata.Respond(String.Format("Inventory {0} Normal completion", rdata.method));
-        }
+//        private void DoGet(InventoryRequestData rdata)
+//        {
+//            rdata.initXmlWriter();
+//
+//            rdata.writer.WriteStartElement(String.Empty,"Inventory",String.Empty);
+//
+//            // If there are additional parameters, then these represent
+//            // a path relative to the root of the inventory. This path
+//            // must be traversed before we format the sub-tree thus
+//            // identified.
+//
+//            traverse(rdata, rdata.root, PARM_PATH);
+//
+//            // Close all open elements
+//
+//            rdata.writer.WriteFullEndElement();
+//
+//            // Indicate a successful request
+//
+//            rdata.Complete();
+//
+//            // Send the response to the user. The body will be implicitly
+//            // constructed from the result of the XML writer.
+//
+//            rdata.Respond(String.Format("Inventory {0} Normal completion", rdata.method));
+//        }
 
         /// <summary>
         /// In the case of the inventory, and probably in general,
@@ -417,210 +419,210 @@ namespace OpenSim.ApplicationPlugins.Rest.Inventory
         /// context identified by the URI.
         /// </summary>
         /// <param name=rdata>HTTP service request work area</param>
-        private void DoExtend(InventoryRequestData rdata)
-        {
-            bool  created  = false;
-            bool  modified = false;
-            string newnode = String.Empty;
-
-            // Resolve the context node specified in the URI. Entity
-            // data will be ADDED beneath this node. rdata already contains
-            // information about the current content of the user's
-            // inventory.
-
-            Object InventoryNode = getInventoryNode(rdata, rdata.root, PARM_PATH, Rest.Fill);
-
-            // Processing depends upon the type of inventory node
-            // identified in the URI. This is the CONTEXT for the
-            // change. We either got a context or we threw an
-            // exception.
-
-            // It follows that we can only add information if the URI
-            // has identified a folder. So only a type of folder is supported
-            // in this case.
-
-            if (typeof(InventoryFolderBase) == InventoryNode.GetType() ||
-                typeof(InventoryFolderImpl) == InventoryNode.GetType())
-            {
-                // Cast the context node appropriately.
-
-                InventoryFolderBase context    = (InventoryFolderBase) InventoryNode;
-
-                Rest.Log.DebugFormat("{0} {1}: Resource(s) will be added to folder {2}",
-                                     MsgId, rdata.method, rdata.path);
-
-                // Reconstitute the inventory sub-tree from the XML supplied in the entity.
-                // The result is a stand-alone inventory subtree, not yet integrated into the
-                // existing tree. An inventory collection consists of three components:
-                // [1] A (possibly empty) set of folders.
-                // [2] A (possibly empty) set of items.
-                // [3] A (possibly empty) set of assets.
-                // If all of these are empty, then the POST is a harmless no-operation.
-
-                XmlInventoryCollection entity = ReconstituteEntity(rdata);
-
-                // Inlined assets can be included in entity. These must be incorporated into
-                // the asset database before we attempt to update the inventory. If anything
-                // fails, return a failure to requestor.
-
-                if (entity.Assets.Count > 0)
-                {
-                    Rest.Log.DebugFormat("{0} Adding {1} assets to server",
-                                         MsgId, entity.Assets.Count);
-
-                    foreach (AssetBase asset in entity.Assets)
-                    {
-                        Rest.Log.DebugFormat("{0} Rest asset: {1} {2} {3}",
-                                             MsgId, asset.ID, asset.Type, asset.Name);
-                        Rest.AssetServices.Store(asset);
-
-                        created = true;
-                        rdata.appendStatus(String.Format("<p> Created asset {0}, UUID {1} <p>",
-                                        asset.Name, asset.ID));
-
-                        if (Rest.DEBUG && Rest.DumpAsset)
-                        {
-                            Rest.Dump(asset.Data);
-                        }
-                    }
-                }
-
-                // Modify the context using the collection of folders and items
-                // returned in the XmlInventoryCollection.
-
-                foreach (InventoryFolderBase folder in entity.Folders)
-                {
-                    InventoryFolderBase found;
-
-                    // If the parentID is zero, then this folder is going
-                    // into the root folder identified by the URI. The requestor
-                    // may have already set the parent ID explicitly, in which
-                    // case we don't have to do it here.
-
-                    if (folder.ParentID == UUID.Zero || folder.ParentID == context.ID)
-                    {
-                        if (newnode != String.Empty)
-                        {
-                            Rest.Log.DebugFormat("{0} Too many resources", MsgId);
-                            rdata.Fail(Rest.HttpStatusCodeBadRequest, "only one root entity is allowed");
-                        }
-                        folder.ParentID = context.ID;
-                        newnode = folder.Name;
-                    }
-
-                    // Search the existing inventory for an existing entry. If
-                    // we have one, we need to decide if it has really changed.
-                    // It could just be present as (unnecessary) context, and we
-                    // don't want to waste time updating the database in that
-                    // case, OR, it could be being moved from another location
-                    // in which case an update is most certainly necessary.
-
-                    found = null;
-
-                    foreach (InventoryFolderBase xf in rdata.folders)
-                    {
-                        // Compare identifying attribute
-                        if (xf.ID == folder.ID)
-                        {
-                            found = xf;
-                            break;
-                        }
-                    }
-
-                    if (found != null && FolderHasChanged(folder,found))
-                    {
-                        Rest.Log.DebugFormat("{0} Updating existing folder", MsgId);
-                        Rest.InventoryServices.MoveFolder(folder);
-
-                        modified = true;
-                        rdata.appendStatus(String.Format("<p> Created folder {0}, UUID {1} <p>",
-                                                         folder.Name, folder.ID));
-                    }
-                    else
-                    {
-                        Rest.Log.DebugFormat("{0} Adding new folder", MsgId);
-                        Rest.InventoryServices.AddFolder(folder);
-
-                        created = true;
-                        rdata.appendStatus(String.Format("<p> Modified folder {0}, UUID {1} <p>",
-                                                         folder.Name, folder.ID));
-                    }
-                }
-
-                // Now we repeat a similar process for the items included
-                // in the entity.
-
-                foreach (InventoryItemBase item in entity.Items)
-                {
-                    InventoryItemBase found = null;
-
-                    // If the parentID is zero, then this is going
-                    // directly into the root identified by the URI.
-
-                    if (item.Folder == UUID.Zero)
-                    {
-                        item.Folder = context.ID;
-                    }
-
-                    // Determine whether this is a new item or a
-                    // replacement definition.
-
-                    foreach (InventoryItemBase xi in rdata.items)
-                    {
-                        // Compare identifying attribute
-                        if (xi.ID == item.ID)
-                        {
-                            found = xi;
-                            break;
-                        }
-                    }
-
-                    if (found != null && ItemHasChanged(item, found))
-                    {
-                        Rest.Log.DebugFormat("{0} Updating item {1} {2} {3} {4} {5}",
-                                             MsgId, item.ID, item.AssetID, item.InvType, item.AssetType, item.Name);
-                        Rest.InventoryServices.UpdateItem(item);
-                        modified = true;
-                        rdata.appendStatus(String.Format("<p> Modified item {0}, UUID {1} <p>", item.Name, item.ID));
-                    }
-                    else
-                    {
-                        Rest.Log.DebugFormat("{0} Adding item {1} {2} {3} {4} {5}",
-                                             MsgId, item.ID, item.AssetID, item.InvType, item.AssetType, item.Name);
-                        Rest.InventoryServices.AddItem(item);
-                        created = true;
-                        rdata.appendStatus(String.Format("<p> Created item {0}, UUID {1} <p>", item.Name, item.ID));
-                    }
-                }
-
-                if (created)
-                {
-                    // Must include a location header with a URI that identifies the new resource.
-                    rdata.AddHeader(Rest.HttpHeaderLocation,String.Format("http://{0}{1}:{2}/{3}",
-                             rdata.hostname, rdata.port,rdata.path,newnode));
-                    rdata.Complete(Rest.HttpStatusCodeCreated);
-                }
-                else
-                {
-                    if (modified)
-                    {
-                        rdata.Complete(Rest.HttpStatusCodeOK);
-                    }
-                    else
-                    {
-                        rdata.Complete(Rest.HttpStatusCodeNoContent);
-                    }
-                }
-
-                rdata.Respond(String.Format("Profile {0} : Normal completion", rdata.method));
-            }
-            else
-            {
-                Rest.Log.DebugFormat("{0} {1}: Resource {2} is not a valid context: {3}",
-                                     MsgId, rdata.method, rdata.path, InventoryNode.GetType());
-                rdata.Fail(Rest.HttpStatusCodeBadRequest, "invalid resource context");
-            }
-        }
+//        private void DoExtend(InventoryRequestData rdata)
+//        {
+//            bool  created  = false;
+//            bool  modified = false;
+//            string newnode = String.Empty;
+//
+//            // Resolve the context node specified in the URI. Entity
+//            // data will be ADDED beneath this node. rdata already contains
+//            // information about the current content of the user's
+//            // inventory.
+//
+//            Object InventoryNode = getInventoryNode(rdata, rdata.root, PARM_PATH, Rest.Fill);
+//
+//            // Processing depends upon the type of inventory node
+//            // identified in the URI. This is the CONTEXT for the
+//            // change. We either got a context or we threw an
+//            // exception.
+//
+//            // It follows that we can only add information if the URI
+//            // has identified a folder. So only a type of folder is supported
+//            // in this case.
+//
+//            if (typeof(InventoryFolderBase) == InventoryNode.GetType() ||
+//                typeof(InventoryFolderImpl) == InventoryNode.GetType())
+//            {
+//                // Cast the context node appropriately.
+//
+//                InventoryFolderBase context    = (InventoryFolderBase) InventoryNode;
+//
+//                Rest.Log.DebugFormat("{0} {1}: Resource(s) will be added to folder {2}",
+//                                     MsgId, rdata.method, rdata.path);
+//
+//                // Reconstitute the inventory sub-tree from the XML supplied in the entity.
+//                // The result is a stand-alone inventory subtree, not yet integrated into the
+//                // existing tree. An inventory collection consists of three components:
+//                // [1] A (possibly empty) set of folders.
+//                // [2] A (possibly empty) set of items.
+//                // [3] A (possibly empty) set of assets.
+//                // If all of these are empty, then the POST is a harmless no-operation.
+//
+//                XmlInventoryCollection entity = ReconstituteEntity(rdata);
+//
+//                // Inlined assets can be included in entity. These must be incorporated into
+//                // the asset database before we attempt to update the inventory. If anything
+//                // fails, return a failure to requestor.
+//
+//                if (entity.Assets.Count > 0)
+//                {
+//                    Rest.Log.DebugFormat("{0} Adding {1} assets to server",
+//                                         MsgId, entity.Assets.Count);
+//
+//                    foreach (AssetBase asset in entity.Assets)
+//                    {
+//                        Rest.Log.DebugFormat("{0} Rest asset: {1} {2} {3}",
+//                                             MsgId, asset.ID, asset.Type, asset.Name);
+//                        Rest.AssetServices.Store(asset);
+//
+//                        created = true;
+//                        rdata.appendStatus(String.Format("<p> Created asset {0}, UUID {1} <p>",
+//                                        asset.Name, asset.ID));
+//
+//                        if (Rest.DEBUG && Rest.DumpAsset)
+//                        {
+//                            Rest.Dump(asset.Data);
+//                        }
+//                    }
+//                }
+//
+//                // Modify the context using the collection of folders and items
+//                // returned in the XmlInventoryCollection.
+//
+//                foreach (InventoryFolderBase folder in entity.Folders)
+//                {
+//                    InventoryFolderBase found;
+//
+//                    // If the parentID is zero, then this folder is going
+//                    // into the root folder identified by the URI. The requestor
+//                    // may have already set the parent ID explicitly, in which
+//                    // case we don't have to do it here.
+//
+//                    if (folder.ParentID == UUID.Zero || folder.ParentID == context.ID)
+//                    {
+//                        if (newnode != String.Empty)
+//                        {
+//                            Rest.Log.DebugFormat("{0} Too many resources", MsgId);
+//                            rdata.Fail(Rest.HttpStatusCodeBadRequest, "only one root entity is allowed");
+//                        }
+//                        folder.ParentID = context.ID;
+//                        newnode = folder.Name;
+//                    }
+//
+//                    // Search the existing inventory for an existing entry. If
+//                    // we have one, we need to decide if it has really changed.
+//                    // It could just be present as (unnecessary) context, and we
+//                    // don't want to waste time updating the database in that
+//                    // case, OR, it could be being moved from another location
+//                    // in which case an update is most certainly necessary.
+//
+//                    found = null;
+//
+//                    foreach (InventoryFolderBase xf in rdata.folders)
+//                    {
+//                        // Compare identifying attribute
+//                        if (xf.ID == folder.ID)
+//                        {
+//                            found = xf;
+//                            break;
+//                        }
+//                    }
+//
+//                    if (found != null && FolderHasChanged(folder,found))
+//                    {
+//                        Rest.Log.DebugFormat("{0} Updating existing folder", MsgId);
+//                        Rest.InventoryServices.MoveFolder(folder);
+//
+//                        modified = true;
+//                        rdata.appendStatus(String.Format("<p> Created folder {0}, UUID {1} <p>",
+//                                                         folder.Name, folder.ID));
+//                    }
+//                    else
+//                    {
+//                        Rest.Log.DebugFormat("{0} Adding new folder", MsgId);
+//                        Rest.InventoryServices.AddFolder(folder);
+//
+//                        created = true;
+//                        rdata.appendStatus(String.Format("<p> Modified folder {0}, UUID {1} <p>",
+//                                                         folder.Name, folder.ID));
+//                    }
+//                }
+//
+//                // Now we repeat a similar process for the items included
+//                // in the entity.
+//
+//                foreach (InventoryItemBase item in entity.Items)
+//                {
+//                    InventoryItemBase found = null;
+//
+//                    // If the parentID is zero, then this is going
+//                    // directly into the root identified by the URI.
+//
+//                    if (item.Folder == UUID.Zero)
+//                    {
+//                        item.Folder = context.ID;
+//                    }
+//
+//                    // Determine whether this is a new item or a
+//                    // replacement definition.
+//
+//                    foreach (InventoryItemBase xi in rdata.items)
+//                    {
+//                        // Compare identifying attribute
+//                        if (xi.ID == item.ID)
+//                        {
+//                            found = xi;
+//                            break;
+//                        }
+//                    }
+//
+//                    if (found != null && ItemHasChanged(item, found))
+//                    {
+//                        Rest.Log.DebugFormat("{0} Updating item {1} {2} {3} {4} {5}",
+//                                             MsgId, item.ID, item.AssetID, item.InvType, item.AssetType, item.Name);
+//                        Rest.InventoryServices.UpdateItem(item);
+//                        modified = true;
+//                        rdata.appendStatus(String.Format("<p> Modified item {0}, UUID {1} <p>", item.Name, item.ID));
+//                    }
+//                    else
+//                    {
+//                        Rest.Log.DebugFormat("{0} Adding item {1} {2} {3} {4} {5}",
+//                                             MsgId, item.ID, item.AssetID, item.InvType, item.AssetType, item.Name);
+//                        Rest.InventoryServices.AddItem(item);
+//                        created = true;
+//                        rdata.appendStatus(String.Format("<p> Created item {0}, UUID {1} <p>", item.Name, item.ID));
+//                    }
+//                }
+//
+//                if (created)
+//                {
+//                    // Must include a location header with a URI that identifies the new resource.
+//                    rdata.AddHeader(Rest.HttpHeaderLocation,String.Format("http://{0}{1}:{2}/{3}",
+//                             rdata.hostname, rdata.port,rdata.path,newnode));
+//                    rdata.Complete(Rest.HttpStatusCodeCreated);
+//                }
+//                else
+//                {
+//                    if (modified)
+//                    {
+//                        rdata.Complete(Rest.HttpStatusCodeOK);
+//                    }
+//                    else
+//                    {
+//                        rdata.Complete(Rest.HttpStatusCodeNoContent);
+//                    }
+//                }
+//
+//                rdata.Respond(String.Format("Profile {0} : Normal completion", rdata.method));
+//            }
+//            else
+//            {
+//                Rest.Log.DebugFormat("{0} {1}: Resource {2} is not a valid context: {3}",
+//                                     MsgId, rdata.method, rdata.path, InventoryNode.GetType());
+//                rdata.Fail(Rest.HttpStatusCodeBadRequest, "invalid resource context");
+//            }
+//        }
 
         /// <summary>
         /// PUT updates the URI-identified element in the inventory. This
@@ -644,243 +646,242 @@ namespace OpenSim.ApplicationPlugins.Rest.Inventory
         /// during the reconstitution process.
         /// </summary>
         /// <param name=rdata>HTTP service request work area</param>
-        private void DoUpdate(InventoryRequestData rdata)
-        {
-            int     count  = 0;
-            bool  created  = false;
-            bool  modified = false;
-
-            // Resolve the inventory node that is to be modified.
-            // rdata already contains information about the current
-            // content of the user's inventory.
-
-            Object InventoryNode = getInventoryNode(rdata, rdata.root, PARM_PATH, Rest.Fill);
-
-            // As long as we have a node, then we have something
-            // meaningful to do, unlike POST. So we reconstitute the
-            // subtree before doing anything else. Note that we
-            // etiher got a valid node or we threw an exception.
-
-            XmlInventoryCollection entity = ReconstituteEntity(rdata);
-
-            // Incorporate any inlined assets first. Any failures
-            // will terminate the request.
-
-            if (entity.Assets.Count > 0)
-            {
-                Rest.Log.DebugFormat("{0} Adding {1} assets to server",
-                                     MsgId, entity.Assets.Count);
-
-                foreach (AssetBase asset in entity.Assets)
-                {
-                    Rest.Log.DebugFormat("{0} Rest asset: {1} {2} {3}",
-                                         MsgId, asset.ID, asset.Type, asset.Name);
-
-                    // The asset was validated during the collection process
-
-                    Rest.AssetServices.Store(asset);
-
-                    created = true;
-                    rdata.appendStatus(String.Format("<p> Created asset {0}, UUID {1} <p>", asset.Name, asset.ID));
-
-                    if (Rest.DEBUG && Rest.DumpAsset)
-                    {
-                        Rest.Dump(asset.Data);
-                    }
-                }
-            }
-
-            // The URI specifies either a folder or an item to be updated.
-            //
-            // The root node in the entity will replace the node identified
-            // by the URI. This means the parent will remain the same, but
-            // any or all attributes associated with the named element
-            // will change.
-            //
-            // If the inventory collection contains an element with a zero
-            // parent ID, then this is taken to be the replacement for the
-            // named node. The collection MAY also specify an explicit
-            // parent ID, in this case it MAY identify the same parent as
-            // the current node, or it MAY specify a different parent,
-            // indicating that the folder is being moved in addition to any
-            // other modifications being made.
-
-            if (typeof(InventoryFolderBase) == InventoryNode.GetType() ||
-                typeof(InventoryFolderImpl) == InventoryNode.GetType())
-            {
-                bool rfound = false;
-                InventoryFolderBase uri = (InventoryFolderBase) InventoryNode;
-                InventoryFolderBase xml = null;
-
-                // If the entity to be replaced resolved to be the root
-                // directory itself (My Inventory), then make sure that
-                // the supplied data include as appropriately typed and
-                // named folder. Note that we can;t rule out the possibility
-                // of a sub-directory being called "My Inventory", so that
-                // is anticipated.
-
-                if (uri == rdata.root)
-                {
-                    foreach (InventoryFolderBase folder in entity.Folders)
-                    {
-                        if ((rfound = (folder.Name == PRIVATE_ROOT_NAME)))
-                        {
-                            if ((rfound = (folder.ParentID == UUID.Zero)))
-                                break;
-                        }
-                    }
-
-                    if (!rfound)
-                    {
-                        Rest.Log.DebugFormat("{0} {1}: Path <{2}> will result in loss of inventory",
-                                             MsgId, rdata.method, rdata.path);
-                        rdata.Fail(Rest.HttpStatusCodeBadRequest, "invalid inventory structure");
-                    }
-                }
-
-                // Scan the set of folders in the entity collection for an
-                // entry that matches the context folder. It is assumed that
-                // the only reliable indicator of this is a zero UUID (using
-                // implicit context), or the parent's UUID matches that of the
-                // URI designated node (explicit context). We don't allow
-                // ambiguity in this case because this is POST and we are
-                // supposed to be modifying a specific node.
-                // We assign any element IDs required as an economy; we don't
-                // want to iterate over the fodler set again if it can be
-                // helped.
-
-                foreach (InventoryFolderBase folder in entity.Folders)
-                {
-                    if (folder.ParentID == uri.ParentID ||
-                        folder.ParentID == UUID.Zero)
-                    {
-                        folder.ParentID = uri.ParentID;
-                        xml = folder;
-                        count++;
-                    }
-                }
-
-                // More than one entry is ambiguous. Other folders should be
-                // added using the POST verb.
-
-                if (count > 1)
-                {
-                    Rest.Log.DebugFormat("{0} {1}: Request for <{2}> is ambiguous",
-                                         MsgId, rdata.method, rdata.path);
-                    rdata.Fail(Rest.HttpStatusCodeConflict, "context is ambiguous");
-                }
-
-                // Exactly one entry means we ARE replacing the node
-                // identified by the URI. So we delete the old folder
-                // by moving it to the trash and then purging it.
-                // We then add all of the folders and items we
-                // included in the entity. The subtree has been
-                // modified.
-
-                if (count == 1)
-                {
-                    InventoryFolderBase TrashCan = GetTrashCan(rdata);
-
-                    // All went well, so we generate a UUID is one is
-                    // needed.
-
-                    if (xml.ID == UUID.Zero)
-                    {
-                        xml.ID = UUID.Random();
-                    }
-
-                    uri.ParentID = TrashCan.ID;
-                    Rest.InventoryServices.MoveFolder(uri);
-                    Rest.InventoryServices.PurgeFolder(TrashCan);
-                    modified = true;
-                }
-
-                // Now, regardelss of what they represent, we
-                // integrate all of the elements in the entity.
-
-                foreach (InventoryFolderBase f in entity.Folders)
-                {
-                    rdata.appendStatus(String.Format("<p>Moving folder {0} UUID {1} <p>", f.Name, f.ID));
-                    Rest.InventoryServices.MoveFolder(f);
-                }
-
-                foreach (InventoryItemBase it in entity.Items)
-                {
-                    rdata.appendStatus(String.Format("<p>Storing item {0} UUID {1} <p>", it.Name, it.ID));
-                    Rest.InventoryServices.AddItem(it);
-                }
-            }
-
-            /// <summary>
-            /// URI specifies an item to be updated
-            /// </summary>
-            /// <remarks>
-            /// The entity must contain a single item node to be
-            /// updated. ID and Folder ID must be correct.
-            /// </remarks>
-
-            else
-            {
-                InventoryItemBase uri = (InventoryItemBase) InventoryNode;
-                InventoryItemBase xml = null;
-
-                if (entity.Folders.Count != 0)
-                {
-                    Rest.Log.DebugFormat("{0} {1}: Request should not contain any folders <{2}>",
-                                         MsgId, rdata.method, rdata.path);
-                    rdata.Fail(Rest.HttpStatusCodeBadRequest, "folder is not allowed");
-                }
-
-                if (entity.Items.Count > 1)
-                {
-                    Rest.Log.DebugFormat("{0} {1}: Entity contains too many items <{2}>",
-                                         MsgId, rdata.method, rdata.path);
-                    rdata.Fail(Rest.HttpStatusCodeBadRequest, "too may items");
-                }
-
-                xml = entity.Items[0];
-
-                if (xml.ID == UUID.Zero)
-                {
-                    xml.ID = UUID.Random();
-                }
-
-                // If the folder reference has changed, then this item is
-                // being moved. Otherwise we'll just delete the old, and
-                // add in the new.
-
-                // Delete the old item
-
-                List<UUID> uuids = new List<UUID>();
-                uuids.Add(uri.ID);
-                Rest.InventoryServices.DeleteItems(uri.Owner, uuids);
-
-                // Add the new item to the inventory
-
-                Rest.InventoryServices.AddItem(xml);
-
-                rdata.appendStatus(String.Format("<p>Storing item {0} UUID {1} <p>", xml.Name, xml.ID));
-            }
-
-            if (created)
-            {
-                rdata.Complete(Rest.HttpStatusCodeCreated);
-            }
-            else
-            {
-                if (modified)
-                {
-                    rdata.Complete(Rest.HttpStatusCodeOK);
-                }
-                else
-                {
-                    rdata.Complete(Rest.HttpStatusCodeNoContent);
-                }
-            }
-
-            rdata.Respond(String.Format("Profile {0} : Normal completion", rdata.method));
-
-        }
+//        private void DoUpdate(InventoryRequestData rdata)
+//        {
+//            int     count  = 0;
+//            bool  created  = false;
+//            bool  modified = false;
+//
+//            // Resolve the inventory node that is to be modified.
+//            // rdata already contains information about the current
+//            // content of the user's inventory.
+//
+//            Object InventoryNode = getInventoryNode(rdata, rdata.root, PARM_PATH, Rest.Fill);
+//
+//            // As long as we have a node, then we have something
+//            // meaningful to do, unlike POST. So we reconstitute the
+//            // subtree before doing anything else. Note that we
+//            // etiher got a valid node or we threw an exception.
+//
+//            XmlInventoryCollection entity = ReconstituteEntity(rdata);
+//
+//            // Incorporate any inlined assets first. Any failures
+//            // will terminate the request.
+//
+//            if (entity.Assets.Count > 0)
+//            {
+//                Rest.Log.DebugFormat("{0} Adding {1} assets to server",
+//                                     MsgId, entity.Assets.Count);
+//
+//                foreach (AssetBase asset in entity.Assets)
+//                {
+//                    Rest.Log.DebugFormat("{0} Rest asset: {1} {2} {3}",
+//                                         MsgId, asset.ID, asset.Type, asset.Name);
+//
+//                    // The asset was validated during the collection process
+//
+//                    Rest.AssetServices.Store(asset);
+//
+//                    created = true;
+//                    rdata.appendStatus(String.Format("<p> Created asset {0}, UUID {1} <p>", asset.Name, asset.ID));
+//
+//                    if (Rest.DEBUG && Rest.DumpAsset)
+//                    {
+//                        Rest.Dump(asset.Data);
+//                    }
+//                }
+//            }
+//
+//            // The URI specifies either a folder or an item to be updated.
+//            //
+//            // The root node in the entity will replace the node identified
+//            // by the URI. This means the parent will remain the same, but
+//            // any or all attributes associated with the named element
+//            // will change.
+//            //
+//            // If the inventory collection contains an element with a zero
+//            // parent ID, then this is taken to be the replacement for the
+//            // named node. The collection MAY also specify an explicit
+//            // parent ID, in this case it MAY identify the same parent as
+//            // the current node, or it MAY specify a different parent,
+//            // indicating that the folder is being moved in addition to any
+//            // other modifications being made.
+//
+//            if (typeof(InventoryFolderBase) == InventoryNode.GetType() ||
+//                typeof(InventoryFolderImpl) == InventoryNode.GetType())
+//            {
+//                bool rfound = false;
+//                InventoryFolderBase uri = (InventoryFolderBase) InventoryNode;
+//                InventoryFolderBase xml = null;
+//
+//                // If the entity to be replaced resolved to be the root
+//                // directory itself (My Inventory), then make sure that
+//                // the supplied data include as appropriately typed and
+//                // named folder. Note that we can;t rule out the possibility
+//                // of a sub-directory being called "My Inventory", so that
+//                // is anticipated.
+//
+//                if (uri == rdata.root)
+//                {
+//                    foreach (InventoryFolderBase folder in entity.Folders)
+//                    {
+//                        if ((rfound = (folder.Name == PRIVATE_ROOT_NAME)))
+//                        {
+//                            if ((rfound = (folder.ParentID == UUID.Zero)))
+//                                break;
+//                        }
+//                    }
+//
+//                    if (!rfound)
+//                    {
+//                        Rest.Log.DebugFormat("{0} {1}: Path <{2}> will result in loss of inventory",
+//                                             MsgId, rdata.method, rdata.path);
+//                        rdata.Fail(Rest.HttpStatusCodeBadRequest, "invalid inventory structure");
+//                    }
+//                }
+//
+//                // Scan the set of folders in the entity collection for an
+//                // entry that matches the context folder. It is assumed that
+//                // the only reliable indicator of this is a zero UUID (using
+//                // implicit context), or the parent's UUID matches that of the
+//                // URI designated node (explicit context). We don't allow
+//                // ambiguity in this case because this is POST and we are
+//                // supposed to be modifying a specific node.
+//                // We assign any element IDs required as an economy; we don't
+//                // want to iterate over the fodler set again if it can be
+//                // helped.
+//
+//                foreach (InventoryFolderBase folder in entity.Folders)
+//                {
+//                    if (folder.ParentID == uri.ParentID ||
+//                        folder.ParentID == UUID.Zero)
+//                    {
+//                        folder.ParentID = uri.ParentID;
+//                        xml = folder;
+//                        count++;
+//                    }
+//                }
+//
+//                // More than one entry is ambiguous. Other folders should be
+//                // added using the POST verb.
+//
+//                if (count > 1)
+//                {
+//                    Rest.Log.DebugFormat("{0} {1}: Request for <{2}> is ambiguous",
+//                                         MsgId, rdata.method, rdata.path);
+//                    rdata.Fail(Rest.HttpStatusCodeConflict, "context is ambiguous");
+//                }
+//
+//                // Exactly one entry means we ARE replacing the node
+//                // identified by the URI. So we delete the old folder
+//                // by moving it to the trash and then purging it.
+//                // We then add all of the folders and items we
+//                // included in the entity. The subtree has been
+//                // modified.
+//
+//                if (count == 1)
+//                {
+//                    InventoryFolderBase TrashCan = GetTrashCan(rdata);
+//
+//                    // All went well, so we generate a UUID is one is
+//                    // needed.
+//
+//                    if (xml.ID == UUID.Zero)
+//                    {
+//                        xml.ID = UUID.Random();
+//                    }
+//
+//                    uri.ParentID = TrashCan.ID;
+//                    Rest.InventoryServices.MoveFolder(uri);
+//                    Rest.InventoryServices.PurgeFolder(TrashCan);
+//                    modified = true;
+//                }
+//
+//                // Now, regardelss of what they represent, we
+//                // integrate all of the elements in the entity.
+//
+//                foreach (InventoryFolderBase f in entity.Folders)
+//                {
+//                    rdata.appendStatus(String.Format("<p>Moving folder {0} UUID {1} <p>", f.Name, f.ID));
+//                    Rest.InventoryServices.MoveFolder(f);
+//                }
+//
+//                foreach (InventoryItemBase it in entity.Items)
+//                {
+//                    rdata.appendStatus(String.Format("<p>Storing item {0} UUID {1} <p>", it.Name, it.ID));
+//                    Rest.InventoryServices.AddItem(it);
+//                }
+//            }
+//
+//            /// <summary>
+//            /// URI specifies an item to be updated
+//            /// </summary>
+//            /// <remarks>
+//            /// The entity must contain a single item node to be
+//            /// updated. ID and Folder ID must be correct.
+//            /// </remarks>
+//
+//            else
+//            {
+//                InventoryItemBase uri = (InventoryItemBase) InventoryNode;
+//                InventoryItemBase xml = null;
+//
+//                if (entity.Folders.Count != 0)
+//                {
+//                    Rest.Log.DebugFormat("{0} {1}: Request should not contain any folders <{2}>",
+//                                         MsgId, rdata.method, rdata.path);
+//                    rdata.Fail(Rest.HttpStatusCodeBadRequest, "folder is not allowed");
+//                }
+//
+//                if (entity.Items.Count > 1)
+//                {
+//                    Rest.Log.DebugFormat("{0} {1}: Entity contains too many items <{2}>",
+//                                         MsgId, rdata.method, rdata.path);
+//                    rdata.Fail(Rest.HttpStatusCodeBadRequest, "too may items");
+//                }
+//
+//                xml = entity.Items[0];
+//
+//                if (xml.ID == UUID.Zero)
+//                {
+//                    xml.ID = UUID.Random();
+//                }
+//
+//                // If the folder reference has changed, then this item is
+//                // being moved. Otherwise we'll just delete the old, and
+//                // add in the new.
+//
+//                // Delete the old item
+//
+//                List<UUID> uuids = new List<UUID>();
+//                uuids.Add(uri.ID);
+//                Rest.InventoryServices.DeleteItems(uri.Owner, uuids);
+//
+//                // Add the new item to the inventory
+//
+//                Rest.InventoryServices.AddItem(xml);
+//
+//                rdata.appendStatus(String.Format("<p>Storing item {0} UUID {1} <p>", xml.Name, xml.ID));
+//            }
+//
+//            if (created)
+//            {
+//                rdata.Complete(Rest.HttpStatusCodeCreated);
+//            }
+//            else
+//            {
+//                if (modified)
+//                {
+//                    rdata.Complete(Rest.HttpStatusCodeOK);
+//                }
+//                else
+//                {
+//                    rdata.Complete(Rest.HttpStatusCodeNoContent);
+//                }
+//            }
+//
+//            rdata.Respond(String.Format("Profile {0} : Normal completion", rdata.method));
+//        }
 
         /// <summary>
         /// Arguably the most damaging REST interface. It deletes the inventory
@@ -902,42 +903,41 @@ namespace OpenSim.ApplicationPlugins.Rest.Inventory
         /// elements.
         /// </summary>
         /// <param name=rdata>HTTP service request work area</param>
-
-        private void DoDelete(InventoryRequestData rdata)
-        {
-            Object InventoryNode = getInventoryNode(rdata, rdata.root, PARM_PATH, false);
-
-            if (typeof(InventoryFolderBase) == InventoryNode.GetType() ||
-                typeof(InventoryFolderImpl) == InventoryNode.GetType())
-            {
-                InventoryFolderBase TrashCan = GetTrashCan(rdata);
-
-                InventoryFolderBase folder = (InventoryFolderBase) InventoryNode;
-                Rest.Log.DebugFormat("{0} {1}: Folder {2} will be deleted",
-                                     MsgId, rdata.method, rdata.path);
-                folder.ParentID = TrashCan.ID;
-                Rest.InventoryServices.MoveFolder(folder);
-                Rest.InventoryServices.PurgeFolder(TrashCan);
-
-                rdata.appendStatus(String.Format("<p>Deleted folder {0} UUID {1} <p>", folder.Name, folder.ID));
-            }
-
-            // Deleting items is much more straight forward.
-
-            else
-            {
-                InventoryItemBase item = (InventoryItemBase) InventoryNode;
-                Rest.Log.DebugFormat("{0} {1}: Item {2} will be deleted",
-                                     MsgId, rdata.method, rdata.path);
-                List<UUID> uuids = new List<UUID>();
-                uuids.Add(item.ID);
-                Rest.InventoryServices.DeleteItems(item.Owner, uuids);
-                rdata.appendStatus(String.Format("<p>Deleted item {0} UUID {1} <p>", item.Name, item.ID));
-            }
-
-            rdata.Complete();
-            rdata.Respond(String.Format("Profile {0} : Normal completion", rdata.method));
-        }
+//        private void DoDelete(InventoryRequestData rdata)
+//        {
+//            Object InventoryNode = getInventoryNode(rdata, rdata.root, PARM_PATH, false);
+//
+//            if (typeof(InventoryFolderBase) == InventoryNode.GetType() ||
+//                typeof(InventoryFolderImpl) == InventoryNode.GetType())
+//            {
+//                InventoryFolderBase TrashCan = GetTrashCan(rdata);
+//
+//                InventoryFolderBase folder = (InventoryFolderBase) InventoryNode;
+//                Rest.Log.DebugFormat("{0} {1}: Folder {2} will be deleted",
+//                                     MsgId, rdata.method, rdata.path);
+//                folder.ParentID = TrashCan.ID;
+//                Rest.InventoryServices.MoveFolder(folder);
+//                Rest.InventoryServices.PurgeFolder(TrashCan);
+//
+//                rdata.appendStatus(String.Format("<p>Deleted folder {0} UUID {1} <p>", folder.Name, folder.ID));
+//            }
+//
+//            // Deleting items is much more straight forward.
+//
+//            else
+//            {
+//                InventoryItemBase item = (InventoryItemBase) InventoryNode;
+//                Rest.Log.DebugFormat("{0} {1}: Item {2} will be deleted",
+//                                     MsgId, rdata.method, rdata.path);
+//                List<UUID> uuids = new List<UUID>();
+//                uuids.Add(item.ID);
+//                Rest.InventoryServices.DeleteItems(item.Owner, uuids);
+//                rdata.appendStatus(String.Format("<p>Deleted item {0} UUID {1} <p>", item.Name, item.ID));
+//            }
+//
+//            rdata.Complete();
+//            rdata.Respond(String.Format("Profile {0} : Normal completion", rdata.method));
+//        }
 
 #endregion method-specific processing
 
@@ -1295,6 +1295,7 @@ namespace OpenSim.ApplicationPlugins.Rest.Inventory
             rdata.writer.WriteAttributeString("folder", String.Empty, i.Folder.ToString());
             rdata.writer.WriteAttributeString("owner", String.Empty, i.Owner.ToString());
             rdata.writer.WriteAttributeString("creator", String.Empty, i.CreatorId);
+            rdata.writer.WriteAttributeString("creatordata", String.Empty, i.CreatorData);
             rdata.writer.WriteAttributeString("creationdate", String.Empty, i.CreationDate.ToString());
             rdata.writer.WriteAttributeString("invtype", String.Empty, i.InvType.ToString());
             rdata.writer.WriteAttributeString("assettype", String.Empty, i.AssetType.ToString());
@@ -1869,7 +1870,7 @@ namespace OpenSim.ApplicationPlugins.Rest.Inventory
 
                 // Create AssetBase entity to hold the inlined asset
 
-                asset = new AssetBase(uuid, name, type);
+                asset = new AssetBase(uuid, name, type, UUID.Zero.ToString());
 
                 asset.Description = desc;
                 asset.Local       = local;
@@ -2128,17 +2129,17 @@ namespace OpenSim.ApplicationPlugins.Rest.Inventory
                 }
                 catch (DllNotFoundException)
                 {
-                    Rest.Log.ErrorFormat("OpenJpeg is not installed correctly on this system.   Asset Data is emtpy for {0}", ic.Item.Name);
+                    Rest.Log.ErrorFormat("OpenJpeg is not installed correctly on this system.   Asset Data is empty for {0}", ic.Item.Name);
                     ic.Asset.Data = new Byte[0];
                 }
                 catch (IndexOutOfRangeException)
                 {
-                    Rest.Log.ErrorFormat("OpenJpeg was unable to encode this.   Asset Data is emtpy for {0}", ic.Item.Name);
+                    Rest.Log.ErrorFormat("OpenJpeg was unable to encode this.   Asset Data is empty for {0}", ic.Item.Name);
                     ic.Asset.Data = new Byte[0];
                 }
                 catch (Exception)
                 {
-                    Rest.Log.ErrorFormat("OpenJpeg was unable to encode this.   Asset Data is emtpy for {0}", ic.Item.Name);
+                    Rest.Log.ErrorFormat("OpenJpeg was unable to encode this.   Asset Data is empty for {0}", ic.Item.Name);
                     ic.Asset.Data = new Byte[0];
                 }
             }

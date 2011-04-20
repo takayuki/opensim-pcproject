@@ -51,6 +51,10 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Inventory
         // The cache proper
         protected Dictionary<UUID, Dictionary<AssetType, InventoryFolderBase>> m_InventoryCache;
 
+        // A cache of userIDs --> ServiceURLs, for HGBroker only
+        protected Dictionary<UUID, string> m_InventoryURLs =
+                new Dictionary<UUID, string>();
+
         public virtual void Init(IConfigSource source, BaseInventoryConnector connector)
         {
             m_Scenes = new List<Scene>();
@@ -89,8 +93,11 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Inventory
 
             // If not, go get them and place them in the cache
             Dictionary<AssetType, InventoryFolderBase> folders = CacheSystemFolders(presence.UUID);
+            CacheInventoryServiceURL(presence.Scene, presence.UUID);
+            
             m_log.DebugFormat("[INVENTORY CACHE]: OnMakeRootAgent in {0}, fetched system folders for {1} {2}: count {3}", 
                 presence.Scene.RegionInfo.RegionName, presence.Firstname, presence.Lastname, folders.Count);
+
         }
 
         void OnClientClosed(UUID clientID, Scene scene)
@@ -100,7 +107,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Inventory
                 ScenePresence sp = null;
                 foreach (Scene s in m_Scenes)
                 {
-                    s.TryGetAvatar(clientID, out sp);
+                    s.TryGetScenePresence(clientID, out sp);
                     if ((sp != null) && !sp.IsChildAgent && (s != scene))
                     {
                         m_log.DebugFormat("[INVENTORY CACHE]: OnClientClosed in {0}, but user {1} still in sim. Keeping system folders in cache",
@@ -113,6 +120,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Inventory
                     "[INVENTORY CACHE]: OnClientClosed in {0}, user {1} out of sim. Dropping system folders",
                     scene.RegionInfo.RegionName, clientID);
                 DropCachedSystemFolders(clientID);
+                DropInventoryServiceURL(clientID);
             }
         }
 
@@ -153,6 +161,8 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Inventory
         /// <returns></returns>
         public InventoryFolderBase GetFolderForType(UUID userID, AssetType type)
         {
+            m_log.DebugFormat("[INVENTORY CACHE]: Getting folder for asset type {0} for user {1}", type, userID);
+            
             Dictionary<AssetType, InventoryFolderBase> folders = null;
             
             lock (m_InventoryCache)
@@ -169,8 +179,57 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Inventory
             
             if ((folders != null) && folders.ContainsKey(type))
             {
+                m_log.DebugFormat(
+                    "[INVENTORY CACHE]: Returning folder {0} as type {1} for {2}", folders[type], type, userID);
+                
                 return folders[type];
             }
+            
+            m_log.WarnFormat("[INVENTORY CACHE]: Could not find folder for system type {0} for {1}", type, userID);
+
+            return null;
+        }
+
+        /// <summary>
+        /// Gets the user's inventory URL from its serviceURLs, if the user is foreign,
+        /// and sticks it in the cache
+        /// </summary>
+        /// <param name="userID"></param>
+        private void CacheInventoryServiceURL(Scene scene, UUID userID)
+        {
+            if (scene.UserAccountService.GetUserAccount(scene.RegionInfo.ScopeID, userID) == null)
+            {
+                // The user does not have a local account; let's cache its service URL
+                string inventoryURL = string.Empty;
+                ScenePresence sp = null;
+                scene.TryGetScenePresence(userID, out sp);
+                if (sp != null)
+                {
+                    AgentCircuitData aCircuit = scene.AuthenticateHandler.GetAgentCircuitData(sp.ControllingClient.CircuitCode);
+                    if (aCircuit.ServiceURLs.ContainsKey("InventoryServerURI"))
+                    {
+                        inventoryURL = aCircuit.ServiceURLs["InventoryServerURI"].ToString();
+                        if (inventoryURL != null && inventoryURL != string.Empty)
+                        {
+                            inventoryURL = inventoryURL.Trim(new char[] { '/' });
+                            m_InventoryURLs.Add(userID, inventoryURL);
+                        }
+                    }
+                }
+            }
+        }
+
+        private void DropInventoryServiceURL(UUID userID)
+        {
+            lock (m_InventoryURLs)
+                if (m_InventoryURLs.ContainsKey(userID))
+                    m_InventoryURLs.Remove(userID);
+        }
+
+        public string GetInventoryServiceURL(UUID userID)
+        {
+            if (m_InventoryURLs.ContainsKey(userID))
+                return m_InventoryURLs[userID];
 
             return null;
         }

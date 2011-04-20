@@ -69,11 +69,11 @@ namespace OpenSim.Region.DataSnapshot.Providers
                 byte RayEndIsIntersection) { this.Stale = true; };
             client.OnLinkObjects += delegate (IClientAPI remoteClient, uint parent, List<uint> children)
                 { this.Stale = true; };
-            client.OnDelinkObjects += delegate(List<uint> primIds) { this.Stale = true; };
+            client.OnDelinkObjects += delegate(List<uint> primIds, IClientAPI clientApi) { this.Stale = true; };
             client.OnGrabUpdate += delegate(UUID objectID, Vector3 offset, Vector3 grapPos,
                 IClientAPI remoteClient, List<SurfaceTouchEventArgs> surfaceArgs) { this.Stale = true; };
             client.OnObjectAttach += delegate(IClientAPI remoteClient, uint objectLocalID, uint AttachmentPt,
-                Quaternion rot, bool silent) { this.Stale = true; };
+                bool silent) { this.Stale = true; };
             client.OnObjectDuplicate += delegate(uint localID, Vector3 offset, uint dupeFlags, UUID AgentID,
                 UUID GroupID) { this.Stale = true; };
             client.OnObjectDuplicateOnRay += delegate(uint localID, uint dupeFlags, UUID AgentID, UUID GroupID,
@@ -101,7 +101,8 @@ namespace OpenSim.Region.DataSnapshot.Providers
             XmlNode parent = nodeFactory.CreateNode(XmlNodeType.Element, "objectdata", "");
             XmlNode node;
 
-            foreach (EntityBase entity in m_scene.Entities)
+            EntityBase[] entities = m_scene.Entities.GetEntities();
+            foreach (EntityBase entity in entities)
             {
                 // only objects, not avatars
                 if (entity is SceneObjectGroup)
@@ -135,16 +136,25 @@ namespace OpenSim.Region.DataSnapshot.Providers
                             xmlobject.AppendChild(node);
 
                             node = nodeFactory.CreateNode(XmlNodeType.Element, "flags", "");
-                            node.InnerText = String.Format("{0:x}", m_rootPart.ObjectFlags);
+                            node.InnerText = String.Format("{0:x}", (uint)m_rootPart.Flags);
                             xmlobject.AppendChild(node);
 
                             node = nodeFactory.CreateNode(XmlNodeType.Element, "regionuuid", "");
                             node.InnerText = m_scene.RegionInfo.RegionSettings.RegionUUID.ToString();
                             xmlobject.AppendChild(node);
 
-                            node = nodeFactory.CreateNode(XmlNodeType.Element, "parceluuid", "");
-                            node.InnerText = land.LandData.GlobalID.ToString();
-                            xmlobject.AppendChild(node);
+                            if (land != null && land.LandData != null)
+                            {
+                                node = nodeFactory.CreateNode(XmlNodeType.Element, "parceluuid", "");
+                                node.InnerText = land.LandData.GlobalID.ToString();
+                                xmlobject.AppendChild(node);
+                            }
+                            else
+                            {
+                                // Something is wrong with this object. Let's not list it.
+                                m_log.WarnFormat("[DATASNAPSHOT]: Bad data for object {0} ({1}) in region {2}", obj.Name, obj.UUID, m_scene.RegionInfo.RegionName);
+                                continue;
+                            }
 
                             node = nodeFactory.CreateNode(XmlNodeType.Element, "location", "");
                             Vector3 loc = obj.AbsolutePosition;
@@ -203,44 +213,54 @@ namespace OpenSim.Region.DataSnapshot.Providers
         {
             string bestguess = string.Empty;
             Dictionary<UUID, int> counts = new Dictionary<UUID, int>();
-            if (sog.RootPart.Shape != null && sog.RootPart.Shape.ProfileShape == ProfileShape.Square &&
-                sog.RootPart.Shape.Textures != null && sog.RootPart.Shape.Textures.FaceTextures != null)
-            {
-                if (sog.RootPart.Shape.Textures.DefaultTexture.TextureID != UUID.Zero &&
-                    sog.RootPart.Shape.Textures.DefaultTexture.TextureID != m_DefaultImage &&
-                    sog.RootPart.Shape.Textures.DefaultTexture.TextureID != m_BlankImage &&
-                    sog.RootPart.Shape.Textures.DefaultTexture.RGBA.A < 50)
-                {
-                    counts[sog.RootPart.Shape.Textures.DefaultTexture.TextureID] = 8;
-                }
 
-                foreach (Primitive.TextureEntryFace tentry in sog.RootPart.Shape.Textures.FaceTextures)
+            PrimitiveBaseShape shape = sog.RootPart.Shape;
+            if (shape != null && shape.ProfileShape == ProfileShape.Square)
+            {
+                Primitive.TextureEntry textures = shape.Textures;
+                if (textures != null)
                 {
-                    if (tentry != null)
+                    if (textures.DefaultTexture != null &&
+                        textures.DefaultTexture.TextureID != UUID.Zero &&
+                        textures.DefaultTexture.TextureID != m_DefaultImage &&
+                        textures.DefaultTexture.TextureID != m_BlankImage &&
+                        textures.DefaultTexture.RGBA.A < 50f)
                     {
-                        if (tentry.TextureID != UUID.Zero && tentry.TextureID != m_DefaultImage && tentry.TextureID != m_BlankImage && tentry.RGBA.A < 50)
+                        counts[textures.DefaultTexture.TextureID] = 8;
+                    }
+
+                    if (textures.FaceTextures != null)
+                    {
+                        foreach (Primitive.TextureEntryFace tentry in textures.FaceTextures)
                         {
-                            int c = 0;
-                            counts.TryGetValue(tentry.TextureID, out c);
-                            counts[tentry.TextureID] = c + 1;
-                            // decrease the default texture count
-                            if (counts.ContainsKey(sog.RootPart.Shape.Textures.DefaultTexture.TextureID))
-                                counts[sog.RootPart.Shape.Textures.DefaultTexture.TextureID] = counts[sog.RootPart.Shape.Textures.DefaultTexture.TextureID] - 1;
+                            if (tentry != null)
+                            {
+                                if (tentry.TextureID != UUID.Zero && tentry.TextureID != m_DefaultImage && tentry.TextureID != m_BlankImage && tentry.RGBA.A < 50)
+                                {
+                                    int c = 0;
+                                    counts.TryGetValue(tentry.TextureID, out c);
+                                    counts[tentry.TextureID] = c + 1;
+                                    // decrease the default texture count
+                                    if (counts.ContainsKey(textures.DefaultTexture.TextureID))
+                                        counts[textures.DefaultTexture.TextureID] = counts[textures.DefaultTexture.TextureID] - 1;
+                                }
+                            }
+                        }
+                    }
+
+                    // Let's pick the most unique texture
+                    int min = 9999;
+                    foreach (KeyValuePair<UUID, int> kv in counts)
+                    {
+                        if (kv.Value < min && kv.Value >= 1)
+                        {
+                            bestguess = kv.Key.ToString();
+                            min = kv.Value;
                         }
                     }
                 }
-
-                // Let's pick the most unique texture
-                int min = 9999;
-                foreach (KeyValuePair<UUID, int> kv in counts)
-                {
-                    if (kv.Value < min && kv.Value >= 1)
-                    {
-                        bestguess = kv.Key.ToString();
-                        min = kv.Value;
-                    }
-                }
             }
+
             return bestguess;
         }
     }

@@ -375,8 +375,7 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
 
         private void IRC_SendNamesReply()
         {
-            List<EntityBase> users = m_scene.Entities.GetAllByType<ScenePresence>();
-
+            EntityBase[] users = m_scene.Entities.GetAllByType<ScenePresence>();
             foreach (EntityBase user in users)
             {
                 SendServerCommand("353 " + m_nick + " = " + IrcRegionName + " :" + user.Name.Replace(" ", ""));
@@ -386,8 +385,7 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
 
         private void IRC_SendWhoReply()
         {
-            List<EntityBase> users = m_scene.Entities.GetAllByType<ScenePresence>();
-
+            EntityBase[] users = m_scene.Entities.GetAllByType<ScenePresence>();
             foreach (EntityBase user in users)
             {
                 /*SendServerCommand(String.Format("352 {0} {1} {2} {3} {4} {5} :0 {6}", IrcRegionName,
@@ -415,11 +413,11 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
 
         private void IRC_SendReplyUsers()
         {
-            List<EntityBase> users = m_scene.Entities.GetAllByType<ScenePresence>();
+            EntityBase[] users = m_scene.Entities.GetAllByType<ScenePresence>();
 
             SendServerCommand("392 :UserID   Terminal  Host");
 
-            if (users.Count == 0)
+            if (users.Length == 0)
             {
                 SendServerCommand("395 :Nobody logged in");
                 return;
@@ -627,6 +625,12 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
             set { if (!value) Disconnect("IsActive Disconnected?"); }
         }
 
+        public bool IsLoggingOut
+        {
+            get { return false; }
+            set { }
+        }
+
         public bool SendLogoutPacketWhenClosing
         {
             set { }
@@ -672,8 +676,9 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
         public event TeleportLandmarkRequest OnTeleportLandmarkRequest;
         public event DeRezObject OnDeRezObject;
         public event Action<IClientAPI> OnRegionHandShakeReply;
-        public event GenericCall2 OnRequestWearables;
-        public event GenericCall2 OnCompleteMovementToRegion;
+        public event GenericCall1 OnRequestWearables;
+        public event GenericCall1 OnCompleteMovementToRegion;
+        public event UpdateAgent OnPreAgentUpdate;
         public event UpdateAgent OnAgentUpdate;
         public event AgentRequestSit OnAgentRequestSit;
         public event AgentSit OnAgentSit;
@@ -717,6 +722,7 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
         public event Action<UUID> OnRemoveAvatar;
         public event ObjectPermissions OnObjectPermissions;
         public event CreateNewInventoryItem OnCreateNewInventoryItem;
+        public event LinkInventoryItem OnLinkInventoryItem;
         public event CreateInventoryFolder OnCreateNewInventoryFolder;
         public event UpdateInventoryFolder OnUpdateInventoryFolder;
         public event MoveInventoryFolder OnMoveInventoryFolder;
@@ -774,6 +780,8 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
         public event UUIDNameRequest OnTeleportHomeRequest;
         public event ScriptAnswer OnScriptAnswer;
         public event AgentSit OnUndo;
+        public event AgentSit OnRedo;
+        public event LandUndo OnLandUndo;
         public event ForceReleaseControls OnForceReleaseControls;
         public event GodLandStatRequest OnLandStatRequest;
         public event DetailedEstateDataRequest OnDetailedEstateDataRequest;
@@ -836,6 +844,25 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
         public event MuteListRequest OnMuteListRequest;
         public event AvatarInterestUpdate OnAvatarInterestUpdate;
         public event PlacesQuery OnPlacesQuery;
+        public event FindAgentUpdate OnFindAgent;
+        public event TrackAgentUpdate OnTrackAgent;
+        public event NewUserReport OnUserReport;
+        public event SaveStateHandler OnSaveState;
+        public event GroupAccountSummaryRequest OnGroupAccountSummaryRequest;
+        public event GroupAccountDetailsRequest OnGroupAccountDetailsRequest;
+        public event GroupAccountTransactionsRequest OnGroupAccountTransactionsRequest;
+        public event FreezeUserUpdate OnParcelFreezeUser;
+        public event EjectUserUpdate OnParcelEjectUser;
+        public event ParcelBuyPass OnParcelBuyPass;
+        public event ParcelGodMark OnParcelGodMark;
+        public event GroupActiveProposalsRequest OnGroupActiveProposalsRequest;
+        public event GroupVoteHistoryRequest OnGroupVoteHistoryRequest;
+        public event SimWideDeletesDelegate OnSimWideDeletes;
+        public event SendPostcard OnSendPostcard;
+        public event MuteListEntryUpdate OnUpdateMuteListEntry;
+        public event MuteListEntryRemove OnRemoveMuteListEntry;
+        public event GodlikeMessage onGodlikeMessage;
+        public event GodUpdateRegionInfoUpdate OnGodUpdateRegionInfoUpdate;
 
 #pragma warning restore 67
 
@@ -872,7 +899,7 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
             Scene scene = (Scene)Scene;
             AvatarAppearance appearance;
             scene.GetAvatarAppearance(this, out appearance);
-            OnSetAppearance(appearance.Texture, (byte[])appearance.VisualParams.Clone());
+            OnSetAppearance(this, appearance.Texture, (byte[])appearance.VisualParams.Clone());
         }
 
         public void SendRegionHandshake(RegionInfo regionInfo, RegionHandshakeArgs args)
@@ -886,7 +913,7 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
 
             if (OnCompleteMovementToRegion != null)
             {
-                OnCompleteMovementToRegion();
+                OnCompleteMovementToRegion(this);
             }
         }
 
@@ -937,6 +964,11 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
         }
 
         public void SendGenericMessage(string method, List<string> message)
+        {
+
+        }
+
+        public void SendGenericMessage(string method, List<byte[]> message)
         {
             
         }
@@ -1001,9 +1033,13 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
             
         }
 
-        public void SendTeleportLocationStart()
+        public void SendTeleportStart(uint flags)
         {
             
+        }
+
+        public void SendTeleportProgress(uint flags, string message)
+        {
         }
 
         public void SendMoneyBalance(UUID transaction, bool success, byte[] description, int balance)
@@ -1016,52 +1052,32 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
             
         }
 
-        public void SendAvatarData(SendAvatarData data)
-        {
-            
-        }
-
-        public void SendAvatarTerseUpdate(SendAvatarTerseData data)
-        {
-            
-        }
-
         public void SendCoarseLocationUpdate(List<UUID> users, List<Vector3> CoarseLocations)
         {
             
         }
 
-        public void AttachObject(uint localID, Quaternion rotation, byte attachPoint, UUID ownerID)
+        public void SendAvatarDataImmediate(ISceneEntity avatar)
         {
-            
+
         }
 
-        public void SetChildAgentThrottle(byte[] throttle)
+        public void SendPrimUpdate(ISceneEntity entity, PrimUpdateFlags updateFlags)
         {
-            
+
         }
 
-        public void SendPrimitiveToClient(SendPrimitiveData data)
+        public void ReprioritizeUpdates()
         {
-            
+
         }
 
-        public void SendPrimTerseUpdate(SendPrimitiveTerseData data)
-        {
-            
-        }
-
-        public void ReprioritizeUpdates(StateUpdateTypes type, UpdatePriorityHandler handler)
+        public void FlushPrimUpdates()
         {
 
         }
 
         public void SendInventoryFolderDetails(UUID ownerID, UUID folderID, List<InventoryItemBase> items, List<InventoryFolderBase> folders, int version, bool fetchFolders, bool fetchItems)
-        {
-            
-        }
-
-        public void FlushPrimUpdates()
         {
             
         }
@@ -1097,6 +1113,11 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
         }
 
         public void SendXferPacket(ulong xferID, uint packet, byte[] data)
+        {
+            
+        }
+
+        public void SendAbortXferPacket(ulong xferID)
         {
             
         }
@@ -1201,7 +1222,7 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
             
         }
 
-        public void SendEstateManagersList(UUID invoice, UUID[] EstateManagers, uint estateID)
+        public void SendEstateList(UUID invoice, int code, UUID[] Data, uint estateID)
         {
             
         }
@@ -1226,7 +1247,7 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
             
         }
 
-        public void SendLandProperties(int sequence_id, bool snap_selection, int request_result, LandData landData, float simObjectBonusFactor, int parcelObjectCapacity, int simObjectCapacity, uint regionFlags)
+        public void SendLandProperties(int sequence_id, bool snap_selection, int request_result, ILandObject lo, float simObjectBonusFactor, int parcelObjectCapacity, int simObjectCapacity, uint regionFlags)
         {
             
         }
@@ -1311,14 +1332,13 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
             
         }
 
-        public void SendObjectPropertiesFamilyData(uint RequestFlags, UUID ObjectUUID, UUID OwnerID, UUID GroupID, uint BaseMask, uint OwnerMask, uint GroupMask, uint EveryoneMask, uint NextOwnerMask, int OwnershipCost, byte SaleType, int SalePrice, uint Category, UUID LastOwnerID, string ObjectName, string Description)
+        public void SendObjectPropertiesFamilyData(ISceneEntity Entity, uint RequestFlags)
         {
             
         }
 
-        public void SendObjectPropertiesReply(UUID ItemID, ulong CreationDate, UUID CreatorUUID, UUID FolderUUID, UUID FromTaskUUID, UUID GroupUUID, short InventorySerial, UUID LastOwnerUUID, UUID ObjectUUID, UUID OwnerUUID, string TouchTitle, byte[] TextureID, string SitTitle, string ItemName, string ItemDescription, uint OwnerMask, uint NextOwnerMask, uint GroupMask, uint EveryoneMask, uint BaseMask, byte saleType, int salePrice)
+        public void SendObjectPropertiesReply(ISceneEntity entity)
         {
-            
         }
 
         public void SendAgentOffline(UUID[] agentIDs)
@@ -1389,6 +1409,11 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
         public void SendTexture(AssetBase TextureAsset)
         {
             
+        }
+
+        public virtual void SetChildAgentThrottle(byte[] throttle)
+        {
+
         }
 
         public byte[] GetThrottlesPacked(float multiplier)
@@ -1626,6 +1651,42 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
         }
 
         public void SendAvatarInterestsReply(UUID avatarID, uint wantMask, string wantText, uint skillsMask, string skillsText, string languages)
+        {
+        }
+        
+        public void SendGroupAccountingDetails(IClientAPI sender,UUID groupID, UUID transactionID, UUID sessionID, int amt)
+        {
+        }
+        
+        public void SendGroupAccountingSummary(IClientAPI sender,UUID groupID, uint moneyAmt, int totalTier, int usedTier)
+        {
+        }
+        
+        public void SendGroupTransactionsSummaryDetails(IClientAPI sender,UUID groupID, UUID transactionID, UUID sessionID,int amt)
+        {
+        }
+
+        public void SendGroupVoteHistory(UUID groupID, UUID transactionID, GroupVoteHistory[] Votes)
+        {
+        }
+
+        public void SendGroupActiveProposals(UUID groupID, UUID transactionID, GroupActiveProposals[] Proposals)
+        {
+        }
+
+        public void SendChangeUserRights(UUID agentID, UUID friendID, int rights)
+        {
+        }
+
+        public void SendTextBoxRequest(string message, int chatChannel, string objectname, string ownerFirstName, string ownerLastName, UUID objectId)
+        {
+        }
+
+        public void StopFlying(ISceneEntity presence)
+        {
+        }
+        
+        public void SendPlacesReply(UUID queryID, UUID transactionID, PlacesReplyData[] data)
         {
         }
     }

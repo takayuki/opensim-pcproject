@@ -31,9 +31,8 @@ using System.Collections.Generic;
 using log4net;
 using Nini.Config;
 using OpenSim.Framework;
-using OpenSim.Framework.Servers.HttpServer;
-using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
+using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
 using OpenSim.Server.Handlers.Base;
 
@@ -51,10 +50,6 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Inventory
 
         public void Initialise(IConfigSource config)
         {
-            //// This module is only on for standalones in hypergrid mode
-            //enabled = (!config.Configs["Startup"].GetBoolean("gridmode", true)) &&
-            //    config.Configs["Startup"].GetBoolean("hypergrid", true);
-            //m_log.DebugFormat("[RegionInventoryService]: enabled? {0}", enabled);
             m_Config = config;
             IConfig moduleConfig = config.Configs["Modules"];
             if (moduleConfig != null)
@@ -98,9 +93,9 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Inventory
 
                 m_log.Info("[RegionInventoryService]: Starting...");
 
-                Object[] args = new Object[] { m_Config, MainServer.Instance, String.Empty };
+                Object[] args = new Object[] { m_Config, MainServer.Instance, "HGInventoryService" };
 
-                ServerUtils.LoadPlugin<IServiceConnector>("OpenSim.Server.Handlers.dll:InventoryServiceInConnector", args);
+                ServerUtils.LoadPlugin<IServiceConnector>("OpenSim.Server.Handlers.dll:XInventoryInConnector", args);
             }
         }
 

@@ -29,6 +29,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.IO.Compression;
@@ -45,7 +46,7 @@ using System.Threading;
 using log4net;
 using Nini.Config;
 using Nwc.XmlRpc;
-using BclExtras;
+// using BclExtras;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using Amib.Threading;
@@ -89,6 +90,17 @@ namespace OpenSim.Framework
             = new Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
 
         public static FireAndForgetMethod FireAndForgetMethod = FireAndForgetMethod.SmartThreadPool;
+
+        /// <summary>
+        /// Gets the name of the directory where the current running executable
+        /// is located
+        /// </summary>
+        /// <returns>Filesystem path to the directory containing the current
+        /// executable</returns>
+        public static string ExecutingDirectory()
+        {
+            return Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+        }
 
         /// <summary>
         /// Linear interpolates B<->C using percent A
@@ -439,10 +451,25 @@ namespace OpenSim.Framework
             return (x + y - (min >> 1) - (min >> 2) + (min >> 4));
         }
 
-        public static bool IsOutsideView(uint oldx, uint newx, uint oldy, uint newy)
+        /// <summary>
+        /// Are the co-ordinates of the new region visible from the old region?
+        /// </summary>
+        /// <param name="oldx">Old region x-coord</param>
+        /// <param name="newx">New region x-coord</param>
+        /// <param name="oldy">Old region y-coord</param>
+        /// <param name="newy">New region y-coord</param>
+        /// <returns></returns>        
+        public static bool IsOutsideView(float drawdist, uint oldx, uint newx, uint oldy, uint newy)
         {
-            // Eventually this will be a function of the draw distance / camera position too.
-            return (((int)Math.Abs((int)(oldx - newx)) > 1) || ((int)Math.Abs((int)(oldy - newy)) > 1));
+            int dd = (int)((drawdist + Constants.RegionSize - 1) / Constants.RegionSize);
+
+            int startX = (int)oldx - dd;
+            int startY = (int)oldy - dd;
+
+            int endX = (int)oldx + dd;
+            int endY = (int)oldy + dd;
+
+            return (newx < startX || endX < newx || newy < startY || endY < newy);
         }
 
         public static string FieldToString(byte[] bytes)
@@ -553,7 +580,7 @@ namespace OpenSim.Framework
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[UTIL]: An error occurred while resolving {0}, {1}", dnsAddress, e);
+                m_log.WarnFormat("[UTIL]: An error occurred while resolving host name {0}, {1}", dnsAddress, e);
 
                 // Still going to throw the exception on for now, since this was what was happening in the first place
                 throw e;
@@ -589,11 +616,17 @@ namespace OpenSim.Framework
 
         public static IPAddress GetLocalHost()
         {
-            string dnsAddress = "localhost";
+            IPAddress[] iplist = GetLocalHosts();
 
-            IPAddress[] hosts = Dns.GetHostEntry(dnsAddress).AddressList;
+            if (iplist.Length == 0) // No accessible external interfaces
+            {
+                IPAddress[] loopback = Dns.GetHostAddresses("localhost");
+                IPAddress localhost = loopback[0];
 
-            foreach (IPAddress host in hosts)
+                return localhost;
+            }
+
+            foreach (IPAddress host in iplist)
             {
                 if (!IPAddress.IsLoopback(host) && host.AddressFamily == AddressFamily.InterNetwork)
                 {
@@ -601,15 +634,15 @@ namespace OpenSim.Framework
                 }
             }
 
-            if (hosts.Length > 0)
+            if (iplist.Length > 0)
             {
-                foreach (IPAddress host in hosts)
+                foreach (IPAddress host in iplist)
                 {
                     if (host.AddressFamily == AddressFamily.InterNetwork)
                         return host;
                 }
                 // Well all else failed...
-                return hosts[0];
+                return iplist[0];
             }
 
             return null;
@@ -1164,6 +1197,16 @@ namespace OpenSim.Framework
 
         }
 
+        public static uint ConvertAccessLevelToMaturity(byte maturity)
+        {
+            if (maturity <= 13)
+                return 0;
+            else if (maturity <= 21)
+                return 1;
+            else
+                return 2;
+        }
+
         /// <summary>
         /// Produces an OSDMap from its string representation on a stream
         /// </summary>
@@ -1184,6 +1227,33 @@ namespace OpenSim.Framework
                 return args;
             }
             return null;
+        }
+
+        public static OSDMap GetOSDMap(string data)
+        {
+            OSDMap args = null;
+            try
+            {
+                OSD buffer;
+                // We should pay attention to the content-type, but let's assume we know it's Json
+                buffer = OSDParser.DeserializeJson(data);
+                if (buffer.Type == OSDType.Map)
+                {
+                    args = (OSDMap)buffer;
+                    return args;
+                }
+                else
+                {
+                    // uh?
+                    m_log.Debug(("[UTILS]: Got OSD of unexpected type " + buffer.Type.ToString()));
+                    return null;
+                }
+            }
+            catch (Exception ex)
+            {
+                m_log.Debug("[UTILS]: exception on GetOSDMap " + ex.Message);
+                return null;
+            }
         }
 
         public static string[] Glob(string path)
@@ -1271,6 +1341,11 @@ namespace OpenSim.Framework
             return (ipaddr1 != null) ? "http://" + ipaddr1.ToString() + ":" + port1 : uri;
         }
 
+        public static byte[] StringToBytes256(string str, params object[] args)
+        {
+            return StringToBytes256(string.Format(str, args));
+        }
+        
         public static byte[] StringToBytes256(string str)
         {
             if (String.IsNullOrEmpty(str)) { return Utils.EmptyBytes; }
@@ -1289,6 +1364,11 @@ namespace OpenSim.Framework
             return data;
         }
 
+        public static byte[] StringToBytes1024(string str, params object[] args)
+        {
+            return StringToBytes1024(string.Format(str, args));
+        }
+        
         public static byte[] StringToBytes1024(string str)
         {
             if (String.IsNullOrEmpty(str)) { return Utils.EmptyBytes; }
@@ -1312,8 +1392,29 @@ namespace OpenSim.Framework
         /// <summary>
         /// Created to work around a limitation in Mono with nested delegates
         /// </summary>
-        private class FireAndForgetWrapper
+        private sealed class FireAndForgetWrapper
         {
+            private static volatile FireAndForgetWrapper instance;
+            private static object syncRoot = new Object();
+
+            public static FireAndForgetWrapper Instance {
+                get {
+
+                    if (instance == null)
+                    {
+                        lock (syncRoot)
+                        {
+                            if (instance == null)
+                            {
+                                instance = new FireAndForgetWrapper();
+                            }
+                        }
+                    }
+
+                    return instance;
+                }
+            }
+
             public void FireAndForget(System.Threading.WaitCallback callback)
             {
                 callback.BeginInvoke(null, EndFireAndForget, callback);
@@ -1382,7 +1483,7 @@ namespace OpenSim.Framework
                     ThreadPool.QueueUserWorkItem(callback, obj);
                     break;
                 case FireAndForgetMethod.BeginInvoke:
-                    FireAndForgetWrapper wrapper = Singleton.GetInstance<FireAndForgetWrapper>();
+                    FireAndForgetWrapper wrapper = FireAndForgetWrapper.Instance;
                     wrapper.FireAndForget(callback, obj);
                     break;
                 case FireAndForgetMethod.SmartThreadPool:
@@ -1410,6 +1511,7 @@ namespace OpenSim.Framework
         }
 
         #endregion FireAndForget Threading Pattern
+
         /// <summary>
         /// Environment.TickCount is an int but it counts all 32 bits so it goes positive
         /// and negative every 24.9 days. This trims down TickCount so it doesn't wrap
@@ -1434,5 +1536,146 @@ namespace OpenSim.Framework
             Int32 diff = EnvironmentTickCount() - prevValue;
             return (diff >= 0) ? diff : (diff + EnvironmentTickCountMask + 1);
         }
+
+        /// <summary>
+        /// Prints the call stack at any given point. Useful for debugging.
+        /// </summary>
+        public static void PrintCallStack()
+        {
+            StackTrace stackTrace = new StackTrace();           // get call stack
+            StackFrame[] stackFrames = stackTrace.GetFrames();  // get method calls (frames)
+
+            // write call stack method names
+            foreach (StackFrame stackFrame in stackFrames)
+            {
+                m_log.Debug(stackFrame.GetMethod().DeclaringType + "." + stackFrame.GetMethod().Name); // write method name
+            }
+        }
+
+        /// <summary>
+        /// Gets the client IP address
+        /// </summary>
+        /// <param name="xff"></param>
+        /// <returns></returns>
+        public static IPEndPoint GetClientIPFromXFF(string xff)
+        {
+            if (xff == string.Empty)
+                return null;
+
+            string[] parts = xff.Split(new char[] { ',' });
+            if (parts.Length > 0)
+            {
+                try
+                {
+                    return new IPEndPoint(IPAddress.Parse(parts[0]), 0);
+                }
+                catch (Exception e)
+                {
+                    m_log.WarnFormat("[UTIL]: Exception parsing XFF header {0}: {1}", xff, e.Message);
+                }
+            }
+
+            return null;
+        }
+
+        public static string GetCallerIP(Hashtable req)
+        {
+            if (req.ContainsKey("headers"))
+            {
+                try
+                {
+                    Hashtable headers = (Hashtable)req["headers"];
+                    if (headers.ContainsKey("remote_addr") && headers["remote_addr"] != null)
+                        return headers["remote_addr"].ToString();
+                }
+                catch (Exception e)
+                {
+                    m_log.WarnFormat("[UTIL]: exception in GetCallerIP: {0}", e.Message);
+                }
+            }
+            return string.Empty;
+        }
+
+        #region Xml Serialization Utilities
+        public static bool ReadBoolean(XmlTextReader reader)
+        {
+            reader.ReadStartElement();
+            bool result = Boolean.Parse(reader.ReadContentAsString().ToLower());
+            reader.ReadEndElement();
+
+            return result;
+        }
+
+        public static UUID ReadUUID(XmlTextReader reader, string name)
+        {
+            UUID id;
+            string idStr;
+
+            reader.ReadStartElement(name);
+
+            if (reader.Name == "Guid")
+                idStr = reader.ReadElementString("Guid");
+            else if (reader.Name == "UUID")
+                idStr = reader.ReadElementString("UUID");
+            else // no leading tag
+                idStr = reader.ReadContentAsString();
+            UUID.TryParse(idStr, out id);
+            reader.ReadEndElement();
+
+            return id;
+        }
+
+        public static Vector3 ReadVector(XmlTextReader reader, string name)
+        {
+            Vector3 vec;
+
+            reader.ReadStartElement(name);
+            vec.X = reader.ReadElementContentAsFloat(reader.Name, String.Empty); // X or x
+            vec.Y = reader.ReadElementContentAsFloat(reader.Name, String.Empty); // Y or y
+            vec.Z = reader.ReadElementContentAsFloat(reader.Name, String.Empty); // Z or z
+            reader.ReadEndElement();
+
+            return vec;
+        }
+
+        public static Quaternion ReadQuaternion(XmlTextReader reader, string name)
+        {
+            Quaternion quat = new Quaternion();
+
+            reader.ReadStartElement(name);
+            while (reader.NodeType != XmlNodeType.EndElement)
+            {
+                switch (reader.Name.ToLower())
+                {
+                    case "x":
+                        quat.X = reader.ReadElementContentAsFloat(reader.Name, String.Empty);
+                        break;
+                    case "y":
+                        quat.Y = reader.ReadElementContentAsFloat(reader.Name, String.Empty);
+                        break;
+                    case "z":
+                        quat.Z = reader.ReadElementContentAsFloat(reader.Name, String.Empty);
+                        break;
+                    case "w":
+                        quat.W = reader.ReadElementContentAsFloat(reader.Name, String.Empty);
+                        break;
+                }
+            }
+
+            reader.ReadEndElement();
+
+            return quat;
+        }
+
+        public static T ReadEnum<T>(XmlTextReader reader, string name)
+        {
+            string value = reader.ReadElementContentAsString(name, String.Empty);
+            // !!!!! to deal with flags without commas
+            if (value.Contains(" ") && !value.Contains(","))
+                value = value.Replace(" ", ", ");
+
+            return (T)Enum.Parse(typeof(T), value); ;
+        }
+        #endregion
     }
 }

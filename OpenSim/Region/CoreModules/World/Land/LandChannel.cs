@@ -64,7 +64,7 @@ namespace OpenSim.Region.CoreModules.World.Land
         #endregion
 
         private readonly Scene m_scene;
-        private readonly LandManagementModule m_landManagementModule;
+        private readonly LandManagementModule m_landManagementModule;        
 
         public LandChannel(Scene scene, LandManagementModule landManagementMod)
         {
@@ -105,7 +105,7 @@ namespace OpenSim.Region.CoreModules.World.Land
             ILandObject obj = new LandObject(UUID.Zero, false, m_scene);
             obj.LandData.Name = "NO LAND";
             return obj;
-        }      
+        }
 
         public List<ILandObject> AllParcels()
         {
@@ -116,6 +116,12 @@ namespace OpenSim.Region.CoreModules.World.Land
 
             return new List<ILandObject>();
         }
+        
+        public void Clear(bool setupDefaultParcel)
+        {
+            if (m_landManagementModule != null)
+                m_landManagementModule.Clear(setupDefaultParcel);
+        }
 
         public List<ILandObject> ParcelsNearPoint(Vector3 position)
         {
@@ -125,16 +131,6 @@ namespace OpenSim.Region.CoreModules.World.Land
             }
 
             return new List<ILandObject>();
-        }
-
-        public bool IsLandPrimCountTainted()
-        {
-            if (m_landManagementModule != null)
-            {
-                return m_landManagementModule.IsLandPrimCountTainted();
-            }
-
-            return false;
         }
 
         public bool IsForcefulBansAllowed()
@@ -152,6 +148,22 @@ namespace OpenSim.Region.CoreModules.World.Land
             if (m_landManagementModule != null)
             {
                 m_landManagementModule.UpdateLandObject(localID, data);
+            }
+        }
+
+        public void Join(int start_x, int start_y, int end_x, int end_y, UUID attempting_user_id)
+        {
+            if (m_landManagementModule != null)
+            {
+                m_landManagementModule.Join(start_x, start_y, end_x, end_y, attempting_user_id);
+            }
+        }
+
+        public void Subdivide(int start_x, int start_y, int end_x, int end_y, UUID attempting_user_id)
+        {
+            if (m_landManagementModule != null)
+            {
+                m_landManagementModule.Subdivide(start_x, start_y, end_x, end_y, attempting_user_id);
             }
         }
         

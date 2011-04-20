@@ -34,55 +34,13 @@ using System.Text;
 using System.Collections.Generic;
 using log4net;
 using OpenSim.Framework;
+using OpenMetaverse;
 
 namespace OpenSim.Server.Base
 {
     public static class ServerUtils
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-        
-        public static string SLAssetTypeToContentType(int assetType)
-        {
-            switch (assetType)
-            {
-                case 0:
-                    return "image/jp2";
-                case 1:
-                    return "application/ogg";
-                case 2:
-                    return "application/x-metaverse-callingcard";
-                case 3:
-                    return "application/x-metaverse-landmark";
-                case 5:
-                    return "application/x-metaverse-clothing";
-                case 6:
-                    return "application/x-metaverse-primitive";
-                case 7:
-                    return "application/x-metaverse-notecard";
-                case 8:
-                    return "application/x-metaverse-folder";
-                case 10:
-                    return "application/x-metaverse-lsl";
-                case 11:
-                    return "application/x-metaverse-lso";
-                case 12:
-                    return "image/tga";
-                case 13:
-                    return "application/x-metaverse-bodypart";
-                case 17:
-                    return "audio/x-wav";
-                case 19:
-                    return "image/jpeg";
-                case 20:
-                    return "application/x-metaverse-animation";
-                case 21:
-                    return "application/x-metaverse-gesture";
-                case 22:
-                    return "application/x-metaverse-simstate";
-                default:
-                    return "application/octet-stream";
-            }
-        }
 
         public static  byte[] SerializeResult(XmlSerializer xs, object data)
         {
@@ -99,6 +57,12 @@ namespace OpenSim.Server.Base
             return ret;
         }
 
+        /// <summary>
+        /// Load a plugin from a dll with the given class or interface
+        /// </summary>
+        /// <param name="dllName"></param>
+        /// <param name="args">The arguments which control which constructor is invoked on the plugin</param>
+        /// <returns></returns>
         public static T LoadPlugin<T>(string dllName, Object[] args) where T:class
         {
             string[] parts = dllName.Split(new char[] {':'});
@@ -113,6 +77,13 @@ namespace OpenSim.Server.Base
             return LoadPlugin<T>(dllName, className, args);
         }
 
+        /// <summary>
+        /// Load a plugin from a dll with the given class or interface
+        /// </summary>
+        /// <param name="dllName"></param>
+        /// <param name="className"></param>
+        /// <param name="args">The arguments which control which constructor is invoked on the plugin</param>
+        /// <returns></returns>
         public static T LoadPlugin<T>(string dllName, string className, Object[] args) where T:class
         {
             string interfaceName = typeof(T).ToString();
@@ -125,12 +96,12 @@ namespace OpenSim.Server.Base
                 {
                     if (pluginType.IsPublic)
                     {
-                        if (className != String.Empty &&
-                                pluginType.ToString() !=
-                                pluginType.Namespace + "." + className)
+                        if (className != String.Empty 
+                            && pluginType.ToString() != pluginType.Namespace + "." + className)
                             continue;
-                        Type typeInterface =
-                                pluginType.GetInterface(interfaceName, true);
+                        
+                        Type typeInterface = pluginType.GetInterface(interfaceName, true);
+
                         if (typeInterface != null)
                         {
                             T plug = null;
@@ -155,14 +126,14 @@ namespace OpenSim.Server.Base
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("Error loading plugin from {0}, exception {1}", dllName, e);
+                m_log.Error(string.Format("Error loading plugin from {0}", dllName), e);
                 return null;
             }
         }
 
-        public static Dictionary<string, string> ParseQueryString(string query)
+        public static Dictionary<string, object> ParseQueryString(string query)
         {
-            Dictionary<string, string> result = new Dictionary<string, string>();
+            Dictionary<string, object> result = new Dictionary<string, object>();
             string[] terms = query.Split(new char[] {'&'});
 
             if (terms.Length == 0)
@@ -180,33 +151,77 @@ namespace OpenSim.Server.Base
                 if (elems.Length > 1)
                     value = System.Web.HttpUtility.UrlDecode(elems[1]);
 
-                result[name] = value;
+                if (name.EndsWith("[]"))
+                {
+                    string cleanName = name.Substring(0, name.Length - 2);
+                    if (result.ContainsKey(cleanName))
+                    {
+                        if (!(result[cleanName] is List<string>))
+                            continue;
+
+                        List<string> l = (List<string>)result[cleanName];
+
+                        l.Add(value);
+                    }
+                    else
+                    {
+                        List<string> newList = new List<string>();
+
+                        newList.Add(value);
+
+                        result[cleanName] = newList;
+                    }
+                }
+                else
+                {
+                    if (!result.ContainsKey(name))
+                        result[name] = value;
+                }
             }
 
             return result;
         }
 
-        public static string BuildQueryString(Dictionary<string, string> data)
+        public static string BuildQueryString(Dictionary<string, object> data)
         {
             string qstring = String.Empty;
 
-            foreach (KeyValuePair<string, string> kvp in data)
+            string part;
+
+            foreach (KeyValuePair<string, object> kvp in data)
             {
-                string part;
-                if (kvp.Value != String.Empty)
+                if (kvp.Value is List<string>)
                 {
-                    part = System.Web.HttpUtility.UrlEncode(kvp.Key) +
-                            "=" + System.Web.HttpUtility.UrlEncode(kvp.Value);
+                    List<string> l = (List<String>)kvp.Value;
+
+                    foreach (string s in l)
+                    {
+                        part = System.Web.HttpUtility.UrlEncode(kvp.Key) +
+                                "[]=" + System.Web.HttpUtility.UrlEncode(s);
+
+                        if (qstring != String.Empty)
+                            qstring += "&";
+
+                        qstring += part;
+                    }
                 }
                 else
                 {
-                    part = System.Web.HttpUtility.UrlEncode(kvp.Key);
+                    if (kvp.Value.ToString() != String.Empty)
+                    {
+                        part = System.Web.HttpUtility.UrlEncode(kvp.Key) +
+                                "=" + System.Web.HttpUtility.UrlEncode(kvp.Value.ToString());
+                    }
+                    else
+                    {
+                        part = System.Web.HttpUtility.UrlEncode(kvp.Key);
+                    }
+
+                    if (qstring != String.Empty)
+                        qstring += "&";
+
+                    qstring += part;
                 }
-
-                if (qstring != String.Empty)
-                    qstring += "&";
-
-                qstring += part;
             }
 
             return qstring;
@@ -235,6 +250,9 @@ namespace OpenSim.Server.Base
         {
             foreach (KeyValuePair<string, object> kvp in data)
             {
+                if (kvp.Value == null)
+                    continue;
+
                 XmlElement elem = parent.OwnerDocument.CreateElement("",
                         kvp.Key, "");
 

@@ -65,65 +65,187 @@ namespace OpenSim.Server.Handlers.Presence
             body = body.Trim();
 
             //m_log.DebugFormat("[XXX]: query String: {0}", body);
-
+            string method = string.Empty;
             try
             {
-                Dictionary<string, string> request =
+                Dictionary<string, object> request =
                         ServerUtils.ParseQueryString(body);
 
                 if (!request.ContainsKey("METHOD"))
                     return FailureResult();
 
-                string method = request["METHOD"];
+                method = request["METHOD"].ToString();
 
                 switch (method)
                 {
+                    case "login":
+                        return LoginAgent(request);
+                    case "logout":
+                        return LogoutAgent(request);
+                    case "logoutregion":
+                        return LogoutRegionAgents(request);
                     case "report":
                         return Report(request);
+                    case "getagent":
+                        return GetAgent(request);
+                    case "getagents":
+                        return GetAgents(request);
                 }
                 m_log.DebugFormat("[PRESENCE HANDLER]: unknown method request: {0}", method);
             }
             catch (Exception e)
             {
-                m_log.Debug("[PRESENCE HANDLER]: Exception {0}" + e);
+                m_log.DebugFormat("[PRESENCE HANDLER]: Exception in method {0}: {1}", method, e);
             }
 
             return FailureResult();
 
         }
 
-        byte[] Report(Dictionary<string, string> request)
+        byte[] LoginAgent(Dictionary<string, object> request)
         {
-            PresenceInfo info = new PresenceInfo();
-            info.Data = new Dictionary<string, string>();
+            string user = String.Empty;
+            UUID session = UUID.Zero;
+            UUID ssession = UUID.Zero;
 
-            if (request["PrincipalID"] == null || request["RegionID"] == null)
+            if (!request.ContainsKey("UserID") || !request.ContainsKey("SessionID"))
                 return FailureResult();
 
-            if (!UUID.TryParse(request["PrincipalID"].ToString(),
-                    out info.PrincipalID))
+            user = request["UserID"].ToString();
+
+            if (!UUID.TryParse(request["SessionID"].ToString(), out session))
                 return FailureResult();
 
-            if (!UUID.TryParse(request["RegionID"].ToString(),
-                    out info.RegionID))
-                return FailureResult();
+            if (request.ContainsKey("SecureSessionID"))
+                // If it's malformed, we go on with a Zero on it
+                UUID.TryParse(request["SecureSessionID"].ToString(), out ssession);
 
-            foreach (KeyValuePair<string, string> kvp in request)
-            {
-                if (kvp.Key == "METHOD" ||
-                        kvp.Key == "PrincipalID" ||
-                        kvp.Key == "RegionID")
-                    continue;
-
-                info.Data[kvp.Key] = kvp.Value;
-            }
-
-            if (m_PresenceService.Report(info))
+            if (m_PresenceService.LoginAgent(user, session, ssession))
                 return SuccessResult();
 
             return FailureResult();
         }
 
+        byte[] LogoutAgent(Dictionary<string, object> request)
+        {
+            UUID session = UUID.Zero;
+
+            if (!request.ContainsKey("SessionID"))
+                return FailureResult();
+
+            if (!UUID.TryParse(request["SessionID"].ToString(), out session))
+                return FailureResult();
+
+            if (m_PresenceService.LogoutAgent(session))
+                return SuccessResult();
+
+            return FailureResult();
+        }
+
+        byte[] LogoutRegionAgents(Dictionary<string, object> request)
+        {
+            UUID region = UUID.Zero;
+
+            if (!request.ContainsKey("RegionID"))
+                return FailureResult();
+
+            if (!UUID.TryParse(request["RegionID"].ToString(), out region))
+                return FailureResult();
+
+            if (m_PresenceService.LogoutRegionAgents(region))
+                return SuccessResult();
+
+            return FailureResult();
+        }
+        
+        byte[] Report(Dictionary<string, object> request)
+        {
+            UUID session = UUID.Zero;
+            UUID region = UUID.Zero;
+
+            if (!request.ContainsKey("SessionID") || !request.ContainsKey("RegionID"))
+                return FailureResult();
+
+            if (!UUID.TryParse(request["SessionID"].ToString(), out session))
+                return FailureResult();
+
+            if (!UUID.TryParse(request["RegionID"].ToString(), out region))
+                return FailureResult();
+
+            if (m_PresenceService.ReportAgent(session, region))
+            {
+                return SuccessResult();
+            }
+
+            return FailureResult();
+        }
+
+        byte[] GetAgent(Dictionary<string, object> request)
+        {
+            UUID session = UUID.Zero;
+
+            if (!request.ContainsKey("SessionID"))
+                return FailureResult();
+
+            if (!UUID.TryParse(request["SessionID"].ToString(), out session))
+                return FailureResult();
+
+            PresenceInfo pinfo = m_PresenceService.GetAgent(session);
+
+            Dictionary<string, object> result = new Dictionary<string, object>();
+            if (pinfo == null)
+                result["result"] = "null";
+            else
+                result["result"] = pinfo.ToKeyValuePairs();
+
+            string xmlString = ServerUtils.BuildXmlResponse(result);
+            //m_log.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
+            UTF8Encoding encoding = new UTF8Encoding();
+            return encoding.GetBytes(xmlString);
+        }
+
+        byte[] GetAgents(Dictionary<string, object> request)
+        {
+
+            string[] userIDs;
+
+            if (!request.ContainsKey("uuids"))
+            {
+                m_log.DebugFormat("[PRESENCE HANDLER]: GetAgents called without required uuids argument");
+                return FailureResult();
+            }
+
+            if (!(request["uuids"] is List<string>))
+            {
+                m_log.DebugFormat("[PRESENCE HANDLER]: GetAgents input argument was of unexpected type {0}", request["uuids"].GetType().ToString());
+                return FailureResult();
+            }
+
+            userIDs = ((List<string>)request["uuids"]).ToArray();
+
+            PresenceInfo[] pinfos = m_PresenceService.GetAgents(userIDs);
+
+            Dictionary<string, object> result = new Dictionary<string, object>();
+            if ((pinfos == null) || ((pinfos != null) && (pinfos.Length == 0)))
+                result["result"] = "null";
+            else
+            {
+                int i = 0;
+                foreach (PresenceInfo pinfo in pinfos)
+                {
+                    Dictionary<string, object> rinfoDict = pinfo.ToKeyValuePairs();
+                    result["presence" + i] = rinfoDict;
+                    i++;
+                }
+            }
+
+            string xmlString = ServerUtils.BuildXmlResponse(result);
+            //m_log.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
+            UTF8Encoding encoding = new UTF8Encoding();
+            return encoding.GetBytes(xmlString);
+        }
+
+        
         private byte[] SuccessResult()
         {
             XmlDocument doc = new XmlDocument();
@@ -138,7 +260,7 @@ namespace OpenSim.Server.Handlers.Presence
 
             doc.AppendChild(rootElement);
 
-            XmlElement result = doc.CreateElement("", "Result", "");
+            XmlElement result = doc.CreateElement("", "result", "");
             result.AppendChild(doc.CreateTextNode("Success"));
 
             rootElement.AppendChild(result);
@@ -160,7 +282,7 @@ namespace OpenSim.Server.Handlers.Presence
 
             doc.AppendChild(rootElement);
 
-            XmlElement result = doc.CreateElement("", "Result", "");
+            XmlElement result = doc.CreateElement("", "result", "");
             result.AppendChild(doc.CreateTextNode("Failure"));
 
             rootElement.AppendChild(result);
@@ -178,5 +300,6 @@ namespace OpenSim.Server.Handlers.Presence
 
             return ms.ToArray();
         }
+
     }
 }

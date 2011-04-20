@@ -28,6 +28,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Data;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -38,16 +39,27 @@ namespace OpenSim.Data.MySQL
     public class MySqlAuthenticationData : MySqlFramework, IAuthenticationData
     {
         private string m_Realm;
-        private List<string> m_ColumnNames = null;
-        private int m_LastExpire = 0;
+        private List<string> m_ColumnNames;
+        private int m_LastExpire;
+        // private string m_connectionString;
+
+        protected virtual Assembly Assembly
+        {
+            get { return GetType().Assembly; }
+        }
 
         public MySqlAuthenticationData(string connectionString, string realm)
                 : base(connectionString)
         {
             m_Realm = realm;
+            m_connectionString = connectionString;
 
-            Migration m = new Migration(m_Connection, GetType().Assembly, "AuthStore");
-            m.Update();
+            using (MySqlConnection dbcon = new MySqlConnection(m_connectionString))
+            {
+                dbcon.Open();
+                Migration m = new Migration(dbcon, Assembly, "AuthStore");
+                m.Update();
+            }
         }
 
         public AuthenticationData Get(UUID principalID)
@@ -55,45 +67,42 @@ namespace OpenSim.Data.MySQL
             AuthenticationData ret = new AuthenticationData();
             ret.Data = new Dictionary<string, object>();
 
-            MySqlCommand cmd = new MySqlCommand(
-                "select * from `"+m_Realm+"` where UUID = ?principalID"
-            );
-
-            cmd.Parameters.AddWithValue("?principalID", principalID.ToString());
-
-            IDataReader result = ExecuteReader(cmd);
-
-            if (result.Read())
+            using (MySqlConnection dbcon = new MySqlConnection(m_connectionString))
             {
-                ret.PrincipalID = principalID;
+                dbcon.Open();
+                MySqlCommand cmd = new MySqlCommand("select * from `" + m_Realm + "` where UUID = ?principalID", dbcon);
+                cmd.Parameters.AddWithValue("?principalID", principalID.ToString());
 
-                if (m_ColumnNames == null)
+                IDataReader result = cmd.ExecuteReader();
+
+                if (result.Read())
                 {
-                    m_ColumnNames = new List<string>();
+                    ret.PrincipalID = principalID;
 
-                    DataTable schemaTable = result.GetSchemaTable();
-                    foreach (DataRow row in schemaTable.Rows)
-                        m_ColumnNames.Add(row["ColumnName"].ToString());
+                    if (m_ColumnNames == null)
+                    {
+                        m_ColumnNames = new List<string>();
+
+                        DataTable schemaTable = result.GetSchemaTable();
+                        foreach (DataRow row in schemaTable.Rows)
+                            m_ColumnNames.Add(row["ColumnName"].ToString());
+                    }
+
+                    foreach (string s in m_ColumnNames)
+                    {
+                        if (s == "UUID")
+                            continue;
+
+                        ret.Data[s] = result[s].ToString();
+                    }
+
+                    return ret;
                 }
-
-                foreach (string s in m_ColumnNames)
+                else
                 {
-                    if (s == "UUID")
-                        continue;
-
-                    ret.Data[s] = result[s].ToString();
+                    return null;
                 }
-
-                result.Close();
-                CloseReaderCommand(cmd);
-
-                return ret;
             }
-
-            result.Close();
-            CloseReaderCommand(cmd);
-
-            return null;
         }
 
         public bool Store(AuthenticationData data)

@@ -26,6 +26,7 @@
  */
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 
 namespace OpenSim.Region.Framework.Interfaces
@@ -34,7 +35,7 @@ namespace OpenSim.Region.Framework.Interfaces
     /// Interface to region archive functionality
     /// </summary>
     public interface IRegionArchiverModule
-    {        
+    {
         void HandleLoadOarConsoleCommand(string module, string[] cmdparams);
         void HandleSaveOarConsoleCommand(string module, string[] cmdparams);
             
@@ -46,7 +47,7 @@ namespace OpenSim.Region.Framework.Interfaces
         /// the EventManager.OnOarFileSaved event.
         /// 
         /// <param name="savePath"></param>
-        void ArchiveRegion(string savePath);
+        void ArchiveRegion(string savePath, Dictionary<string, object> options);
         
         /// <summary>
         /// Archive the region to the given path
@@ -57,7 +58,7 @@ namespace OpenSim.Region.Framework.Interfaces
         /// 
         /// <param name="savePath"></param>
         /// <param name="requestId">If supplied, this request Id is later returned in the saved event</param>
-        void ArchiveRegion(string savePath, Guid requestId);
+        void ArchiveRegion(string savePath, Guid requestId, Dictionary<string, object> options);
 
         /// <summary>
         /// Archive the region to a stream.
@@ -90,8 +91,12 @@ namespace OpenSim.Region.Framework.Interfaces
         /// If true, the loaded region merges with the existing one rather than replacing it.  Any terrain or region
         /// settings in the archive will be ignored.
         /// </param>
+        /// <param name="skipAssets">
+        /// If true, the archive is loaded without loading any assets contained within it.  This is useful if the
+        /// assets are already known to be present in the grid's asset service.
+        /// </param>
         /// <param name="requestId">If supplied, this request Id is later returned in the saved event</param>
-        void DearchiveRegion(string loadPath, bool merge, Guid requestId);
+        void DearchiveRegion(string loadPath, bool merge, bool skipAssets, Guid requestId);
         
         /// <summary>
         /// Dearchive a region from a stream.  This replaces the existing scene. 
@@ -113,7 +118,11 @@ namespace OpenSim.Region.Framework.Interfaces
         /// If true, the loaded region merges with the existing one rather than replacing it.  Any terrain or region
         /// settings in the archive will be ignored.
         /// </param>
+        /// <param name="skipAssets">
+        /// If true, the archive is loaded without loading any assets contained within it.  This is useful if the
+        /// assets are already known to be present in the grid's asset service.
+        /// </param
         /// <param name="requestId">If supplied, this request Id is later returned in the saved event</param>
-        void DearchiveRegion(Stream loadStream, bool merge, Guid requestId);
+        void DearchiveRegion(Stream loadStream, bool merge, bool skipAssets, Guid requestId);
     }
 }

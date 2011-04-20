@@ -41,6 +41,7 @@ using rotation = OpenSim.Region.ScriptEngine.Shared.LSL_Types.Quaternion;
 using key = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLString;
 using LSL_List = OpenSim.Region.ScriptEngine.Shared.LSL_Types.list;
 using LSL_String = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLString;
+using LSL_Key = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLString;
 using LSL_Float = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLFloat;
 using LSL_Integer = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLInteger;
 
@@ -80,11 +81,21 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
             return m_OSSL_Functions.osGetCurrentSunHour();
         }
 
+        public double osGetSunParam(string param)
+        {
+            return m_OSSL_Functions.osGetSunParam(param);
+        }
+        // Deprecated
         public double osSunGetParam(string param)
         {
             return m_OSSL_Functions.osSunGetParam(param);
         }
 
+        public void osSetSunParam(string param, double value)
+        {
+            m_OSSL_Functions.osSetSunParam(param, value);
+        }
+        // Deprecated
         public void osSunSetParam(string param, double value)
         {
             m_OSSL_Functions.osSunSetParam(param, value);
@@ -96,15 +107,35 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         }
 
 // Not yet plugged in as available OSSL functions, so commented out
-//        void osWindParamSet(string plugin, string param, float value)
+//        void osSetWindParam(string plugin, string param, float value)
 //        {
-//            m_OSSL_Functions.osWindParamSet(plugin, param, value);
+//            m_OSSL_Functions.osSetWindParam(plugin, param, value);
 //        }
 //
-//        float osWindParamGet(string plugin, string param)
+//        float osGetWindParam(string plugin, string param)
 //        {
-//            return m_OSSL_Functions.osWindParamGet(plugin, param);
+//            return m_OSSL_Functions.osGetWindParam(plugin, param);
 //        }
+
+        public void osParcelJoin(vector pos1, vector pos2)
+        {
+            m_OSSL_Functions.osParcelJoin(pos1,pos2);
+        }
+
+        public void osParcelSubdivide(vector pos1, vector pos2)
+        {
+            m_OSSL_Functions.osParcelSubdivide(pos1, pos2);
+        }
+
+        public void osSetParcelDetails(vector pos, LSL_List rules)
+        {
+            m_OSSL_Functions.osSetParcelDetails(pos, rules);
+        }
+        // Deprecated
+        public void osParcelSetDetails(vector pos, LSL_List rules)
+        {
+            m_OSSL_Functions.osParcelSetDetails(pos,rules);
+        }
 
         public double osList2Double(LSL_Types.list src, int index)
         {
@@ -149,11 +180,21 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
                                              blend, disp, timer, alpha, face);
         }
 
+        public LSL_Float osGetTerrainHeight(int x, int y)
+        {
+            return m_OSSL_Functions.osGetTerrainHeight(x, y);
+        }
+        // Deprecated
         public LSL_Float osTerrainGetHeight(int x, int y)
         {
             return m_OSSL_Functions.osTerrainGetHeight(x, y);
         }
 
+        public LSL_Integer osSetTerrainHeight(int x, int y, double val)
+        {
+            return m_OSSL_Functions.osSetTerrainHeight(x, y, val);
+        }
+        // Deprecated
         public LSL_Integer osTerrainSetHeight(int x, int y, double val)
         {
             return m_OSSL_Functions.osTerrainSetHeight(x, y, val);
@@ -209,6 +250,21 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public void osTeleportAgent(string agent, vector position, vector lookat)
         {
             m_OSSL_Functions.osTeleportAgent(agent, position, lookat);
+        }
+
+        public void osTeleportOwner(string regionName, vector position, vector lookat)
+        {
+            m_OSSL_Functions.osTeleportOwner(regionName, position, lookat);
+        }
+
+        public void osTeleportOwner(int regionX, int regionY, vector position, vector lookat)
+        {
+            m_OSSL_Functions.osTeleportOwner(regionX, regionY, position, lookat);
+        }
+
+        public void osTeleportOwner(vector position, vector lookat)
+        {
+            m_OSSL_Functions.osTeleportOwner(position, lookat);
         }
 
         // Avatar info functions
@@ -302,6 +358,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
             return m_OSSL_Functions.osSetPenCap(drawList, direction, type);
         }
 
+        public string osSetPenColor(string drawList, string color)
+        {
+            return m_OSSL_Functions.osSetPenColor(drawList, color);
+        }
+        // Deprecated
         public string osSetPenColour(string drawList, string colour)
         {
             return m_OSSL_Functions.osSetPenColour(drawList, colour);
@@ -632,11 +693,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         {
             return m_OSSL_Functions.osGetRegionMapTexture(regionName);
         }
-		
-		public LSL_List osGetRegionStats()
-		{
-			return m_OSSL_Functions.osGetRegionStats();
-		}
+        
+        public LSL_List osGetRegionStats()
+        {
+            return m_OSSL_Functions.osGetRegionStats();
+        }
 
         /// <summary>
         /// Returns the amount of memory in use by the Simulator Daemon.
@@ -646,6 +707,56 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public LSL_Integer osGetSimulatorMemory()
         {
             return m_OSSL_Functions.osGetSimulatorMemory();
+        }
+        
+        public void osKickAvatar(string FirstName,string SurName,string alert)
+        {
+            m_OSSL_Functions.osKickAvatar(FirstName, SurName, alert);
+        }
+        
+        public void osSetSpeed(string UUID, float SpeedModifier)
+        {
+            m_OSSL_Functions.osSetSpeed(UUID, SpeedModifier);
+        }
+        
+        public void osCauseDamage(string avatar, double damage)
+        {
+            m_OSSL_Functions.osCauseDamage(avatar, damage);
+        }
+        
+        public void osCauseHealing(string avatar, double healing)
+        {
+            m_OSSL_Functions.osCauseHealing(avatar, healing);
+        }
+        
+        public LSL_List osGetPrimitiveParams(LSL_Key prim, LSL_List rules)
+        {
+            return m_OSSL_Functions.osGetPrimitiveParams(prim, rules);
+        }
+        
+        public void osSetPrimitiveParams(LSL_Key prim, LSL_List rules)
+        {
+            m_OSSL_Functions.osSetPrimitiveParams(prim, rules);
+        }
+
+        public void osSetProjectionParams(bool projection, LSL_Key texture, double fov, double focus, double amb)
+        {
+            m_OSSL_Functions.osSetProjectionParams(projection, texture, fov, focus, amb);
+        }
+
+        public void osSetProjectionParams(LSL_Key prim, bool projection, LSL_Key texture, double fov, double focus, double amb)
+        {
+            m_OSSL_Functions.osSetProjectionParams(prim, projection, texture, fov, focus, amb);
+        }
+
+        public LSL_List osGetAvatarList()
+        {
+            return m_OSSL_Functions.osGetAvatarList();
+        }
+
+        public LSL_String osUnixTimeToTimestamp(long time)
+        {
+            return m_OSSL_Functions.osUnixTimeToTimestamp(time);
         }
     }
 }

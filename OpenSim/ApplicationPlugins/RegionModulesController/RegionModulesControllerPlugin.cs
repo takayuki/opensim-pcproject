@@ -62,12 +62,12 @@ namespace OpenSim.ApplicationPlugins.RegionModulesController
                 new List<ISharedRegionModule>();
 
 #region IApplicationPlugin implementation
-
+        
         public void Initialise (OpenSimBase openSim)
         {
-            m_log.DebugFormat("[REGIONMODULES]: Initializing...");
             m_openSim = openSim;
-            openSim.ApplicationRegistry.RegisterInterface<IRegionModulesController>(this);
+            m_openSim.ApplicationRegistry.RegisterInterface<IRegionModulesController>(this);
+            m_log.DebugFormat("[REGIONMODULES]: Initializing...");
 
             // Who we are
             string id = AddinManager.CurrentAddin.Id;
@@ -81,9 +81,9 @@ namespace OpenSim.ApplicationPlugins.RegionModulesController
 
             // The [Modules] section in the ini file
             IConfig modulesConfig =
-                    openSim.ConfigSource.Source.Configs["Modules"];
+                    m_openSim.ConfigSource.Source.Configs["Modules"];
             if (modulesConfig == null)
-                modulesConfig = openSim.ConfigSource.Source.AddConfig("Modules");
+                modulesConfig = m_openSim.ConfigSource.Source.AddConfig("Modules");
 
             // Scan modules and load all that aren't disabled
             foreach (TypeExtensionNode node in
@@ -91,66 +91,24 @@ namespace OpenSim.ApplicationPlugins.RegionModulesController
             {
                 if (node.Type.GetInterface(typeof(ISharedRegionModule).ToString()) != null)
                 {
-                    // Get the config string
-                    string moduleString =
-                            modulesConfig.GetString("Setup_" + node.Id, String.Empty);
-
-                    // We have a selector
-                    if (moduleString != String.Empty)
+                    if (CheckModuleEnabled(node, modulesConfig))
                     {
-                        // Allow disabling modules even if they don't have
-                        // support for it
-                        if (moduleString == "disabled")
-                            continue;
-
-                        // Split off port, if present
-                        string[] moduleParts = moduleString.Split(new char[] {'/'}, 2);
-                        // Format is [port/][class]
-                        string className = moduleParts[0];
-                        if (moduleParts.Length > 1)
-                            className = moduleParts[1];
-
-                        // Match the class name if given
-                        if (className != String.Empty &&
-                                node.Type.ToString() != className)
-                            continue;
+                        m_log.DebugFormat("[REGIONMODULES]: Found shared region module {0}, class {1}", node.Id, node.Type);
+                        m_sharedModules.Add(node);
                     }
-
-                    m_log.DebugFormat("[REGIONMODULES]: Found shared region module {0}, class {1}", node.Id, node.Type);
-                    m_sharedModules.Add(node);
                 }
                 else if (node.Type.GetInterface(typeof(INonSharedRegionModule).ToString()) != null)
                 {
-                    // Get the config string
-                    string moduleString =
-                            modulesConfig.GetString("Setup_" + node.Id, String.Empty);
-
-                    // We have a selector
-                    if (moduleString != String.Empty)
+                    if (CheckModuleEnabled(node, modulesConfig))
                     {
-                        // Allow disabling modules even if they don't have
-                        // support for it
-                        if (moduleString == "disabled")
-                            continue;
-
-                        // Split off port, if present
-                        string[] moduleParts = moduleString.Split(new char[] {'/'}, 2);
-                        // Format is [port/][class]
-                        string className = moduleParts[0];
-                        if (moduleParts.Length > 1)
-                            className = moduleParts[1];
-
-                        // Match the class name if given
-                        if (className != String.Empty &&
-                                node.Type.ToString() != className)
-                            continue;
+                        m_log.DebugFormat("[REGIONMODULES]: Found non-shared region module {0}, class {1}", node.Id, node.Type);
+                        m_nonSharedModules.Add(node);
                     }
-
-                    m_log.DebugFormat("[REGIONMODULES]: Found non-shared region module {0}, class {1}", node.Id, node.Type);
-                    m_nonSharedModules.Add(node);
                 }
                 else
+                {
                     m_log.DebugFormat("[REGIONMODULES]: Found unknown type of module {0}, class {1}", node.Id, node.Type);
+                }
             }
 
             // Load and init the module. We try a constructor with a port
@@ -162,7 +120,7 @@ namespace OpenSim.ApplicationPlugins.RegionModulesController
             //
             foreach (TypeExtensionNode node in m_sharedModules)
             {
-                Object[] ctorArgs = new Object[] {(uint)0};
+                Object[] ctorArgs = new Object[] { (uint)0 };
 
                 // Read the config again
                 string moduleString =
@@ -172,7 +130,7 @@ namespace OpenSim.ApplicationPlugins.RegionModulesController
                 if (moduleString != String.Empty)
                 {
                     // Get the port number from the string
-                    string[] moduleParts = moduleString.Split(new char[] {'/'},
+                    string[] moduleParts = moduleString.Split(new char[] { '/' },
                             2);
                     if (moduleParts.Length > 1)
                         ctorArgs[0] = Convert.ToUInt32(moduleParts[0]);
@@ -195,18 +153,19 @@ namespace OpenSim.ApplicationPlugins.RegionModulesController
 
                 // OK, we're up and running
                 m_sharedInstances.Add(module);
-                module.Initialise(openSim.ConfigSource.Source);
+                module.Initialise(m_openSim.ConfigSource.Source);
             }
+        }
+
+        public void PostInitialise ()
+        {
+            m_log.DebugFormat("[REGIONMODULES]: PostInitializing...");
 
             // Immediately run PostInitialise on shared modules
             foreach (ISharedRegionModule module in m_sharedInstances)
             {
                 module.PostInitialise();
             }
-        }
-
-        public void PostInitialise ()
-        {
         }
 
 #endregion
@@ -240,7 +199,6 @@ namespace OpenSim.ApplicationPlugins.RegionModulesController
 
 #endregion
 
-
         public string Version
         {
             get
@@ -258,6 +216,42 @@ namespace OpenSim.ApplicationPlugins.RegionModulesController
         }
 
 #region IRegionModulesController implementation
+        
+        /// <summary>
+        /// Check that the given module is no disabled in the [Modules] section of the config files.
+        /// </summary>
+        /// <param name="node"></param>
+        /// <param name="modulesConfig">The config section</param>
+        /// <returns>true if the module is enabled, false if it is disabled</returns>
+        protected bool CheckModuleEnabled(TypeExtensionNode node, IConfig modulesConfig)
+        {
+            // Get the config string
+            string moduleString =
+                    modulesConfig.GetString("Setup_" + node.Id, String.Empty);
+
+            // We have a selector
+            if (moduleString != String.Empty)
+            {
+                // Allow disabling modules even if they don't have
+                // support for it
+                if (moduleString == "disabled")
+                    return false;
+
+                // Split off port, if present
+                string[] moduleParts = moduleString.Split(new char[] { '/' }, 2);
+                // Format is [port/][class]
+                string className = moduleParts[0];
+                if (moduleParts.Length > 1)
+                    className = moduleParts[1];
+
+                // Match the class name if given
+                if (className != String.Empty &&
+                        node.Type.ToString() != className)
+                    return false;
+            }            
+            
+            return true;
+        }        
 
         // The root of all evil.
         // This is where we handle adding the modules to scenes when they

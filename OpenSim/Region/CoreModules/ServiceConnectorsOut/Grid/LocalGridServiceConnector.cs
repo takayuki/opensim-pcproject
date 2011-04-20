@@ -169,7 +169,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Grid
 
         #region IGridService
 
-        public bool RegisterRegion(UUID scopeID, GridRegion regionInfo)
+        public string RegisterRegion(UUID scopeID, GridRegion regionInfo)
         {
             return m_GridService.RegisterRegion(scopeID, regionInfo);
         }
@@ -181,22 +181,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Grid
 
         public List<GridRegion> GetNeighbours(UUID scopeID, UUID regionID)
         {
-            if (m_LocalCache.ContainsKey(regionID))
-            {
-                List<GridRegion> neighbours = m_LocalCache[regionID].GetNeighbours();
-                if (neighbours.Count == 0)
-                    // try the DB
-                    neighbours = m_GridService.GetNeighbours(scopeID, regionID);
-                return neighbours;
-            }
-            else
-            {
-                m_log.WarnFormat("[LOCAL GRID CONNECTOR]: GetNeighbours: Requested region {0} is not on this sim", regionID);
-                return new List<GridRegion>();
-            }
-
-            // Don't go to the DB
-            //return m_GridService.GetNeighbours(scopeID, regionID);
+            return m_GridService.GetNeighbours(scopeID, regionID); 
         }
 
         public GridRegion GetRegionByUUID(UUID scopeID, UUID regionID)
@@ -238,17 +223,42 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Grid
             return m_GridService.GetRegionRange(scopeID, xmin, xmax, ymin, ymax);
         }
 
+        public List<GridRegion> GetDefaultRegions(UUID scopeID)
+        {
+            return m_GridService.GetDefaultRegions(scopeID);
+        }
+
+        public List<GridRegion> GetFallbackRegions(UUID scopeID, int x, int y)
+        {
+            return m_GridService.GetFallbackRegions(scopeID, x, y);
+        }
+
+        public List<GridRegion> GetHyperlinks(UUID scopeID)
+        {
+            return m_GridService.GetHyperlinks(scopeID);
+        }
+        
+        public int GetRegionFlags(UUID scopeID, UUID regionID)
+        {
+            return m_GridService.GetRegionFlags(scopeID, regionID);
+        }
+
         #endregion
 
         public void NeighboursCommand(string module, string[] cmdparams)
         {
+            System.Text.StringBuilder caps = new System.Text.StringBuilder();
+
             foreach (KeyValuePair<UUID, RegionCache> kvp in m_LocalCache)
             {
-                m_log.InfoFormat("*** Neighbours of {0} {1} ***", kvp.Key, kvp.Value.RegionName);
+                caps.AppendFormat("*** Neighbours of {0} ({1}) ***\n", kvp.Value.RegionName, kvp.Key);
                 List<GridRegion> regions = kvp.Value.GetNeighbours();
                 foreach (GridRegion r in regions)
-                    m_log.InfoFormat("    {0} @ {1}={2}", r.RegionName, r.RegionLocX / Constants.RegionSize, r.RegionLocY / Constants.RegionSize);
+                    caps.AppendFormat("    {0} @ {1}-{2}\n", r.RegionName, r.RegionLocX / Constants.RegionSize, r.RegionLocY / Constants.RegionSize);
             }
+
+            MainConsole.Instance.Output(caps.ToString());
         }
+
     }
 }

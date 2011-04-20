@@ -32,6 +32,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reflection;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using OpenMetaverse;
 using Nini.Config;
@@ -44,6 +45,7 @@ namespace OpenSim.Framework.Console
     {
         public int last;
         public long lastLineSeen;
+        public bool newConnection = true;
     }
 
     // A console that uses REST interfaces
@@ -61,6 +63,7 @@ namespace OpenSim.Framework.Console
                 new Dictionary<UUID, ConsoleConnection>();
         private string m_UserName = String.Empty;
         private string m_Password = String.Empty;
+        private string m_AllowedOrigin = String.Empty;
 
         public RemoteConsole(string defaultPrompt) : base(defaultPrompt)
         {
@@ -76,6 +79,7 @@ namespace OpenSim.Framework.Console
 
             m_UserName = netConfig.GetString("ConsoleUser", String.Empty);
             m_Password = netConfig.GetString("ConsolePass", String.Empty);
+            m_AllowedOrigin = netConfig.GetString("ConsoleAllowedOrigin", String.Empty);
         }
 
         public void SetServer(IHttpServer server)
@@ -106,7 +110,14 @@ namespace OpenSim.Framework.Console
 
         public override string ReadLine(string p, bool isCommand, bool e)
         {
+            if (isCommand)
+                Output("+++"+p);
+            else
+                Output("-++"+p);
+
             m_DataEvent.WaitOne();
+
+            string cmdinput;
 
             lock (m_InputData)
             {
@@ -116,30 +127,54 @@ namespace OpenSim.Framework.Console
                     return "";
                 }
 
-                string cmdinput = m_InputData[0];
+                cmdinput = m_InputData[0];
                 m_InputData.RemoveAt(0);
                 if (m_InputData.Count == 0)
                     m_DataEvent.Reset();
 
-                if (isCommand)
-                {
-                    string[] cmd = Commands.Resolve(Parser.Parse(cmdinput));
-
-                    if (cmd.Length != 0)
-                    {
-                        int i;
-
-                        for (i=0 ; i < cmd.Length ; i++)
-                        {
-                            if (cmd[i].Contains(" "))
-                                cmd[i] = "\"" + cmd[i] + "\"";
-                        }
-                        return String.Empty;
-                    }
-                }
-                return cmdinput;
             }
+
+            if (isCommand)
+            {
+                string[] cmd = Commands.Resolve(Parser.Parse(cmdinput));
+
+                if (cmd.Length != 0)
+                {
+                    int i;
+
+                    for (i=0 ; i < cmd.Length ; i++)
+                    {
+                        if (cmd[i].Contains(" "))
+                            cmd[i] = "\"" + cmd[i] + "\"";
+                    }
+                    return String.Empty;
+                }
+            }
+            return cmdinput;
         }
+
+        private Hashtable CheckOrigin(Hashtable result)
+        {
+            if (!string.IsNullOrEmpty(m_AllowedOrigin))
+                result["access_control_allow_origin"] = m_AllowedOrigin;
+            return result;
+        }
+        /* TODO: Figure out how PollServiceHTTPHandler can access the request headers
+         * in order to use m_AllowedOrigin as a regular expression
+        private Hashtable CheckOrigin(Hashtable headers, Hashtable result)
+        {
+            if (!string.IsNullOrEmpty(m_AllowedOrigin))
+            {
+                if (headers.ContainsKey("origin"))
+                {
+                    string origin = headers["origin"].ToString();
+                    if (Regex.IsMatch(origin, m_AllowedOrigin))
+                        result["access_control_allow_origin"] = origin;
+                }
+            }
+            return result;
+        }
+        */
 
         private void DoExpire()
         {
@@ -226,6 +261,7 @@ namespace OpenSim.Framework.Console
             reply["str_response_string"] = xmldoc.InnerXml;
             reply["int_response_code"] = 200;
             reply["content_type"] = "text/xml";
+            reply = CheckOrigin(reply);
 
             return reply;
         }
@@ -279,7 +315,8 @@ namespace OpenSim.Framework.Console
 
             reply["str_response_string"] = xmldoc.InnerXml;
             reply["int_response_code"] = 200;
-            reply["content_type"] = "text/plain";
+            reply["content_type"] = "text/xml";
+            reply = CheckOrigin(reply);
 
             return reply;
         }
@@ -302,7 +339,13 @@ namespace OpenSim.Framework.Console
             if (!UUID.TryParse(post["ID"].ToString(), out id))
                 return reply;
 
-            if (post["COMMAND"] == null || post["COMMAND"].ToString() == String.Empty)
+            lock (m_Connections)
+            {
+                if (!m_Connections.ContainsKey(id))
+                    return reply;
+            }
+
+            if (post["COMMAND"] == null)
                 return reply;
 
             lock (m_InputData)
@@ -328,7 +371,8 @@ namespace OpenSim.Framework.Console
 
             reply["str_response_string"] = xmldoc.InnerXml;
             reply["int_response_code"] = 200;
-            reply["content_type"] = "text/plain";
+            reply["content_type"] = "text/xml";
+            reply = CheckOrigin(reply);
 
             return reply;
         }
@@ -410,6 +454,12 @@ namespace OpenSim.Framework.Console
             XmlElement rootElement = xmldoc.CreateElement("", "ConsoleSession",
                     "");
 
+            if (c.newConnection)
+            {
+                c.newConnection = false;
+                Output("+++" + DefaultPrompt);
+            }
+
             lock (m_Scrollback)
             {
                 long startLine = m_LineNumber - m_Scrollback.Count;
@@ -436,6 +486,7 @@ namespace OpenSim.Framework.Console
             result["content_type"] = "application/xml";
             result["keepalive"] = false;
             result["reusecontext"] = false;
+            result = CheckOrigin(result);
 
             return result;
         }
@@ -459,6 +510,7 @@ namespace OpenSim.Framework.Console
             result["content_type"] = "text/xml";
             result["keepalive"] = false;
             result["reusecontext"] = false;
+            result = CheckOrigin(result);
 
             return result;
         }

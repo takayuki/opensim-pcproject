@@ -141,7 +141,17 @@ namespace OpenSim.Framework.Console
                 CommandInfo commandInfo = (CommandInfo)dict[String.Empty];
                 help.Add(commandInfo.help_text);
                 help.Add(commandInfo.long_help);
+
+                string descriptiveHelp = commandInfo.descriptive_help;
+
+                // If we do have some descriptive help then insert a spacing line before and after for readability.
+                if (descriptiveHelp != string.Empty)
+                    help.Add(string.Empty);
+                
                 help.Add(commandInfo.descriptive_help);
+
+                if (descriptiveHelp != string.Empty)
+                    help.Add(string.Empty);
             }
             else
             {
@@ -182,8 +192,7 @@ namespace OpenSim.Framework.Console
         public void AddCommand(string module, bool shared, string command,
                 string help, string longhelp, CommandDelegate fn)
         {
-            AddCommand(module, shared, command, help, longhelp,
-                    String.Empty, fn);
+            AddCommand(module, shared, command, help, longhelp, String.Empty, fn);
         }
 
         /// <summary>
@@ -552,8 +561,9 @@ namespace OpenSim.Framework.Console
         }
     }
 
-    // A console that processes commands internally
-    //
+    /// <summary>
+    /// A console that processes commands internally
+    /// </summary>
     public class CommandConsole : ConsoleBase
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
@@ -574,6 +584,9 @@ namespace OpenSim.Framework.Console
                 Output(s);
         }
 
+        /// <summary>
+        /// Display a command prompt on the console and wait for user input
+        /// </summary>
         public void Prompt()
         {
             string line = ReadLine(m_defaultPrompt + "# ", true, true);

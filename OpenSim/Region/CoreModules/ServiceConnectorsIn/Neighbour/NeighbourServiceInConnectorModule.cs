@@ -31,7 +31,6 @@ using System.Collections.Generic;
 using log4net;
 using Nini.Config;
 using OpenSim.Framework;
-using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Server.Base;
@@ -123,17 +122,14 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Neighbour
 
         public GridRegion HelloNeighbour(ulong regionHandle, RegionInfo thisRegion)
         {
-            m_log.DebugFormat("[NEIGHBOUR IN CONNECTOR]: HelloNeighbour from {0}, to {1}. Count = {2}",
-                thisRegion.RegionName, regionHandle, m_Scenes.Count);
             foreach (Scene s in m_Scenes)
             {
                 if (s.RegionInfo.RegionHandle == regionHandle)
                 {
-                    m_log.Debug("[NEIGHBOUR IN CONNECTOR]: Found region to SendHelloNeighbour");
+                    //m_log.DebugFormat("[NEIGHBOUR IN CONNECTOR]: HelloNeighbour from {0} to {1}", thisRegion.RegionName, s.RegionInfo.RegionName);
                     return s.IncomingHelloNeighbour(thisRegion);
                 }
             }
-            m_log.DebugFormat("[NEIGHBOUR IN CONNECTOR]: region handle {0} not found", regionHandle);
             return null;
         }
 

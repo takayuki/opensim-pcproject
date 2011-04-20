@@ -185,6 +185,11 @@ namespace OpenSim.Region.Physics.BasicPhysicsPlugin
 
         }
 
+        public override void VehicleFlags(int param, bool remove)
+        {
+
+        }
+
         public override void SetVolumeDetect(int param)
         {
 
@@ -305,22 +310,22 @@ namespace OpenSim.Region.Physics.BasicPhysicsPlugin
 
         public override Quaternion APIDTarget 
         { 
-        	set { return; }
+            set { return; }
         }
         
         public override bool APIDActive
         { 
-        	set { return; }
+            set { return; }
         }
         
         public override float APIDStrength
         { 
-        	set { return; }
+            set { return; }
         }
         
         public override float APIDDamping
         { 
-        	set { return; }
+            set { return; }
         }
 
         public override void SubscribeEvents(int ms)

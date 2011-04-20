@@ -33,7 +33,6 @@ using System.Reflection;
 using Nini.Config;
 using OpenSim.Framework;
 using OpenSim.Framework.Communications;
-using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Services.Interfaces;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OpenSim.Server.Base;
@@ -86,10 +85,10 @@ namespace OpenSim.Services.Connectors
 
         #region IGridService
 
-        public virtual bool RegisterRegion(UUID scopeID, GridRegion regionInfo)
+        public string RegisterRegion(UUID scopeID, GridRegion regionInfo)
         {
             Dictionary<string, object> rinfo = regionInfo.ToKeyValuePairs();
-            Dictionary<string, string> sendData = new Dictionary<string,string>();
+            Dictionary<string, object> sendData = new Dictionary<string,object>();
             foreach (KeyValuePair<string, object> kvp in rinfo)
                 sendData[kvp.Key] = (string)kvp.Value;
 
@@ -110,11 +109,23 @@ namespace OpenSim.Services.Connectors
                     Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
 
                     if (replyData.ContainsKey("Result")&& (replyData["Result"].ToString().ToLower() == "success"))
-                        return true;
+                    {
+                        return String.Empty;
+                    }
+                    else if (replyData.ContainsKey("Result")&& (replyData["Result"].ToString().ToLower() == "failure"))
+                    {
+                        m_log.DebugFormat("[GRID CONNECTOR]: Registration failed: {0}", replyData["Message"].ToString());
+                        return replyData["Message"].ToString();
+                    }
                     else if (!replyData.ContainsKey("Result"))
+                    {
                         m_log.DebugFormat("[GRID CONNECTOR]: reply data does not contain result field");
+                    }
                     else
+                    {
                         m_log.DebugFormat("[GRID CONNECTOR]: unexpected result {0}", replyData["Result"].ToString());
+                        return "Unexpected result "+replyData["Result"].ToString();
+                    }
                     
                 }
                 else
@@ -125,12 +136,12 @@ namespace OpenSim.Services.Connectors
                 m_log.DebugFormat("[GRID CONNECTOR]: Exception when contacting grid server: {0}", e.Message);
             }
 
-            return false;
+            return "Error communicating with grid service";
         }
 
-        public virtual bool DeregisterRegion(UUID regionID)
+        public bool DeregisterRegion(UUID regionID)
         {
-            Dictionary<string, string> sendData = new Dictionary<string, string>();
+            Dictionary<string, object> sendData = new Dictionary<string, object>();
 
             sendData["REGIONID"] = regionID.ToString();
 
@@ -160,9 +171,9 @@ namespace OpenSim.Services.Connectors
             return false;
         }
 
-        public virtual List<GridRegion> GetNeighbours(UUID scopeID, UUID regionID)
+        public List<GridRegion> GetNeighbours(UUID scopeID, UUID regionID)
         {
-            Dictionary<string, string> sendData = new Dictionary<string, string>();
+            Dictionary<string, object> sendData = new Dictionary<string, object>();
 
             sendData["SCOPEID"] = scopeID.ToString();
             sendData["REGIONID"] = regionID.ToString();
@@ -198,9 +209,6 @@ namespace OpenSim.Services.Connectors
                         GridRegion rinfo = new GridRegion((Dictionary<string, object>)r);
                         rinfos.Add(rinfo);
                     }
-                    else
-                        m_log.DebugFormat("[GRID CONNECTOR]: GetNeighbours {0}, {1} received invalid response type {2}",
-                            scopeID, regionID, r.GetType());
                 }
             }
             else
@@ -210,9 +218,9 @@ namespace OpenSim.Services.Connectors
             return rinfos;
         }
 
-        public virtual GridRegion GetRegionByUUID(UUID scopeID, UUID regionID)
+        public GridRegion GetRegionByUUID(UUID scopeID, UUID regionID)
         {
-            Dictionary<string, string> sendData = new Dictionary<string, string>();
+            Dictionary<string, object> sendData = new Dictionary<string, object>();
 
             sendData["SCOPEID"] = scopeID.ToString();
             sendData["REGIONID"] = regionID.ToString();
@@ -256,9 +264,9 @@ namespace OpenSim.Services.Connectors
             return rinfo;
         }
 
-        public virtual GridRegion GetRegionByPosition(UUID scopeID, int x, int y)
+        public GridRegion GetRegionByPosition(UUID scopeID, int x, int y)
         {
-            Dictionary<string, string> sendData = new Dictionary<string, string>();
+            Dictionary<string, object> sendData = new Dictionary<string, object>();
 
             sendData["SCOPEID"] = scopeID.ToString();
             sendData["X"] = x.ToString();
@@ -287,9 +295,9 @@ namespace OpenSim.Services.Connectors
                 {
                     if (replyData["result"] is Dictionary<string, object>)
                         rinfo = new GridRegion((Dictionary<string, object>)replyData["result"]);
-                    else
-                        m_log.DebugFormat("[GRID CONNECTOR]: GetRegionByPosition {0}, {1}-{2} received invalid response",
-                            scopeID, x, y);
+                    //else
+                    //    m_log.DebugFormat("[GRID CONNECTOR]: GetRegionByPosition {0}, {1}-{2} received no region",
+                    //        scopeID, x, y);
                 }
                 else
                     m_log.DebugFormat("[GRID CONNECTOR]: GetRegionByPosition {0}, {1}-{2} received null response",
@@ -301,9 +309,9 @@ namespace OpenSim.Services.Connectors
             return rinfo;
         }
 
-        public virtual GridRegion GetRegionByName(UUID scopeID, string regionName)
+        public GridRegion GetRegionByName(UUID scopeID, string regionName)
         {
-            Dictionary<string, string> sendData = new Dictionary<string, string>();
+            Dictionary<string, object> sendData = new Dictionary<string, object>();
 
             sendData["SCOPEID"] = scopeID.ToString();
             sendData["NAME"] = regionName;
@@ -342,9 +350,9 @@ namespace OpenSim.Services.Connectors
             return rinfo;
         }
 
-        public virtual List<GridRegion> GetRegionsByName(UUID scopeID, string name, int maxNumber)
+        public List<GridRegion> GetRegionsByName(UUID scopeID, string name, int maxNumber)
         {
-            Dictionary<string, string> sendData = new Dictionary<string, string>();
+            Dictionary<string, object> sendData = new Dictionary<string, object>();
 
             sendData["SCOPEID"] = scopeID.ToString();
             sendData["NAME"] = name;
@@ -379,9 +387,6 @@ namespace OpenSim.Services.Connectors
                             GridRegion rinfo = new GridRegion((Dictionary<string, object>)r);
                             rinfos.Add(rinfo);
                         }
-                        else
-                            m_log.DebugFormat("[GRID CONNECTOR]: GetRegionsByName {0}, {1}, {2} received invalid response",
-                                scopeID, name, maxNumber);
                     }
                 }
                 else
@@ -394,9 +399,9 @@ namespace OpenSim.Services.Connectors
             return rinfos;
         }
 
-        public virtual List<GridRegion> GetRegionRange(UUID scopeID, int xmin, int xmax, int ymin, int ymax)
+        public List<GridRegion> GetRegionRange(UUID scopeID, int xmin, int xmax, int ymin, int ymax)
         {
-            Dictionary<string, string> sendData = new Dictionary<string, string>();
+            Dictionary<string, object> sendData = new Dictionary<string, object>();
 
             sendData["SCOPEID"] = scopeID.ToString();
             sendData["XMIN"] = xmin.ToString();
@@ -446,6 +451,203 @@ namespace OpenSim.Services.Connectors
                 m_log.DebugFormat("[GRID CONNECTOR]: GetRegionRange received null reply");
 
             return rinfos;
+        }
+
+        public List<GridRegion> GetDefaultRegions(UUID scopeID)
+        {
+            Dictionary<string, object> sendData = new Dictionary<string, object>();
+
+            sendData["SCOPEID"] = scopeID.ToString();
+
+            sendData["METHOD"] = "get_default_regions";
+
+            List<GridRegion> rinfos = new List<GridRegion>();
+            string reply = string.Empty;
+            try
+            {
+                reply = SynchronousRestFormsRequester.MakeRequest("POST",
+                        m_ServerURI + "/grid",
+                        ServerUtils.BuildQueryString(sendData));
+
+                //m_log.DebugFormat("[GRID CONNECTOR]: reply was {0}", reply);
+            }
+            catch (Exception e)
+            {
+                m_log.DebugFormat("[GRID CONNECTOR]: Exception when contacting grid server: {0}", e.Message);
+                return rinfos;
+            }
+
+            if (reply != string.Empty)
+            {
+                Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
+
+                if (replyData != null)
+                {
+                    Dictionary<string, object>.ValueCollection rinfosList = replyData.Values;
+                    foreach (object r in rinfosList)
+                    {
+                        if (r is Dictionary<string, object>)
+                        {
+                            GridRegion rinfo = new GridRegion((Dictionary<string, object>)r);
+                            rinfos.Add(rinfo);
+                        }
+                    }
+                }
+                else
+                    m_log.DebugFormat("[GRID CONNECTOR]: GetDefaultRegions {0} received null response",
+                        scopeID);
+            }
+            else
+                m_log.DebugFormat("[GRID CONNECTOR]: GetDefaultRegions received null reply");
+
+            return rinfos;
+        }
+
+        public List<GridRegion> GetFallbackRegions(UUID scopeID, int x, int y)
+        {
+            Dictionary<string, object> sendData = new Dictionary<string, object>();
+
+            sendData["SCOPEID"] = scopeID.ToString();
+            sendData["X"] = x.ToString();
+            sendData["Y"] = y.ToString();
+
+            sendData["METHOD"] = "get_fallback_regions";
+
+            List<GridRegion> rinfos = new List<GridRegion>();
+            string reply = string.Empty;
+            try
+            {
+                reply = SynchronousRestFormsRequester.MakeRequest("POST",
+                        m_ServerURI + "/grid",
+                        ServerUtils.BuildQueryString(sendData));
+
+                //m_log.DebugFormat("[GRID CONNECTOR]: reply was {0}", reply);
+            }
+            catch (Exception e)
+            {
+                m_log.DebugFormat("[GRID CONNECTOR]: Exception when contacting grid server: {0}", e.Message);
+                return rinfos;
+            }
+
+            if (reply != string.Empty)
+            {
+                Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
+
+                if (replyData != null)
+                {
+                    Dictionary<string, object>.ValueCollection rinfosList = replyData.Values;
+                    foreach (object r in rinfosList)
+                    {
+                        if (r is Dictionary<string, object>)
+                        {
+                            GridRegion rinfo = new GridRegion((Dictionary<string, object>)r);
+                            rinfos.Add(rinfo);
+                        }
+                    }
+                }
+                else
+                    m_log.DebugFormat("[GRID CONNECTOR]: GetFallbackRegions {0}, {1}-{2} received null response",
+                        scopeID, x, y);
+            }
+            else
+                m_log.DebugFormat("[GRID CONNECTOR]: GetFallbackRegions received null reply");
+
+            return rinfos;
+        }
+
+        public List<GridRegion> GetHyperlinks(UUID scopeID)
+        {
+            Dictionary<string, object> sendData = new Dictionary<string, object>();
+
+            sendData["SCOPEID"] = scopeID.ToString();
+
+            sendData["METHOD"] = "get_hyperlinks";
+
+            List<GridRegion> rinfos = new List<GridRegion>();
+            string reply = string.Empty;
+            try
+            {
+                reply = SynchronousRestFormsRequester.MakeRequest("POST",
+                        m_ServerURI + "/grid",
+                        ServerUtils.BuildQueryString(sendData));
+
+                //m_log.DebugFormat("[GRID CONNECTOR]: reply was {0}", reply);
+            }
+            catch (Exception e)
+            {
+                m_log.DebugFormat("[GRID CONNECTOR]: Exception when contacting grid server: {0}", e.Message);
+                return rinfos;
+            }
+
+            if (reply != string.Empty)
+            {
+                Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
+
+                if (replyData != null)
+                {
+                    Dictionary<string, object>.ValueCollection rinfosList = replyData.Values;
+                    foreach (object r in rinfosList)
+                    {
+                        if (r is Dictionary<string, object>)
+                        {
+                            GridRegion rinfo = new GridRegion((Dictionary<string, object>)r);
+                            rinfos.Add(rinfo);
+                        }
+                    }
+                }
+                else
+                    m_log.DebugFormat("[GRID CONNECTOR]: GetHyperlinks {0} received null response",
+                        scopeID);
+            }
+            else
+                m_log.DebugFormat("[GRID CONNECTOR]: GetHyperlinks received null reply");
+
+            return rinfos;
+        }
+        
+        public int GetRegionFlags(UUID scopeID, UUID regionID)
+        {
+            Dictionary<string, object> sendData = new Dictionary<string, object>();
+
+            sendData["SCOPEID"] = scopeID.ToString();
+            sendData["REGIONID"] = regionID.ToString();
+
+            sendData["METHOD"] = "get_region_flags";
+
+            string reply = string.Empty;
+            try
+            {
+                reply = SynchronousRestFormsRequester.MakeRequest("POST",
+                        m_ServerURI + "/grid",
+                        ServerUtils.BuildQueryString(sendData));
+            }
+            catch (Exception e)
+            {
+                m_log.DebugFormat("[GRID CONNECTOR]: Exception when contacting grid server: {0}", e.Message);
+                return -1;
+            }
+
+            int flags = -1;
+
+            if (reply != string.Empty)
+            {
+                Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
+
+                if ((replyData != null) && replyData.ContainsKey("result") && (replyData["result"] != null))
+                {
+                    Int32.TryParse((string)replyData["result"], out flags);
+                    //else
+                    //    m_log.DebugFormat("[GRID CONNECTOR]: GetRegionFlags {0}, {1} received wrong type {2}",
+                    //        scopeID, regionID, replyData["result"].GetType());
+                }
+                else
+                    m_log.DebugFormat("[GRID CONNECTOR]: GetRegionFlags {0}, {1} received null response",
+                        scopeID, regionID);
+            }
+            else
+                m_log.DebugFormat("[GRID CONNECTOR]: GetRegionFlags received null reply");
+
+            return flags;
         }
 
         #endregion

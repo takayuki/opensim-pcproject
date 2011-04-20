@@ -74,7 +74,7 @@ namespace OpenSim.Framework.Capabilities
             m_httpListenerHostName = httpListenerHostname;
             m_httpListenerPort = httpListenerPort;
             m_useSSL = https;
-            if (m_useSSL)
+            if (httpListener != null && m_useSSL)
             {
                 m_httpListenerHostName = httpListener.SSLCommonName;
                 m_httpListenerPort = httpListener.SSLPort;
@@ -88,8 +88,8 @@ namespace OpenSim.Framework.Capabilities
         /// handler to be removed</param>
         public void Remove(string capsName)
         {
-            // This line must be here, or caps will break!
             m_httpListener.RemoveStreamHandler("POST", m_capsHandlers[capsName].Path);
+            m_httpListener.RemoveStreamHandler("GET", m_capsHandlers[capsName].Path);
             m_capsHandlers.Remove(capsName);
         }
 

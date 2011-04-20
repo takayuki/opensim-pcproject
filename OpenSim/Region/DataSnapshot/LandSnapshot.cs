@@ -32,11 +32,12 @@ using System.Xml;
 using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
-using OpenSim.Framework.Communications.Cache;
+
 using OpenSim.Region.CoreModules.World.Land;
 using OpenSim.Region.DataSnapshot.Interfaces;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Services.Interfaces;
 
 namespace OpenSim.Region.DataSnapshot.Providers
 {
@@ -121,6 +122,8 @@ namespace OpenSim.Region.DataSnapshot.Providers
         {
             ILandChannel landChannel = m_scene.LandChannel;
             List<ILandObject> parcels = landChannel.AllParcels();
+
+            IDwellModule dwellModule = m_scene.RequestModuleInterface<IDwellModule>();
 
             XmlNode parent = nodeFactory.CreateNode(XmlNodeType.Element, "parceldata", "");
             if (parcels != null)
@@ -207,7 +210,10 @@ namespace OpenSim.Region.DataSnapshot.Providers
                         xmlparcel.AppendChild(infouuid);
 
                         XmlNode dwell = nodeFactory.CreateNode(XmlNodeType.Element, "dwell", "");
-                        dwell.InnerText = parcel.Dwell.ToString();
+                        if (dwellModule != null)
+                            dwell.InnerText = dwellModule.GetDwell(parcel.GlobalID).ToString();
+                        else
+                            dwell.InnerText = "0";
                         xmlparcel.AppendChild(dwell);
 
                         //TODO: figure how to figure out teleport system landData.landingType
@@ -258,8 +264,8 @@ namespace OpenSim.Region.DataSnapshot.Providers
                             try
                             {
                                 XmlNode username = nodeFactory.CreateNode(XmlNodeType.Element, "name", "");
-                                CachedUserInfo profile = m_scene.CommsManager.UserProfileCacheService.GetUserDetails(userOwnerUUID);
-                                username.InnerText = profile.UserProfile.FirstName + " " + profile.UserProfile.SurName;
+                                UserAccount account = m_scene.UserAccountService.GetUserAccount(m_scene.RegionInfo.ScopeID, userOwnerUUID);
+                                username.InnerText = account.FirstName + " " + account.LastName;
                                 userblock.AppendChild(username);
                             }
                             catch (Exception)

@@ -34,14 +34,14 @@ using System.Timers;
 using Timer=System.Timers.Timer;
 using Nini.Config;
 using NUnit.Framework;
-using NUnit.Framework.SyntaxHelpers;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Communications;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
-using OpenSim.Region.CoreModules.ServiceConnectorsOut.Interregion;
+using OpenSim.Region.CoreModules.Framework.EntityTransfer;
 using OpenSim.Region.CoreModules.World.Serialiser;
+using OpenSim.Region.CoreModules.ServiceConnectorsOut.Simulation;
 using OpenSim.Tests.Common;
 using OpenSim.Tests.Common.Mock;
 using OpenSim.Tests.Common.Setup;
@@ -58,7 +58,6 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         public UUID agent1, agent2, agent3;
         public static Random random;
         public ulong region1,region2,region3;
-        public TestCommunicationsManager cm;
         public AgentCircuitData acd1;
         public SceneObjectGroup sog1, sog2, sog3;
         public TestClient testclient;
@@ -66,12 +65,13 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         [TestFixtureSetUp]
         public void Init()
         {
-            cm = new TestCommunicationsManager();
-            scene = SceneSetupHelpers.SetupScene("Neighbour x", UUID.Random(), 1000, 1000, cm);
-            scene2 = SceneSetupHelpers.SetupScene("Neighbour x+1", UUID.Random(), 1001, 1000, cm);
-            scene3 = SceneSetupHelpers.SetupScene("Neighbour x-1", UUID.Random(), 999, 1000, cm);
+            TestHelper.InMethod();
+            
+            scene = SceneSetupHelpers.SetupScene("Neighbour x", UUID.Random(), 1000, 1000);
+            scene2 = SceneSetupHelpers.SetupScene("Neighbour x+1", UUID.Random(), 1001, 1000);
+            scene3 = SceneSetupHelpers.SetupScene("Neighbour x-1", UUID.Random(), 999, 1000);
 
-            ISharedRegionModule interregionComms = new RESTInterregionComms();
+            ISharedRegionModule interregionComms = new LocalSimulationConnectorModule();
             interregionComms.Initialise(new IniConfigSource());
             interregionComms.PostInitialise();
             SceneSetupHelpers.SetupSceneModules(scene, new IniConfigSource(), interregionComms);
@@ -106,8 +106,8 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             agent.AgentID = agent1;
             agent.firstname = firstName;
             agent.lastname = "testlastname";
-            agent.SessionID = UUID.Zero;
-            agent.SecureSessionID = UUID.Zero;
+            agent.SessionID = UUID.Random();
+            agent.SecureSessionID = UUID.Random();
             agent.circuitcode = 123;
             agent.BaseFolder = UUID.Zero;
             agent.InventoryFolder = UUID.Zero;
@@ -116,8 +116,10 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             agent.ChildrenCapSeeds = new Dictionary<ulong, string>();
             agent.child = true;
 
+            scene.PresenceService.LoginAgent(agent.AgentID.ToString(), agent.SessionID, agent.SecureSessionID);
+
             string reason;
-            scene.NewUserConnection(agent, out reason);
+            scene.NewUserConnection(agent, (uint)TeleportFlags.ViaLogin, out reason);
             testclient = new TestClient(agent, scene);
             scene.AddNewClient(testclient);
 
@@ -153,7 +155,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             if (acd1 == null)
                 fixNullPresence();
 
-            scene.NewUserConnection(acd1, out reason);
+            scene.NewUserConnection(acd1, 0, out reason);
             if (testclient == null)
                 testclient = new TestClient(acd1, scene);
             scene.AddNewClient(testclient);
@@ -169,24 +171,6 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             List<ulong> neighbours = presence.GetKnownRegionList();
 
             Assert.That(neighbours.Count, Is.EqualTo(2));
-        }
-        public void fixNullPresence()
-        {
-            string firstName = "testfirstname";
-
-            AgentCircuitData agent = new AgentCircuitData();
-            agent.AgentID = agent1;
-            agent.firstname = firstName;
-            agent.lastname = "testlastname";
-            agent.SessionID = UUID.Zero;
-            agent.SecureSessionID = UUID.Zero;
-            agent.circuitcode = 123;
-            agent.BaseFolder = UUID.Zero;
-            agent.InventoryFolder = UUID.Zero;
-            agent.startpos = Vector3.Zero;
-            agent.CapsPath = GetRandomCapsObjectPath();
-
-            acd1 = agent;
         }
 
         [Test]
@@ -205,24 +189,36 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             CompleteAvatarMovement
             */
         }
-
-        // I'm commenting this test, because this is not supposed to happen here
-        //[Test]
-        public void T020_TestMakeRootAgent()
+        
+        /// <summary>
+        /// Test that if a root agent logs into a region, a child agent is also established in the neighbouring region
+        /// </summary>
+        /// <remarks>
+        /// Please note that unlike the other tests here, this doesn't rely on structures
+        /// </remarks>
+        [Test]
+        public void TestChildAgentEstablished()
         {
             TestHelper.InMethod();
-
-            ScenePresence presence = scene.GetScenePresence(agent1);
-            Assert.That(presence.IsChildAgent, Is.False, "Starts out as a root agent");
-
-            presence.MakeChildAgent();
-            Assert.That(presence.IsChildAgent, Is.True, "Did not change to child agent after MakeChildAgent");
-
-            // Accepts 0 but rejects Constants.RegionSize
-            Vector3 pos = new Vector3(0,unchecked(Constants.RegionSize-1),0);
-            presence.MakeRootAgent(pos,true);
-            Assert.That(presence.IsChildAgent, Is.False, "Did not go back to root agent");
-            Assert.That(presence.AbsolutePosition, Is.EqualTo(pos), "Position is not the same one entered");
+//            log4net.Config.XmlConfigurator.Configure();
+            
+            UUID agent1Id = UUID.Parse("00000000-0000-0000-0000-000000000001");
+            
+            TestScene myScene1 = SceneSetupHelpers.SetupScene("Neighbour y", UUID.Random(), 1000, 1000);
+            TestScene myScene2 = SceneSetupHelpers.SetupScene("Neighbour y + 1", UUID.Random(), 1001, 1000);            
+            
+            IConfigSource configSource = new IniConfigSource();
+            configSource.AddConfig("Modules").Set("EntityTransferModule", "BasicEntityTransferModule");                      
+            EntityTransferModule etm = new EntityTransferModule();
+            
+            SceneSetupHelpers.SetupSceneModules(myScene1, configSource, etm);            
+            
+            SceneSetupHelpers.AddRootAgent(myScene1, agent1Id);
+            ScenePresence childPresence = myScene2.GetScenePresence(agent1);
+            
+            // TODO: Need to do a fair amount of work to allow synchronous establishment of child agents
+//            Assert.That(childPresence, Is.Not.Null);
+//            Assert.That(childPresence.IsChildAgent, Is.True);
         }
 
         // I'm commenting this test because it does not represent
@@ -242,7 +238,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             // Adding child agent to region 1001
             string reason;
-            scene2.NewUserConnection(acd1, out reason);
+            scene2.NewUserConnection(acd1,0, out reason);
             scene2.AddNewClient(testclient);
 
             ScenePresence presence = scene.GetScenePresence(agent1);
@@ -327,67 +323,28 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Assert.That(presence2.IsChildAgent, Is.True, "Did not return from region as expected.");
             Assert.That(presence.IsChildAgent, Is.False, "Presence was not made root in old region again.");
         }
-
-        [Test]
-        public void T030_TestAddAttachments()
+        
+        public void fixNullPresence()
         {
-            TestHelper.InMethod();
+            string firstName = "testfirstname";
 
-            ScenePresence presence = scene.GetScenePresence(agent1);
+            AgentCircuitData agent = new AgentCircuitData();
+            agent.AgentID = agent1;
+            agent.firstname = firstName;
+            agent.lastname = "testlastname";
+            agent.SessionID = UUID.Zero;
+            agent.SecureSessionID = UUID.Zero;
+            agent.circuitcode = 123;
+            agent.BaseFolder = UUID.Zero;
+            agent.InventoryFolder = UUID.Zero;
+            agent.startpos = Vector3.Zero;
+            agent.CapsPath = GetRandomCapsObjectPath();
 
-            presence.AddAttachment(sog1);
-            presence.AddAttachment(sog2);
-            presence.AddAttachment(sog3);
-
-            Assert.That(presence.HasAttachments(), Is.True);
-            Assert.That(presence.ValidateAttachments(), Is.True);
+            acd1 = agent;
         }
-
-        [Test]
-        public void T031_RemoveAttachments()
-        {
-            TestHelper.InMethod();
-
-            ScenePresence presence = scene.GetScenePresence(agent1);
-            presence.RemoveAttachment(sog1);
-            presence.RemoveAttachment(sog2);
-            presence.RemoveAttachment(sog3);
-            Assert.That(presence.HasAttachments(), Is.False);
-        }
-
-        // I'm commenting this test because scene setup NEEDS InventoryService to 
-        // be non-null
-        //[Test]
-        public void T032_CrossAttachments()
-        {
-            TestHelper.InMethod();
-
-            ScenePresence presence = scene.GetScenePresence(agent1);
-            ScenePresence presence2 = scene2.GetScenePresence(agent1);
-            presence2.AddAttachment(sog1);
-            presence2.AddAttachment(sog2);
-
-            ISharedRegionModule serialiser = new SerialiserModule();
-            SceneSetupHelpers.SetupSceneModules(scene, new IniConfigSource(), serialiser);
-            SceneSetupHelpers.SetupSceneModules(scene2, new IniConfigSource(), serialiser);
-
-            Assert.That(presence.HasAttachments(), Is.False, "Presence has attachments before cross");
-
-            Assert.That(presence2.CrossAttachmentsIntoNewRegion(region1, true), Is.True, "Cross was not successful");
-            Assert.That(presence2.HasAttachments(), Is.False, "Presence2 objects were not deleted");
-            Assert.That(presence.HasAttachments(), Is.True, "Presence has not received new objects");
-        }
-
-        [TearDown]
-        public void TearDown()
-        {
-            if (MainServer.Instance != null) MainServer.Instance.Stop();
-        }
-
+        
         public static string GetRandomCapsObjectPath()
         {
-            TestHelper.InMethod();
-
             UUID caps = UUID.Random();
             string capsPath = caps.ToString();
             capsPath = capsPath.Remove(capsPath.Length - 4, 4);

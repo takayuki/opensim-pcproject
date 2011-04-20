@@ -41,27 +41,121 @@ namespace OpenSim.Services.PresenceService
 {
     public class PresenceService : PresenceServiceBase, IPresenceService
     {
-//        private static readonly ILog m_log =
-//                LogManager.GetLogger(
-//                MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILog m_log =
+                LogManager.GetLogger(
+                MethodBase.GetCurrentMethod().DeclaringType);
+
+        protected bool m_allowDuplicatePresences = false;
 
         public PresenceService(IConfigSource config)
             : base(config)
         {
+            m_log.Debug("[PRESENCE SERVICE]: Starting presence service");
+
+            IConfig presenceConfig = config.Configs["PresenceService"];
+            if (presenceConfig != null)
+            {
+                m_allowDuplicatePresences =
+                        presenceConfig.GetBoolean("AllowDuplicatePresences",
+                                                  m_allowDuplicatePresences);
+            }
         }
 
-        public bool Report(PresenceInfo presence)
+        public bool LoginAgent(string userID, UUID sessionID,
+                UUID secureSessionID)
         {
-            PresenceData p = new PresenceData();
-            p.Data = new Dictionary<string, string>();
+            //PresenceData[] d = m_Database.Get("UserID", userID);
+            //m_Database.Get("UserID", userID);
 
-            p.UUID = presence.PrincipalID;
-            p.currentRegion = presence.RegionID;
+            if (!m_allowDuplicatePresences)
+                m_Database.Delete("UserID", userID.ToString());
 
-            foreach (KeyValuePair<string, string> kvp in presence.Data)
-                p.Data[kvp.Key] = kvp.Value;
+            PresenceData data = new PresenceData();
 
-            return false;
+            data.UserID = userID;
+            data.RegionID = UUID.Zero;
+            data.SessionID = sessionID;
+            data.Data = new Dictionary<string, string>();
+            data.Data["SecureSessionID"] = secureSessionID.ToString();
+            
+            m_Database.Store(data);
+
+            m_log.DebugFormat("[PRESENCE SERVICE]: LoginAgent {0} with session {1} and ssession {2}",
+                userID, sessionID, secureSessionID);
+            return true;
         }
+
+        public bool LogoutAgent(UUID sessionID)
+        {
+            m_log.DebugFormat("[PRESENCE SERVICE]: Session {0} logout", sessionID);
+            return m_Database.Delete("SessionID", sessionID.ToString());
+        }
+
+        public bool LogoutRegionAgents(UUID regionID)
+        {
+            m_Database.LogoutRegionAgents(regionID);
+
+            return true;
+        }
+
+
+        public bool ReportAgent(UUID sessionID, UUID regionID)
+        {
+//            m_log.DebugFormat("[PRESENCE SERVICE]: ReportAgent with session {0} in region {1}", sessionID, regionID);
+            try
+            {
+                PresenceData pdata = m_Database.Get(sessionID);
+                if (pdata == null)
+                    return false;
+                if (pdata.Data == null)
+                    return false;
+
+                return m_Database.ReportAgent(sessionID, regionID);
+            }
+            catch (Exception e)
+            {
+                m_log.DebugFormat("[PRESENCE SERVICE]: ReportAgent threw exception {0}", e.StackTrace);
+                return false;
+            }
+        }
+
+        public PresenceInfo GetAgent(UUID sessionID)
+        {
+            PresenceInfo ret = new PresenceInfo();
+            
+            PresenceData data = m_Database.Get(sessionID);
+            if (data == null)
+                return null;
+
+            ret.UserID = data.UserID;
+            ret.RegionID = data.RegionID;
+
+            return ret;
+        }
+
+        public PresenceInfo[] GetAgents(string[] userIDs)
+        {
+            List<PresenceInfo> info = new List<PresenceInfo>();
+
+            foreach (string userIDStr in userIDs)
+            {
+                PresenceData[] data = m_Database.Get("UserID",
+                        userIDStr);
+
+                foreach (PresenceData d in data)
+                {
+                    PresenceInfo ret = new PresenceInfo();
+
+                    ret.UserID = d.UserID;
+                    ret.RegionID = d.RegionID;
+
+                    info.Add(ret);
+                }
+            }
+
+            // m_log.DebugFormat("[PRESENCE SERVICE]: GetAgents for {0} userIDs found {1} presences", userIDs.Length, info.Count);
+            return info.ToArray();
+        }
+
     }
 }

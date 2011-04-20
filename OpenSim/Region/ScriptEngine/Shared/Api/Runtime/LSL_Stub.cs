@@ -674,6 +674,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
             return m_LSL_Functions.llGetPrimitiveParams(rules);
         }
 
+        public LSL_List llGetLinkPrimitiveParams(int linknum, LSL_List rules)
+        {
+            return m_LSL_Functions.llGetLinkPrimitiveParams(linknum, rules);
+        }
+
         public LSL_Integer llGetRegionAgentCount()
         {
             return m_LSL_Functions.llGetRegionAgentCount();
@@ -887,6 +892,31 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public LSL_String llKey2Name(string id)
         {
             return m_LSL_Functions.llKey2Name(id);
+        }
+
+        public LSL_String llGetUsername(string id)
+        {
+            return m_LSL_Functions.llGetUsername(id);
+        }
+
+        public LSL_String llRequestUsername(string id)
+        {
+            return m_LSL_Functions.llRequestUsername(id);
+        }
+
+        public LSL_String llGetDisplayName(string id)
+        {
+            return m_LSL_Functions.llGetDisplayName(id);
+        }
+
+        public LSL_String llRequestDisplayName(string id)
+        {
+            return m_LSL_Functions.llRequestDisplayName(id);
+        }
+
+        public void llLinkParticleSystem(int linknum, LSL_List rules)
+        {
+            m_LSL_Functions.llLinkParticleSystem(linknum, rules);
         }
 
         public LSL_String llList2CSV(LSL_List src)
@@ -1468,6 +1498,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
             m_LSL_Functions.llSetLinkTexture(linknumber, texture, face);
         }
 
+        public void llSetLinkTextureAnim(int linknum, int mode, int face, int sizex, int sizey, double start, double length, double rate)
+        {
+            m_LSL_Functions.llSetLinkTextureAnim(linknum, mode, face, sizex, sizey, start, length, rate);
+        }
+
         public void llSetLocalRot(LSL_Rotation rot)
         {
             m_LSL_Functions.llSetLocalRot(rot);
@@ -1506,6 +1541,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public void llSetPrimitiveParams(LSL_List rules)
         {
             m_LSL_Functions.llSetPrimitiveParams(rules);
+        }
+
+        public void llSetLinkPrimitiveParamsFast(int linknum, LSL_List rules)
+        {
+            m_LSL_Functions.llSetLinkPrimitiveParamsFast(linknum, rules);
         }
 
         public void llSetPrimURL(string url)
@@ -1811,6 +1851,26 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public LSL_String llXorBase64StringsCorrect(string str1, string str2)
         {
             return m_LSL_Functions.llXorBase64StringsCorrect(str1, str2);
+        }
+        
+        public LSL_List llGetPrimMediaParams(int face, LSL_List rules)
+        {
+            return m_LSL_Functions.llGetPrimMediaParams(face, rules);
+        }
+        
+        public LSL_Integer llSetPrimMediaParams(int face, LSL_List rules)
+        {
+            return m_LSL_Functions.llSetPrimMediaParams(face, rules);
+        }
+        
+        public LSL_Integer llClearPrimMedia(LSL_Integer face)
+        {
+            return m_LSL_Functions.llClearPrimMedia(face);
+        }
+
+        public void print(string str)
+        {
+            m_LSL_Functions.print(str);
         }
     }
 }

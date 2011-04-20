@@ -88,7 +88,89 @@ namespace OpenSim.Region.RegionCombinerModule
         public void RegionLoaded(Scene scene)
         {
             if (enabledYN)
+            {
                 RegionLoadedDoWork(scene);
+
+                scene.EventManager.OnNewPresence += NewPresence;
+            }
+        }
+
+        private void NewPresence(ScenePresence presence)
+        {
+            if (presence.IsChildAgent)
+            {
+                byte[] throttleData;
+
+                try
+                {
+                    throttleData = presence.ControllingClient.GetThrottlesPacked(1);
+                } 
+                catch (NotImplementedException)
+                {
+                    return;
+                }
+
+                if (throttleData == null)
+                    return;
+
+                if (throttleData.Length == 0)
+                    return;
+
+                if (throttleData.Length != 28)
+                    return;
+
+                byte[] adjData;
+                int pos = 0;
+
+                if (!BitConverter.IsLittleEndian)
+                {
+                    byte[] newData = new byte[7 * 4];
+                    Buffer.BlockCopy(throttleData, 0, newData, 0, 7 * 4);
+
+                    for (int i = 0; i < 7; i++)
+                        Array.Reverse(newData, i * 4, 4);
+
+                    adjData = newData;
+                }
+                else
+                {
+                    adjData = throttleData;
+                }
+
+                // 0.125f converts from bits to bytes
+                int resend = (int)(BitConverter.ToSingle(adjData, pos) * 0.125f); pos += 4;
+                int land = (int)(BitConverter.ToSingle(adjData, pos) * 0.125f); pos += 4;
+                int wind = (int)(BitConverter.ToSingle(adjData, pos) * 0.125f); pos += 4;
+                int cloud = (int)(BitConverter.ToSingle(adjData, pos) * 0.125f); pos += 4;
+                int task = (int)(BitConverter.ToSingle(adjData, pos) * 0.125f); pos += 4;
+                int texture = (int)(BitConverter.ToSingle(adjData, pos) * 0.125f); pos += 4;
+                int asset = (int)(BitConverter.ToSingle(adjData, pos) * 0.125f);
+                // State is a subcategory of task that we allocate a percentage to
+
+
+                //int total = resend + land + wind + cloud + task + texture + asset;
+
+                byte[] data = new byte[7 * 4];
+                int ii = 0;
+
+                Buffer.BlockCopy(Utils.FloatToBytes(resend), 0, data, ii, 4); ii += 4;
+                Buffer.BlockCopy(Utils.FloatToBytes(land * 50), 0, data, ii, 4); ii += 4;
+                Buffer.BlockCopy(Utils.FloatToBytes(wind), 0, data, ii, 4); ii += 4;
+                Buffer.BlockCopy(Utils.FloatToBytes(cloud), 0, data, ii, 4); ii += 4;
+                Buffer.BlockCopy(Utils.FloatToBytes(task), 0, data, ii, 4); ii += 4;
+                Buffer.BlockCopy(Utils.FloatToBytes(texture), 0, data, ii, 4); ii += 4;
+                Buffer.BlockCopy(Utils.FloatToBytes(asset), 0, data, ii, 4);
+
+                try
+                {
+                    presence.ControllingClient.SetChildAgentThrottle(data);
+                }
+                catch (NotImplementedException)
+                {
+                    return;
+                }
+
+            }
         }
 
         private void RegionLoadedDoWork(Scene scene)
@@ -614,7 +696,9 @@ namespace OpenSim.Region.RegionCombinerModule
             presence.SetSendCourseLocationMethod(SendCourseLocationUpdates);
         }
 
-        private void SendCourseLocationUpdates(UUID sceneId, ScenePresence presence)
+        // This delegate was refactored for non-combined regions.
+        // This combined region version will not use the pre-compiled lists of locations and ids
+        private void SendCourseLocationUpdates(UUID sceneId, ScenePresence presence, List<Vector3> coarseLocations, List<UUID> avatarUUIDs)
         {
             RegionConnections connectiondata = null; 
             lock (m_regions)
@@ -625,36 +709,37 @@ namespace OpenSim.Region.RegionCombinerModule
                     return;
             }
 
-            List<ScenePresence> avatars = connectiondata.RegionScene.GetAvatars();
             List<Vector3> CoarseLocations = new List<Vector3>();
             List<UUID> AvatarUUIDs = new List<UUID>();
-            for (int i = 0; i < avatars.Count; i++)
+            connectiondata.RegionScene.ForEachScenePresence(delegate(ScenePresence sp)
             {
-                if (avatars[i].UUID != presence.UUID)
+                if (sp.IsChildAgent)
+                    return;
+                if (sp.UUID != presence.UUID)
                 {
-                    if (avatars[i].ParentID != 0)
+                    if (sp.ParentID != 0)
                     {
                         // sitting avatar
-                        SceneObjectPart sop = connectiondata.RegionScene.GetSceneObjectPart(avatars[i].ParentID);
+                        SceneObjectPart sop = connectiondata.RegionScene.GetSceneObjectPart(sp.ParentID);
                         if (sop != null)
                         {
-                            CoarseLocations.Add(sop.AbsolutePosition + avatars[i].AbsolutePosition);
-                            AvatarUUIDs.Add(avatars[i].UUID);
+                            CoarseLocations.Add(sop.AbsolutePosition + sp.AbsolutePosition);
+                            AvatarUUIDs.Add(sp.UUID);
                         }
                         else
                         {
                             // we can't find the parent..  ! arg!
-                            CoarseLocations.Add(avatars[i].AbsolutePosition);
-                            AvatarUUIDs.Add(avatars[i].UUID);
+                            CoarseLocations.Add(sp.AbsolutePosition);
+                            AvatarUUIDs.Add(sp.UUID);
                         }
                     }
                     else
                     {
-                        CoarseLocations.Add(avatars[i].AbsolutePosition);
-                        AvatarUUIDs.Add(avatars[i].UUID);
+                        CoarseLocations.Add(sp.AbsolutePosition);
+                        AvatarUUIDs.Add(sp.UUID);
                     }
                 }
-            }
+            });
             DistributeCourseLocationUpdates(CoarseLocations, AvatarUUIDs, connectiondata, presence);
         }
 
@@ -916,13 +1001,13 @@ namespace OpenSim.Region.RegionCombinerModule
             VirtualRegion.Permissions.OnDuplicateObject += BigRegion.PermissionModule.CanDuplicateObject;
             VirtualRegion.Permissions.OnDeleteObject += BigRegion.PermissionModule.CanDeleteObject; //MAYBE FULLY IMPLEMENTED
             VirtualRegion.Permissions.OnEditObject += BigRegion.PermissionModule.CanEditObject; //MAYBE FULLY IMPLEMENTED
-            VirtualRegion.Permissions.OnEditParcel += BigRegion.PermissionModule.CanEditParcel; //MAYBE FULLY IMPLEMENTED
+            VirtualRegion.Permissions.OnEditParcelProperties += BigRegion.PermissionModule.CanEditParcelProperties; //MAYBE FULLY IMPLEMENTED
             VirtualRegion.Permissions.OnInstantMessage += BigRegion.PermissionModule.CanInstantMessage;
             VirtualRegion.Permissions.OnInventoryTransfer += BigRegion.PermissionModule.CanInventoryTransfer; //NOT YET IMPLEMENTED
             VirtualRegion.Permissions.OnIssueEstateCommand += BigRegion.PermissionModule.CanIssueEstateCommand; //FULLY IMPLEMENTED
             VirtualRegion.Permissions.OnMoveObject += BigRegion.PermissionModule.CanMoveObject; //MAYBE FULLY IMPLEMENTED
             VirtualRegion.Permissions.OnObjectEntry += BigRegion.PermissionModule.CanObjectEntry;
-            VirtualRegion.Permissions.OnReturnObject += BigRegion.PermissionModule.CanReturnObject; //NOT YET IMPLEMENTED
+            VirtualRegion.Permissions.OnReturnObjects += BigRegion.PermissionModule.CanReturnObjects; //NOT YET IMPLEMENTED
             VirtualRegion.Permissions.OnRezObject += BigRegion.PermissionModule.CanRezObject; //MAYBE FULLY IMPLEMENTED
             VirtualRegion.Permissions.OnRunConsoleCommand += BigRegion.PermissionModule.CanRunConsoleCommand;
             VirtualRegion.Permissions.OnRunScript += BigRegion.PermissionModule.CanRunScript; //NOT YET IMPLEMENTED
@@ -948,7 +1033,6 @@ namespace OpenSim.Region.RegionCombinerModule
             VirtualRegion.Permissions.OnEditUserInventory += BigRegion.PermissionModule.CanEditUserInventory; //NOT YET IMPLEMENTED
             VirtualRegion.Permissions.OnDeleteUserInventory += BigRegion.PermissionModule.CanDeleteUserInventory; //NOT YET IMPLEMENTED
             VirtualRegion.Permissions.OnTeleport += BigRegion.PermissionModule.CanTeleport; //NOT YET IMPLEMENTED
-            VirtualRegion.Permissions.OnUseObjectReturn += BigRegion.PermissionModule.CanUseObjectReturn; //NOT YET IMPLEMENTED
         }
 
         #region console commands

@@ -33,7 +33,6 @@ using System.Reflection;
 using Nini.Config;
 using OpenSim.Framework;
 using OpenSim.Framework.Communications;
-using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 
@@ -67,7 +66,7 @@ namespace OpenSim.Services.Connectors
             IConfig authorizationConfig = source.Configs["AuthorizationService"];
             if (authorizationConfig == null)
             {
-                m_log.Info("[AUTHORIZATION CONNECTOR]: AuthorizationService missing from OpenSim.ini");
+                //m_log.Info("[AUTHORIZATION CONNECTOR]: AuthorizationService missing from OpenSim.ini");
                 throw new Exception("Authorization connector init error");
             }
 
@@ -86,6 +85,7 @@ namespace OpenSim.Services.Connectors
             bool responseOnFailure = authorizationConfig.GetBoolean("ResponseOnFailure",true);
                     
             m_ResponseOnFailure = responseOnFailure;
+            m_log.Info("[AUTHORIZATION CONNECTOR]: AuthorizationService initialized");
         }
 
         public bool IsAuthorizedForRegion(string userID, string firstname, string surname, string email, string regionName, string regionID, out string message)

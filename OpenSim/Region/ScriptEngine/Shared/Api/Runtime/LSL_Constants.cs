@@ -50,6 +50,8 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public const int STATUS_CAST_SHADOWS = 512;
 
         public const int AGENT = 1;
+        public const int AGENT_BY_LEGACY_NAME = 1;
+        public const int AGENT_BY_USERNAME = 0x10;
         public const int ACTIVE = 2;
         public const int PASSIVE = 4;
         public const int SCRIPTED = 8;
@@ -160,6 +162,8 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public const int VEHICLE_BANKING_MIX = 39;
         public const int VEHICLE_BANKING_TIMESCALE = 40;
         public const int VEHICLE_REFERENCE_FRAME = 44;
+        public const int VEHICLE_RANGE_BLOCK = 45;
+        public const int VEHICLE_ROLL_FRAME = 46;
         public const int VEHICLE_FLAG_NO_DEFLECTION_UP = 1;
         public const int VEHICLE_FLAG_LIMIT_ROLL_ONLY = 2;
         public const int VEHICLE_FLAG_HOVER_WATER_ONLY = 4;
@@ -170,6 +174,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public const int VEHICLE_FLAG_MOUSELOOK_STEER = 128;
         public const int VEHICLE_FLAG_MOUSELOOK_BANK = 256;
         public const int VEHICLE_FLAG_CAMERA_DECOUPLED = 512;
+        public const int VEHICLE_FLAG_NO_X = 1024;
+        public const int VEHICLE_FLAG_NO_Y = 2048;
+        public const int VEHICLE_FLAG_NO_Z = 4096;
+        public const int VEHICLE_FLAG_LOCK_HOVER_HEIGHT = 8192;
+        public const int VEHICLE_FLAG_NO_DEFLECTION = 16392;
+        public const int VEHICLE_FLAG_LOCK_ROTATION = 32784;
 
         public const int INVENTORY_ALL = -1;
         public const int INVENTORY_NONE = -1;
@@ -265,9 +275,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public const int CHANGED_LINK = 32;
         public const int CHANGED_ALLOWED_DROP = 64;
         public const int CHANGED_OWNER = 128;
-        public const int CHANGED_REGION_RESTART = 256;
-        public const int CHANGED_REGION = 512;
-        public const int CHANGED_TELEPORT = 1024;
+        public const int CHANGED_REGION = 256;
+        public const int CHANGED_TELEPORT = 512;
+        public const int CHANGED_REGION_RESTART = 1024;
+        public const int CHANGED_REGION_START = 1024; //LL Changed the constant from CHANGED_REGION_RESTART
+        public const int CHANGED_MEDIA = 2048;
         public const int CHANGED_ANIMATION = 16384;
         public const int TYPE_INVALID = 0;
         public const int TYPE_INTEGER = 1;
@@ -305,6 +317,10 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public const int PRIM_CAST_SHADOWS = 24; // Not implemented, here for completeness sake
         public const int PRIM_POINT_LIGHT = 23; // Huh?
         public const int PRIM_GLOW = 25;
+        public const int PRIM_TEXT = 26;
+        public const int PRIM_NAME = 27;
+        public const int PRIM_DESC = 28;
+        public const int PRIM_ROT_LOCAL = 29;
         public const int PRIM_TEXGEN_DEFAULT = 0;
         public const int PRIM_TEXGEN_PLANAR = 1;
 
@@ -493,6 +509,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public const int PARCEL_DETAILS_OWNER = 2;
         public const int PARCEL_DETAILS_GROUP = 3;
         public const int PARCEL_DETAILS_AREA = 4;
+        public const int PARCEL_DETAILS_ID = 5;
 
         // constants for llSetClickAction
         public const int CLICK_ACTION_NONE = 0;
@@ -508,6 +525,41 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public const int TOUCH_INVALID_FACE = -1;
         public static readonly vector TOUCH_INVALID_TEXCOORD = new vector(-1.0, -1.0, 0.0);
         public static readonly vector TOUCH_INVALID_VECTOR = ZERO_VECTOR;
+        
+        // constants for llGetPrimMediaParams/llSetPrimMediaParams
+        public const int PRIM_MEDIA_ALT_IMAGE_ENABLE = 0;
+        public const int PRIM_MEDIA_CONTROLS = 1;
+        public const int PRIM_MEDIA_CURRENT_URL = 2;
+        public const int PRIM_MEDIA_HOME_URL = 3;
+        public const int PRIM_MEDIA_AUTO_LOOP = 4;
+        public const int PRIM_MEDIA_AUTO_PLAY = 5;
+        public const int PRIM_MEDIA_AUTO_SCALE = 6;
+        public const int PRIM_MEDIA_AUTO_ZOOM = 7;
+        public const int PRIM_MEDIA_FIRST_CLICK_INTERACT = 8;
+        public const int PRIM_MEDIA_WIDTH_PIXELS = 9;
+        public const int PRIM_MEDIA_HEIGHT_PIXELS = 10;
+        public const int PRIM_MEDIA_WHITELIST_ENABLE = 11;
+        public const int PRIM_MEDIA_WHITELIST = 12;
+        public const int PRIM_MEDIA_PERMS_INTERACT = 13;
+        public const int PRIM_MEDIA_PERMS_CONTROL = 14;
+        
+        public const int PRIM_MEDIA_CONTROLS_STANDARD = 0;
+        public const int PRIM_MEDIA_CONTROLS_MINI = 1;
+        
+        public const int PRIM_MEDIA_PERM_NONE = 0;
+        public const int PRIM_MEDIA_PERM_OWNER = 1;
+        public const int PRIM_MEDIA_PERM_GROUP = 2;
+        public const int PRIM_MEDIA_PERM_ANYONE = 4;
+        
+        // extra constants for llSetPrimMediaParams
+        public static readonly LSLInteger LSL_STATUS_OK = new LSLInteger(0);
+        public static readonly LSLInteger LSL_STATUS_MALFORMED_PARAMS = new LSLInteger(1000);
+        public static readonly LSLInteger LSL_STATUS_TYPE_MISMATCH = new LSLInteger(1001);
+        public static readonly LSLInteger LSL_STATUS_BOUNDS_ERROR = new LSLInteger(1002);
+        public static readonly LSLInteger LSL_STATUS_NOT_FOUND = new LSLInteger(1003);
+        public static readonly LSLInteger LSL_STATUS_NOT_SUPPORTED = new LSLInteger(1004);
+        public static readonly LSLInteger LSL_STATUS_INTERNAL_ERROR = new LSLInteger(1999);
+        public static readonly LSLInteger LSL_STATUS_WHITELIST_FAILED = new LSLInteger(2001);
 
         // Constants for default textures
         public const string TEXTURE_BLANK = "5748decc-f629-461c-9a36-a35a221fe21f";
@@ -515,29 +567,31 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public const string TEXTURE_PLYWOOD = "89556747-24cb-43ed-920b-47caed15465f";
         public const string TEXTURE_TRANSPARENT = "8dcd4a48-2d37-4909-9f78-f7a9eb4ef903";
         public const string TEXTURE_MEDIA = "8b5fec65-8d8d-9dc5-cda8-8fdf2716e361";
-		
-		// Constants for osGetRegionStats
-		public const int STATS_TIME_DILATION = 0;
-		public const int STATS_SIM_FPS = 1;
-		public const int STATS_PHYSICS_FPS = 2;
-		public const int STATS_AGENT_UPDATES = 3;
-		public const int STATS_ROOT_AGENTS = 4;
-		public const int STATS_CHILD_AGENTS = 5;
-		public const int STATS_TOTAL_PRIMS = 6;
-		public const int STATS_ACTIVE_PRIMS = 7;
-		public const int STATS_FRAME_MS = 8;
-		public const int STATS_NET_MS = 9;
-		public const int STATS_PHYSICS_MS = 10;
-		public const int STATS_IMAGE_MS = 11;
-		public const int STATS_OTHER_MS = 12;
-		public const int STATS_IN_PACKETS_PER_SECOND = 13;
-		public const int STATS_OUT_PACKETS_PER_SECOND = 14;
-		public const int STATS_UNACKED_BYTES = 15;
-		public const int STATS_AGENT_MS = 16;
-		public const int STATS_PENDING_DOWNLOADS = 17;
-		public const int STATS_PENDING_UPLOADS = 18;
-		public const int STATS_ACTIVE_SCRIPTS = 19;
-		public const int STATS_SCRIPT_LPS = 20;
+        
+        // Constants for osGetRegionStats
+        public const int STATS_TIME_DILATION = 0;
+        public const int STATS_SIM_FPS = 1;
+        public const int STATS_PHYSICS_FPS = 2;
+        public const int STATS_AGENT_UPDATES = 3;
+        public const int STATS_ROOT_AGENTS = 4;
+        public const int STATS_CHILD_AGENTS = 5;
+        public const int STATS_TOTAL_PRIMS = 6;
+        public const int STATS_ACTIVE_PRIMS = 7;
+        public const int STATS_FRAME_MS = 8;
+        public const int STATS_NET_MS = 9;
+        public const int STATS_PHYSICS_MS = 10;
+        public const int STATS_IMAGE_MS = 11;
+        public const int STATS_OTHER_MS = 12;
+        public const int STATS_IN_PACKETS_PER_SECOND = 13;
+        public const int STATS_OUT_PACKETS_PER_SECOND = 14;
+        public const int STATS_UNACKED_BYTES = 15;
+        public const int STATS_AGENT_MS = 16;
+        public const int STATS_PENDING_DOWNLOADS = 17;
+        public const int STATS_PENDING_UPLOADS = 18;
+        public const int STATS_ACTIVE_SCRIPTS = 19;
+        public const int STATS_SCRIPT_LPS = 20;
 
+        public const string URL_REQUEST_GRANTED = "URL_REQUEST_GRANTED";
+        public const string URL_REQUEST_DENIED = "URL_REQUEST_DENIED";
     }
 }

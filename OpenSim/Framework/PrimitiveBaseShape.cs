@@ -26,12 +26,17 @@
  */
 
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.IO;
 using System.Reflection;
+using System.Xml;
+using System.Xml.Schema;
 using System.Xml.Serialization;
 using log4net;
 using OpenMetaverse;
+using OpenMetaverse.StructuredData;
 
 namespace OpenSim.Framework
 {
@@ -131,6 +136,13 @@ namespace OpenSim.Framework
         [XmlIgnore] private bool _lightEntry;
         [XmlIgnore] private bool _sculptEntry;
 
+        // Light Projection Filter
+        [XmlIgnore] private bool _projectionEntry;
+        [XmlIgnore] private UUID _projectionTextureID;
+        [XmlIgnore] private float _projectionFOV;
+        [XmlIgnore] private float _projectionFocus;
+        [XmlIgnore] private float _projectionAmb;
+
         public byte ProfileCurve
         {
             get { return (byte)((byte)HollowShape | (byte)ProfileShape); }
@@ -171,6 +183,13 @@ namespace OpenSim.Framework
             }
         }
 
+        /// <summary>
+        /// Entries to store media textures on each face
+        /// </summary>
+        /// Do not change this value directly - always do it through an IMoapModule.
+        /// Lock before manipulating.
+        public MediaList Media { get; set; }
+
         public PrimitiveBaseShape()
         {
             PCode = (byte) PCodeEnum.Primitive;
@@ -188,13 +207,55 @@ namespace OpenSim.Framework
             m_textureEntry = DEFAULT_TEXTURE;
         }
 
+        /// <summary>
+        /// Construct a PrimitiveBaseShape object from a OpenMetaverse.Primitive object
+        /// </summary>
+        /// <param name="prim"></param>
+        public PrimitiveBaseShape(Primitive prim)
+        {
+            PCode = (byte)prim.PrimData.PCode;
+            ExtraParams = new byte[1];
+
+            State = prim.PrimData.State;
+            PathBegin = Primitive.PackBeginCut(prim.PrimData.PathBegin);
+            PathEnd = Primitive.PackEndCut(prim.PrimData.PathEnd);
+            PathScaleX = Primitive.PackPathScale(prim.PrimData.PathScaleX);
+            PathScaleY = Primitive.PackPathScale(prim.PrimData.PathScaleY);
+            PathShearX = (byte)Primitive.PackPathShear(prim.PrimData.PathShearX);
+            PathShearY = (byte)Primitive.PackPathShear(prim.PrimData.PathShearY);
+            PathSkew = Primitive.PackPathTwist(prim.PrimData.PathSkew);
+            ProfileBegin = Primitive.PackBeginCut(prim.PrimData.ProfileBegin);
+            ProfileEnd = Primitive.PackEndCut(prim.PrimData.ProfileEnd);
+            Scale = prim.Scale;
+            PathCurve = (byte)prim.PrimData.PathCurve;
+            ProfileCurve = (byte)prim.PrimData.ProfileCurve;
+            ProfileHollow = Primitive.PackProfileHollow(prim.PrimData.ProfileHollow);
+            PathRadiusOffset = Primitive.PackPathTwist(prim.PrimData.PathRadiusOffset);
+            PathRevolutions = Primitive.PackPathRevolutions(prim.PrimData.PathRevolutions);
+            PathTaperX = Primitive.PackPathTaper(prim.PrimData.PathTaperX);
+            PathTaperY = Primitive.PackPathTaper(prim.PrimData.PathTaperY);
+            PathTwist = Primitive.PackPathTwist(prim.PrimData.PathTwist);
+            PathTwistBegin = Primitive.PackPathTwist(prim.PrimData.PathTwistBegin);
+
+            m_textureEntry = prim.Textures.GetBytes();
+
+            SculptEntry = (prim.Sculpt.Type != OpenMetaverse.SculptType.None);
+            SculptData = prim.Sculpt.GetBytes();
+            SculptTexture = prim.Sculpt.SculptTexture;
+            SculptType = (byte)prim.Sculpt.Type;
+        }
+
         [XmlIgnore]
         public Primitive.TextureEntry Textures
         {
             get
             {
-                //m_log.DebugFormat("[PRIMITIVE BASE SHAPE]: get m_textureEntry length {0}", m_textureEntry.Length);
-                return new Primitive.TextureEntry(m_textureEntry, 0, m_textureEntry.Length);
+//                m_log.DebugFormat("[SHAPE]: get m_textureEntry length {0}", m_textureEntry.Length);
+                try { return new Primitive.TextureEntry(m_textureEntry, 0, m_textureEntry.Length); }
+                catch { }
+
+                m_log.Warn("[SHAPE]: Failed to decode texture, length=" + ((m_textureEntry != null) ? m_textureEntry.Length : 0));
+                return new Primitive.TextureEntry(UUID.Zero);
             }
 
             set { m_textureEntry = value.GetBytes(); }
@@ -741,11 +802,57 @@ namespace OpenSim.Framework
             }
         }
 
+        public bool ProjectionEntry {
+            get {
+                return _projectionEntry;
+            }
+            set {
+                _projectionEntry = value;
+            }
+        }
+
+        public UUID ProjectionTextureUUID {
+            get {
+                return _projectionTextureID;
+            }
+            set {
+                _projectionTextureID = value;
+            }
+        }
+
+        public float ProjectionFOV {
+            get {
+                return _projectionFOV;
+            }
+            set {
+                _projectionFOV = value;
+            }
+        }
+
+        public float ProjectionFocus {
+            get {
+                return _projectionFocus;
+            }
+            set {
+                _projectionFocus = value;
+            }
+        }
+
+        public float ProjectionAmbiance {
+            get {
+                return _projectionAmb;
+            }
+            set {
+                _projectionAmb = value;
+            }
+        }
+
         public byte[] ExtraParamsToBytes()
         {
             ushort FlexiEP = 0x10;
             ushort LightEP = 0x20;
             ushort SculptEP = 0x30;
+            ushort ProjectionEP = 0x40;
 
             int i = 0;
             uint TotalBytesLength = 1; // ExtraParamsNum
@@ -768,6 +875,12 @@ namespace OpenSim.Framework
                 ExtraParamsNum++;
                 TotalBytesLength += 17;// data
                 TotalBytesLength += 2 + 4; // type
+            }
+            if (_projectionEntry)
+            {
+                ExtraParamsNum++;
+                TotalBytesLength += 28;// data
+                TotalBytesLength += 2 + 4;// type
             }
 
             byte[] returnbytes = new byte[TotalBytesLength];
@@ -820,8 +933,20 @@ namespace OpenSim.Framework
                 Array.Copy(SculptData, 0, returnbytes, i, SculptData.Length);
                 i += SculptData.Length;
             }
+            if (_projectionEntry)
+            {
+                byte[] ProjectionData = GetProjectionBytes();
 
-            if (!_flexiEntry && !_lightEntry && !_sculptEntry)
+                returnbytes[i++] = (byte)(ProjectionEP % 256);
+                returnbytes[i++] = (byte)((ProjectionEP >> 8) % 256);
+                returnbytes[i++] = (byte)((ProjectionData.Length) % 256);
+                returnbytes[i++] = (byte)((ProjectionData.Length >> 16) % 256);
+                returnbytes[i++] = (byte)((ProjectionData.Length >> 20) % 256);
+                returnbytes[i++] = (byte)((ProjectionData.Length >> 24) % 256);
+                Array.Copy(ProjectionData, 0, returnbytes, i, ProjectionData.Length);
+                i += ProjectionData.Length;
+            }
+            if (!_flexiEntry && !_lightEntry && !_sculptEntry && !_projectionEntry)
             {
                 byte[] returnbyte = new byte[1];
                 returnbyte[0] = 0;
@@ -839,6 +964,7 @@ namespace OpenSim.Framework
             const ushort FlexiEP = 0x10;
             const ushort LightEP = 0x20;
             const ushort SculptEP = 0x30;
+            const ushort ProjectionEP = 0x40;
 
             switch (type)
             {
@@ -868,6 +994,14 @@ namespace OpenSim.Framework
                     }
                     ReadSculptData(data, 0);
                     break;
+                case ProjectionEP:
+                    if (!inUse)
+                    {
+                        _projectionEntry = false;
+                        return;
+                    }
+                    ReadProjectionData(data, 0);
+                    break;
             }
         }
 
@@ -879,10 +1013,12 @@ namespace OpenSim.Framework
             const ushort FlexiEP = 0x10;
             const ushort LightEP = 0x20;
             const ushort SculptEP = 0x30;
+            const ushort ProjectionEP = 0x40;
 
             bool lGotFlexi = false;
             bool lGotLight = false;
             bool lGotSculpt = false;
+            bool lGotFilter = false;
 
             int i = 0;
             byte extraParamCount = 0;
@@ -919,6 +1055,11 @@ namespace OpenSim.Framework
                         i += 17;
                         lGotSculpt = true;
                         break;
+                    case ProjectionEP:
+                        ReadProjectionData(data, i);
+                        i += 28;
+                        lGotFilter = true;
+                        break;
                 }
             }
 
@@ -928,6 +1069,8 @@ namespace OpenSim.Framework
                 _lightEntry = false;
             if (!lGotSculpt)
                 _sculptEntry = false;
+            if (!lGotFilter)
+                _projectionEntry = false;
 
         }
 
@@ -1067,6 +1210,42 @@ namespace OpenSim.Framework
             return data;
         }
 
+        public void ReadProjectionData(byte[] data, int pos)
+        {
+            byte[] ProjectionTextureUUID = new byte[16];
+
+            if (data.Length - pos >= 28)
+            {
+                _projectionEntry = true;
+                Array.Copy(data, pos, ProjectionTextureUUID,0, 16);
+                _projectionTextureID = new UUID(ProjectionTextureUUID, 0);
+
+                _projectionFOV = Utils.BytesToFloat(data, pos + 16);
+                _projectionFocus = Utils.BytesToFloat(data, pos + 20);
+                _projectionAmb = Utils.BytesToFloat(data, pos + 24);
+            }
+            else
+            {
+                _projectionEntry = false;
+                _projectionTextureID = UUID.Zero;
+                _projectionFOV = 0f;
+                _projectionFocus = 0f;
+                _projectionAmb = 0f;
+            }
+        }
+
+        public byte[] GetProjectionBytes()
+        {
+            byte[] data = new byte[28];
+
+            _projectionTextureID.GetBytes().CopyTo(data, 0);
+            Utils.FloatToBytes(_projectionFOV).CopyTo(data, 16);
+            Utils.FloatToBytes(_projectionFocus).CopyTo(data, 20);
+            Utils.FloatToBytes(_projectionAmb).CopyTo(data, 24);
+
+            return data;
+        }
+
 
         /// <summary>
         /// Creates a OpenMetaverse.Primitive and populates it with converted PrimitiveBaseShape values
@@ -1162,8 +1341,107 @@ namespace OpenSim.Framework
             prim.Properties.Permissions = new Permissions();
             prim.Properties.SalePrice = 10;
             prim.Properties.SaleType = new SaleType();
-            
+
             return prim;
+        }
+
+        /// <summary>
+        /// Encapsulates a list of media entries.
+        /// </summary>
+        /// This class is necessary because we want to replace auto-serialization of MediaEntry with something more
+        /// OSD like and less vulnerable to change.
+        public class MediaList : List<MediaEntry>, IXmlSerializable
+        {
+            public const string MEDIA_TEXTURE_TYPE = "sl";
+
+            public MediaList() : base() {}
+            public MediaList(IEnumerable<MediaEntry> collection) : base(collection) {}
+            public MediaList(int capacity) : base(capacity) {}
+
+            public XmlSchema GetSchema()
+            {
+                return null;
+            }
+
+            public string ToXml()
+            {
+                lock (this)
+                {
+                    using (StringWriter sw = new StringWriter())
+                    {
+                        using (XmlTextWriter xtw = new XmlTextWriter(sw))
+                        {
+                            xtw.WriteStartElement("OSMedia");
+                            xtw.WriteAttributeString("type", MEDIA_TEXTURE_TYPE);
+                            xtw.WriteAttributeString("version", "0.1");
+
+                            OSDArray meArray = new OSDArray();
+                            foreach (MediaEntry me in this)
+                            {
+                                OSD osd = (null == me ? new OSD() : me.GetOSD());
+                                meArray.Add(osd);
+                            }
+
+                            xtw.WriteStartElement("OSData");
+                            xtw.WriteRaw(OSDParser.SerializeLLSDXmlString(meArray));
+                            xtw.WriteEndElement();
+
+                            xtw.WriteEndElement();
+
+                            xtw.Flush();
+                            return sw.ToString();
+                        }
+                    }
+                }
+            }
+
+            public void WriteXml(XmlWriter writer)
+            {
+                writer.WriteRaw(ToXml());
+            }
+
+            public static MediaList FromXml(string rawXml)
+            {
+                MediaList ml = new MediaList();
+                ml.ReadXml(rawXml);
+                return ml;
+            }
+
+            public void ReadXml(string rawXml)
+            {
+                using (StringReader sr = new StringReader(rawXml))
+                {
+                    using (XmlTextReader xtr = new XmlTextReader(sr))
+                    {
+                        xtr.MoveToContent();
+
+                        string type = xtr.GetAttribute("type");
+                        //m_log.DebugFormat("[MOAP]: Loaded media texture entry with type {0}", type);
+
+                        if (type != MEDIA_TEXTURE_TYPE)
+                            return;
+
+                        xtr.ReadStartElement("OSMedia");
+
+                        OSDArray osdMeArray = (OSDArray)OSDParser.DeserializeLLSDXml(xtr.ReadInnerXml());
+                        foreach (OSD osdMe in osdMeArray)
+                        {
+                            MediaEntry me = (osdMe is OSDMap ? MediaEntry.FromOSD(osdMe) : new MediaEntry());
+                            Add(me);
+                        }
+
+                        xtr.ReadEndElement();
+                    }
+                }
+            }
+
+            public void ReadXml(XmlReader reader)
+            {
+                if (reader.IsEmptyElement)
+                    return;
+
+                ReadXml(reader.ReadInnerXml());
+            }
         }
     }
 }

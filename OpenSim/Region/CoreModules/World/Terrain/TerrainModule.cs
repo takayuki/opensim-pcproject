@@ -68,7 +68,7 @@ namespace OpenSim.Region.CoreModules.World.Terrain
         #endregion
 
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
+        
         private readonly Commander m_commander = new Commander("terrain");
 
         private readonly Dictionary<StandardTerrainEffects, ITerrainFloodEffect> m_floodeffects =
@@ -84,6 +84,7 @@ namespace OpenSim.Region.CoreModules.World.Terrain
         private ITerrainChannel m_revert;
         private Scene m_scene;
         private volatile bool m_tainted;
+        private readonly UndoStack<LandUndoState> m_undo = new UndoStack<LandUndoState>(5);
 
         #region ICommandableModule Members
 
@@ -130,7 +131,6 @@ namespace OpenSim.Region.CoreModules.World.Terrain
                 m_scene.EventManager.OnNewClient += EventManager_OnNewClient;
                 m_scene.EventManager.OnPluginConsole += EventManager_OnPluginConsole;
                 m_scene.EventManager.OnTerrainTick += EventManager_OnTerrainTick;
-                InstallInterfaces();
             }
 
             InstallDefaultEffects();
@@ -139,6 +139,9 @@ namespace OpenSim.Region.CoreModules.World.Terrain
 
         public void RegionLoaded(Scene scene)
         {
+            //Do this here to give file loaders time to initialize and
+            //register their supported file extensions and file formats.
+            InstallInterfaces();
         }
 
         public void RemoveRegion(Scene scene)
@@ -173,6 +176,11 @@ namespace OpenSim.Region.CoreModules.World.Terrain
         #endregion
 
         #region ITerrainModule Members
+
+        public void UndoTerrain(ITerrainChannel channel)
+        {
+            m_channel = channel;
+        }
 
         /// <summary>
         /// Loads a terrain file from disk and installs it in the scene.
@@ -375,8 +383,13 @@ namespace OpenSim.Region.CoreModules.World.Terrain
         private void LoadPlugins()
         {
             m_plugineffects = new Dictionary<string, ITerrainEffect>();
+            string plugineffectsPath = "Terrain";
+            
             // Load the files in the Terrain/ dir
-            string[] files = Directory.GetFiles("Terrain");
+            if (!Directory.Exists(plugineffectsPath))
+                return;
+            
+            string[] files = Directory.GetFiles(plugineffectsPath);
             foreach (string file in files)
             {
                 m_log.Info("Loading effects in " + file);
@@ -528,6 +541,39 @@ namespace OpenSim.Region.CoreModules.World.Terrain
         }
 
         /// <summary>
+        /// Saves the terrain to a larger terrain file.
+        /// </summary>
+        /// <param name="filename">The terrain file to save</param>
+        /// <param name="fileWidth">The width of the file in units</param>
+        /// <param name="fileHeight">The height of the file in units</param>
+        /// <param name="fileStartX">Where to begin our slice</param>
+        /// <param name="fileStartY">Where to begin our slice</param>
+        public void SaveToFile(string filename, int fileWidth, int fileHeight, int fileStartX, int fileStartY)
+        {
+            int offsetX = (int)m_scene.RegionInfo.RegionLocX - fileStartX;
+            int offsetY = (int)m_scene.RegionInfo.RegionLocY - fileStartY;
+
+            if (offsetX >= 0 && offsetX < fileWidth && offsetY >= 0 && offsetY < fileHeight)
+            {
+                // this region is included in the tile request
+                foreach (KeyValuePair<string, ITerrainLoader> loader in m_loaders)
+                {
+                    if (filename.EndsWith(loader.Key))
+                    {
+                        lock (m_scene)
+                        {
+                            loader.Value.SaveFile(m_channel, filename, offsetX, offsetY,
+                                                  fileWidth, fileHeight,
+                                                  (int)Constants.RegionSize,
+                                                  (int)Constants.RegionSize);
+                        }
+                        return;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
         /// Performs updates to the region periodically, synchronising physics and other heightmap aware sections
         /// </summary>
         private void EventManager_OnTerrainTick()
@@ -574,8 +620,10 @@ namespace OpenSim.Region.CoreModules.World.Terrain
         {
             client.OnModifyTerrain += client_OnModifyTerrain;
             client.OnBakeTerrain += client_OnBakeTerrain;
+            client.OnLandUndo += client_OnLandUndo;
+            client.OnUnackedTerrain += client_OnUnackedTerrain;
         }
-
+        
         /// <summary>
         /// Checks to see if the terrain has been modified since last check
         /// but won't attempt to limit those changes to the limits specified in the estate settings
@@ -664,6 +712,19 @@ namespace OpenSim.Region.CoreModules.World.Terrain
             return changesLimited;
         }
 
+        private void client_OnLandUndo(IClientAPI client)
+        {
+            lock (m_undo)
+            {
+                if (m_undo.Count > 0)
+                {
+                    LandUndoState goback = m_undo.Pop();
+                    if (goback != null)
+                        goback.PlaybackState();
+                }
+            }
+        }
+
         /// <summary>
         /// Sends a copy of the current terrain to the scenes clients
         /// </summary>
@@ -718,6 +779,7 @@ namespace OpenSim.Region.CoreModules.World.Terrain
                     }
                     if (allowed)
                     {
+                        StoreUndoState();
                         m_painteffects[(StandardTerrainEffects) action].PaintEffect(
                             m_channel, allowMask, west, south, height, size, seconds);
 
@@ -758,6 +820,7 @@ namespace OpenSim.Region.CoreModules.World.Terrain
 
                     if (allowed)
                     {
+                        StoreUndoState();
                         m_floodeffects[(StandardTerrainEffects) action].FloodEffect(
                             m_channel, fillArea, size);
 
@@ -779,6 +842,31 @@ namespace OpenSim.Region.CoreModules.World.Terrain
             if (m_scene.Permissions.CanIssueEstateCommand(remoteClient.AgentId, true))
             {
                 InterfaceBakeTerrain(null); //bake terrain does not use the passed in parameter
+            }
+        }
+        
+        protected void client_OnUnackedTerrain(IClientAPI client, int patchX, int patchY)
+        {
+            //m_log.Debug("Terrain packet unacked, resending patch: " + patchX + " , " + patchY);
+             client.SendLayerData(patchX, patchY, m_scene.Heightmap.GetFloatsSerialised());
+        }
+
+        private void StoreUndoState()
+        {
+            lock (m_undo)
+            {
+                if (m_undo.Count > 0)
+                {
+                    LandUndoState last = m_undo.Peek();
+                    if (last != null)
+                    {
+                        if (last.Compare(m_channel))
+                            return;
+                    }
+                }
+
+                LandUndoState nUndo = new LandUndoState(this, m_channel);
+                m_undo.Push(nUndo);
             }
         }
 
@@ -803,6 +891,15 @@ namespace OpenSim.Region.CoreModules.World.Terrain
         private void InterfaceSaveFile(Object[] args)
         {
             SaveToFile((string) args[0]);
+        }
+
+        private void InterfaceSaveTileFile(Object[] args)
+        {
+            SaveToFile((string)args[0],
+                         (int)args[1],
+                         (int)args[2],
+                         (int)args[3],
+                         (int)args[4]);
         }
 
         private void InterfaceBakeTerrain(Object[] args)
@@ -1029,8 +1126,12 @@ namespace OpenSim.Region.CoreModules.World.Terrain
         {
             // Load / Save
             string supportedFileExtensions = "";
+            string supportedFilesSeparator = "";
             foreach (KeyValuePair<string, ITerrainLoader> loader in m_loaders)
-                supportedFileExtensions += " " + loader.Key + " (" + loader.Value + ")";
+            {
+                supportedFileExtensions += supportedFilesSeparator + loader.Key + " (" + loader.Value + ")";
+                supportedFilesSeparator = ", ";
+            }
 
             Command loadFromFileCommand =
                 new Command("load", CommandIntentions.COMMAND_HAZARDOUS, InterfaceLoadFile, "Loads a terrain from a specified file.");
@@ -1056,6 +1157,17 @@ namespace OpenSim.Region.CoreModules.World.Terrain
             loadFromTileCommand.AddArgument("minimum Y tile", "The Y region coordinate of the first section on the file",
                                             "Integer");
 
+            Command saveToTileCommand =
+                new Command("save-tile", CommandIntentions.COMMAND_HAZARDOUS, InterfaceSaveTileFile, "Saves the current heightmap to the larger file.");
+            saveToTileCommand.AddArgument("filename",
+                                            "The file you wish to save to, the file extension determines the loader to be used. Supported extensions include: " +
+                                            supportedFileExtensions, "String");
+            saveToTileCommand.AddArgument("file width", "The width of the file in tiles", "Integer");
+            saveToTileCommand.AddArgument("file height", "The height of the file in tiles", "Integer");
+            saveToTileCommand.AddArgument("minimum X tile", "The X region coordinate of the first section on the file",
+                                            "Integer");
+            saveToTileCommand.AddArgument("minimum Y tile", "The Y region coordinate of the first section on the file",
+                                            "Integer");
             // Terrain adjustments
             Command fillRegionCommand =
                 new Command("fill", CommandIntentions.COMMAND_HAZARDOUS, InterfaceFillTerrain, "Fills the current heightmap with a specified value.");
@@ -1107,6 +1219,7 @@ namespace OpenSim.Region.CoreModules.World.Terrain
             m_commander.RegisterCommand("load", loadFromFileCommand);
             m_commander.RegisterCommand("load-tile", loadFromTileCommand);
             m_commander.RegisterCommand("save", saveToFileCommand);
+            m_commander.RegisterCommand("save-tile", saveToTileCommand);
             m_commander.RegisterCommand("fill", fillRegionCommand);
             m_commander.RegisterCommand("elevate", elevateCommand);
             m_commander.RegisterCommand("lower", lowerCommand);

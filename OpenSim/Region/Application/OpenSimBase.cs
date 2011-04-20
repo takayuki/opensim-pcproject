@@ -36,8 +36,6 @@ using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Communications;
-using OpenSim.Framework.Communications.Services;
-using OpenSim.Framework.Communications.Cache;
 using OpenSim.Framework.Console;
 using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
@@ -47,6 +45,7 @@ using OpenSim.Region.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Physics.Manager;
+using OpenSim.Server.Base;
 
 namespace OpenSim
 {
@@ -84,8 +83,6 @@ namespace OpenSim
         protected ConfigSettings m_configSettings;
 
         protected ConfigurationLoader m_configLoader;
-
-        protected GridInfoService m_gridInfoService;
 
         public ConsoleCommand CreateAccount = null;
 
@@ -190,6 +187,24 @@ namespace OpenSim
                 userStatsURI = startupConfig.GetString("Stats_URI", String.Empty);
             }
 
+            // Load the simulation data service
+            IConfig simDataConfig = m_config.Source.Configs["SimulationDataStore"];
+            if (simDataConfig == null)
+                throw new Exception("Configuration file is missing the [SimulationDataStore] section");
+            string module = simDataConfig.GetString("LocalServiceModule", String.Empty);
+            if (String.IsNullOrEmpty(module))
+                throw new Exception("Configuration file is missing the LocalServiceModule parameter in the [SimulationDataStore] section");
+            m_simulationDataService = ServerUtils.LoadPlugin<ISimulationDataService>(module, new object[] { m_config.Source });
+
+            // Load the estate data service
+            IConfig estateDataConfig = m_config.Source.Configs["EstateDataStore"];
+            if (estateDataConfig == null)
+                throw new Exception("Configuration file is missing the [EstateDataStore] section");
+            module = estateDataConfig.GetString("LocalServiceModule", String.Empty);
+            if (String.IsNullOrEmpty(module))
+                throw new Exception("Configuration file is missing the LocalServiceModule parameter in the [EstateDataStore] section");
+            m_estateDataService = ServerUtils.LoadPlugin<IEstateDataService>(module, new object[] { m_config.Source });
+
             base.StartupSpecific();
 
             m_stats = StatsManager.StartCollectingSimExtraStats();
@@ -201,12 +216,6 @@ namespace OpenSim
             foreach (IApplicationPlugin plugin in m_plugins)
             {
                 plugin.PostInitialise();
-            }
-
-            // Only enable logins to the regions once we have completely finished starting up (apart from scripts)
-            if ((SceneManager.CurrentOrFirstScene != null) && (SceneManager.CurrentOrFirstScene.SceneGridService != null))
-            {
-                SceneManager.CurrentOrFirstScene.SceneGridService.RegionLoginsEnabled = true;
             }
 
             AddPluginCommands();
@@ -279,31 +288,6 @@ namespace OpenSim
         }
 
         /// <summary>
-        /// Initialises the asset cache. This supports legacy configuration values
-        /// to ensure consistent operation, but values outside of that namespace
-        /// are handled by the more generic resolution mechanism provided by 
-        /// the ResolveAssetServer virtual method. If extended resolution fails, 
-        /// then the normal default action is taken.
-        /// Creation of the AssetCache is handled by ResolveAssetCache. This
-        /// function accepts a reference to the instantiated AssetServer and
-        /// returns an IAssetCache implementation, if possible. This is a virtual
-        /// method.
-        /// </summary>
-        public void ProcessLogin(bool LoginEnabled)
-        {
-            if (LoginEnabled)
-            {
-                m_log.Info("[LOGIN]: Login is now enabled.");
-                SceneManager.CurrentOrFirstScene.SceneGridService.RegionLoginsEnabled = true;
-            }
-            else
-            {
-                m_log.Info("[LOGIN]: Login is now disabled.");
-                SceneManager.CurrentOrFirstScene.SceneGridService.RegionLoginsEnabled = false;
-            }
-        }
-
-        /// <summary>
         /// Execute the region creation process.  This includes setting up scene infrastructure.
         /// </summary>
         /// <param name="regionInfo"></param>
@@ -343,8 +327,8 @@ namespace OpenSim
             //regionInfo.originRegionID = regionInfo.RegionID;
 
             // set initial ServerURI
-            regionInfo.ServerURI = "http://" + regionInfo.ExternalHostName + ":" + regionInfo.InternalEndPoint.Port;
             regionInfo.HttpPort = m_httpServerPort;
+            regionInfo.ServerURI = "http://" + regionInfo.ExternalHostName + ":" + regionInfo.HttpPort.ToString() + "/";
             
             regionInfo.osSecret = m_osSecret;
             
@@ -368,22 +352,18 @@ namespace OpenSim
             m_moduleLoader.InitialiseSharedModules(scene);
 
             // Use this in the future, the line above will be deprecated soon
-            m_log.Info("[MODULES]: Loading Region's modules (new style)");
+            m_log.Info("[REGIONMODULES]: Loading Region's modules (new style)");
             IRegionModulesController controller;
             if (ApplicationRegistry.TryGet(out controller))
             {
                 controller.AddRegionToModules(scene);
             }
-            else m_log.Error("[MODULES]: The new RegionModulesController is missing...");
+            else m_log.Error("[REGIONMODULES]: The new RegionModulesController is missing...");
 
             scene.SetModuleInterfaces();
 
             // Prims have to be loaded after module configuration since some modules may be invoked during the load
             scene.LoadPrimsFromStorage(regionInfo.originRegionID);
-            
-            // moved these here as the terrain texture has to be created after the modules are initialized
-            // and has to happen before the region is registered with the grid.
-            scene.CreateTerrainTexture(false);
             
             // TODO : Try setting resource for region xstats here on scene
             MainServer.Instance.AddStreamHandler(new Region.Framework.Scenes.RegionStatsHandler(regionInfo)); 
@@ -394,19 +374,21 @@ namespace OpenSim
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[STARTUP]: Registration of region with grid failed, aborting startup - {0}", e.StackTrace);
+                m_log.ErrorFormat(
+                    "[STARTUP]: Registration of region with grid failed, aborting startup due to {0} {1}", 
+                    e.Message, e.StackTrace);
 
                 // Carrying on now causes a lot of confusion down the
                 // line - we need to get the user's attention
                 Environment.Exit(1);
             }
 
+            scene.loadAllLandObjectsFromStorage(regionInfo.originRegionID);
+            scene.EventManager.TriggerParcelPrimCountUpdate();
+
             // We need to do this after we've initialized the
             // scripting engines.
             scene.CreateScriptInstances();
-
-            scene.loadAllLandObjectsFromStorage(regionInfo.originRegionID);
-            scene.EventManager.TriggerParcelPrimCountUpdate();
 
             m_sceneManager.Add(scene);
 
@@ -573,7 +555,7 @@ namespace OpenSim
 
             regionInfo.InternalEndPoint.Port = (int) port;
 
-            Scene scene = CreateScene(regionInfo, m_storageManager, circuitManager);
+            Scene scene = CreateScene(regionInfo, m_simulationDataService, m_estateDataService, circuitManager);
 
             if (m_autoCreateClientStack)
             {
@@ -586,47 +568,7 @@ namespace OpenSim
             scene.PhysicsScene.SetTerrain(scene.Heightmap.GetFloatsSerialised());
             scene.PhysicsScene.SetWaterLevel((float) regionInfo.RegionSettings.WaterHeight);
 
-            // TODO: Remove this cruft once MasterAvatar is fully deprecated
-            //Master Avatar Setup
-            UserProfileData masterAvatar;
-            if (scene.RegionInfo.MasterAvatarAssignedUUID == UUID.Zero)
-            {
-                masterAvatar =
-                    m_commsManager.UserService.SetupMasterUser(scene.RegionInfo.MasterAvatarFirstName,
-                                                               scene.RegionInfo.MasterAvatarLastName,
-                                                               scene.RegionInfo.MasterAvatarSandboxPassword);
-            }
-            else
-            {
-                masterAvatar = m_commsManager.UserService.SetupMasterUser(scene.RegionInfo.MasterAvatarAssignedUUID);
-                scene.RegionInfo.MasterAvatarFirstName = masterAvatar.FirstName;
-                scene.RegionInfo.MasterAvatarLastName = masterAvatar.SurName;
-            }
-
-            if (masterAvatar == null)
-            {
-                m_log.Info("[PARCEL]: No master avatar found, using null.");
-                scene.RegionInfo.MasterAvatarAssignedUUID = UUID.Zero;
-            }
-            else
-            {
-                m_log.InfoFormat("[PARCEL]: Found master avatar {0} {1} [" + masterAvatar.ID.ToString() + "]",
-                                 scene.RegionInfo.MasterAvatarFirstName, scene.RegionInfo.MasterAvatarLastName);
-                scene.RegionInfo.MasterAvatarAssignedUUID = masterAvatar.ID;
-            }
-
             return scene;
-        }
-
-        protected override StorageManager CreateStorageManager()
-        {
-            return
-                CreateStorageManager(m_configSettings.StorageConnectionString, m_configSettings.EstateConnectionString);
-        }
-
-        protected StorageManager CreateStorageManager(string connectionstring, string estateconnectionstring)
-        {
-            return new StorageManager(m_configSettings.StorageDll, connectionstring, estateconnectionstring);
         }
 
         protected override ClientStackManager CreateClientStackManager()
@@ -634,19 +576,14 @@ namespace OpenSim
             return new ClientStackManager(m_configSettings.ClientstackDll);
         }
 
-        protected override Scene CreateScene(RegionInfo regionInfo, StorageManager storageManager,
-                                             AgentCircuitManager circuitManager)
+        protected override Scene CreateScene(RegionInfo regionInfo, ISimulationDataService simDataService,
+            IEstateDataService estateDataService, AgentCircuitManager circuitManager)
         {
-            bool hgrid = ConfigSource.Source.Configs["Startup"].GetBoolean("hypergrid", false);
-            if (hgrid)
-                return HGCommands.CreateScene(regionInfo, circuitManager, m_commsManager, 
-                storageManager, m_moduleLoader, m_configSettings, m_config, m_version);
-
-            SceneCommunicationService sceneGridService = new SceneCommunicationService(m_commsManager);
+            SceneCommunicationService sceneGridService = new SceneCommunicationService();
 
             return new Scene(
-                regionInfo, circuitManager, m_commsManager, sceneGridService,
-                storageManager, m_moduleLoader, false, m_configSettings.PhysicalPrim,
+                regionInfo, circuitManager, sceneGridService,
+                simDataService, estateDataService, m_moduleLoader, false, m_configSettings.PhysicalPrim,
                 m_configSettings.See_into_region_from_neighbor, m_config.Source, m_version);
         }
         
@@ -854,8 +791,114 @@ namespace OpenSim
         {
             regionnum = m_sceneManager.Scenes.Count;
         }
-    }
+        
+        /// <summary>
+        /// Create an estate with an initial region.
+        /// </summary>
+        /// <remarks>
+        /// This method doesn't allow an estate to be created with the same name as existing estates.
+        /// </remarks>
+        /// <param name="regInfo"></param>
+        /// <param name="existingName">A list of estate names that already exist.</param>
+        /// <returns>true if the estate was created, false otherwise</returns>
+        public bool CreateEstate(RegionInfo regInfo, List<string> existingNames)
+        {
+            // Create a new estate
+            regInfo.EstateSettings = EstateDataService.LoadEstateSettings(regInfo.RegionID, true);
+            string newName = MainConsole.Instance.CmdPrompt("New estate name", regInfo.EstateSettings.EstateName);
 
+            if (existingNames.Contains(newName))
+            {
+                MainConsole.Instance.OutputFormat("An estate named {0} already exists.  Please try again.", newName);
+                return false;
+            }
+            
+            regInfo.EstateSettings.EstateName = newName;
+            
+            // FIXME: Later on, the scene constructor will reload the estate settings no matter what.
+            // Therefore, we need to do an initial save here otherwise the new estate name will be reset
+            // back to the default.  The reloading of estate settings by scene could be eliminated if it
+            // knows that the passed in settings in RegionInfo are already valid.  Also, it might be 
+            // possible to eliminate some additional later saves made by callers of this method.
+            regInfo.EstateSettings.Save();   
+            
+            return true;
+        }
+        
+        /// <summary>
+        /// Load the estate information for the provided RegionInfo object.
+        /// </summary>
+        /// <param name="regInfo"></param>
+        public void PopulateRegionEstateInfo(RegionInfo regInfo)
+        {
+            if (EstateDataService != null)
+                regInfo.EstateSettings = EstateDataService.LoadEstateSettings(regInfo.RegionID, false);
+
+            if (regInfo.EstateSettings.EstateID == 0) // No record at all
+            {
+                MainConsole.Instance.OutputFormat("Region {0} is not part of an estate.", regInfo.RegionName);
+                
+                List<EstateSettings> estates = EstateDataService.LoadEstateSettingsAll();                
+                List<string> estateNames = new List<string>();
+                foreach (EstateSettings estate in estates)
+                    estateNames.Add(estate.EstateName);                
+                
+                while (true)
+                {
+                    if (estates.Count == 0)
+                    {                        
+                        MainConsole.Instance.Output("No existing estates found.  You must create a new one.");
+                        
+                        if (CreateEstate(regInfo, estateNames))
+                            break;                        
+                        else
+                            continue;
+                    }
+                    else
+                    {
+                        string response 
+                            = MainConsole.Instance.CmdPrompt(
+                                string.Format(
+                                    "Do you wish to join region {0} to an existing estate (yes/no)?", regInfo.RegionName), 
+                                    "yes", 
+                                    new List<string>() { "yes", "no" });
+                        
+                        if (response == "no")
+                        {
+                            if (CreateEstate(regInfo, estateNames))                            
+                                break;
+                            else
+                                continue;
+                        }
+                        else
+                        {                           
+                            response 
+                                = MainConsole.Instance.CmdPrompt(
+                                    string.Format(
+                                        "Name of estate to join.  Existing estate names are ({0})", string.Join(", ", estateNames.ToArray())), 
+                                    estateNames[0]);
+    
+                            List<int> estateIDs = EstateDataService.GetEstates(response);
+                            if (estateIDs.Count < 1)
+                            {
+                                MainConsole.Instance.Output("The name you have entered matches no known estate.  Please try again.");
+                                continue;
+                            }
+    
+                            int estateID = estateIDs[0];
+    
+                            regInfo.EstateSettings = EstateDataService.LoadEstateSettings(estateID);
+    
+                            if (EstateDataService.LinkRegion(regInfo.RegionID, estateID))
+                                break;
+    
+                            MainConsole.Instance.Output("Joining the estate failed. Please try again.");
+                        }
+                    }
+                }
+            }
+        }
+    }
     
     public class OpenSimConfigSource
     {

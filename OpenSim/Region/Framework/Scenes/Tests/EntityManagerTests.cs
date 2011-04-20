@@ -32,7 +32,6 @@ using System.Text;
 using System.Collections.Generic;
 using Nini.Config;
 using NUnit.Framework;
-using NUnit.Framework.SyntaxHelpers;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Communications;
@@ -53,7 +52,6 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         public void T010_AddObjects()
         {
             TestHelper.InMethod();
-            // Console.WriteLine("Beginning test {0}", MethodBase.GetCurrentMethod());
             
             random = new Random();
             SceneObjectGroup found;
@@ -89,7 +87,6 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         public void T011_ThreadAddRemoveTest()
         {
             TestHelper.InMethod();
-            // Console.WriteLine("Beginning test {0}", MethodBase.GetCurrentMethod());
             
             // This test adds and removes with mutiple threads, attempting to break the 
             // uuid and localid dictionary coherence.
@@ -134,7 +131,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             sop.Text = RandomName();
             sop.SitName = RandomName();
             sop.TouchName = RandomName();
-            sop.ObjectFlags |= (uint)PrimFlags.Phantom;
+            sop.Flags |= PrimFlags.Phantom;
 
             SceneObjectGroup sog = new SceneObjectGroup(sop);
             scene.AddNewSceneObject(sog, false);

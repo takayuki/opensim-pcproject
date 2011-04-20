@@ -30,7 +30,7 @@ using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
-using OpenSim.Framework.Communications.Cache;
+
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
@@ -69,7 +69,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Gestures
             item = invService.GetItem(item);
             if (item != null)
             {
-                item.Flags = 1;
+                item.Flags |= 1;
                 invService.UpdateItem(item);
             }
             else 
@@ -85,7 +85,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Gestures
             item = invService.GetItem(item);
             if (item != null)
             {
-                item.Flags = 0;
+                item.Flags &= ~(uint)1;
                 invService.UpdateItem(item);
             }
             else 

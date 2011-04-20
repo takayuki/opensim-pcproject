@@ -29,6 +29,9 @@ namespace OpenSim.Region.Framework.Interfaces
 {
     public interface IWorldMapModule
     {
-        void LazySaveGeneratedMaptile(byte[] data, bool temporary);
+        /// <summary>
+        /// Generate a map tile for the scene. a terrain texture for this scene
+        /// </summary>
+        void GenerateMaptile();
     }
 }

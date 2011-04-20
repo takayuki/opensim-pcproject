@@ -27,23 +27,24 @@
 
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Xml;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
+using OpenSim.Services.Interfaces;
 
 namespace OpenSim.ApplicationPlugins.Rest.Inventory
 {
 
     public class RestAppearanceServices : IRest
     {
-
-        private static readonly int PARM_USERID = 0;
+//        private static readonly int PARM_USERID = 0;
 
         // private static readonly int PARM_PATH   = 1;
 
-        private bool       enabled = false;
+//        private bool       enabled = false;
         private string     qPrefix = "appearance";
 
         /// <summary>
@@ -63,6 +64,7 @@ namespace OpenSim.ApplicationPlugins.Rest.Inventory
             {
                 Rest.Log.InfoFormat("{0} Domain is relative, adding absolute prefix", MsgId);
                 qPrefix = String.Format("{0}{1}{2}", Rest.Prefix, Rest.UrlPathSeparator, qPrefix);
+                qPrefix = String.Format("{0}{1}{2}", Rest.Prefix, Rest.UrlPathSeparator, qPrefix);
                 Rest.Log.InfoFormat("{0} Domain is now <{1}>", MsgId, qPrefix);
             }
 
@@ -72,7 +74,7 @@ namespace OpenSim.ApplicationPlugins.Rest.Inventory
 
             // Activate if everything went OK
 
-            enabled = true;
+//            enabled = true;
 
             Rest.Log.InfoFormat("{0} User appearance services initialization complete", MsgId);
         }
@@ -93,7 +95,7 @@ namespace OpenSim.ApplicationPlugins.Rest.Inventory
 
         public void Close()
         {
-            enabled = false;
+//            enabled = false;
             Rest.Log.InfoFormat("{0} User appearance services closing down", MsgId);
         }
 
@@ -135,152 +137,153 @@ namespace OpenSim.ApplicationPlugins.Rest.Inventory
 
         private void DoAppearance(RequestData hdata)
         {
+            // !!! REFACTORIMG PROBLEM. This needs rewriting for 0.7
 
-            AppearanceRequestData rdata = (AppearanceRequestData) hdata;
+            //AppearanceRequestData rdata = (AppearanceRequestData) hdata;
 
-            Rest.Log.DebugFormat("{0} DoAppearance ENTRY", MsgId);
+            //Rest.Log.DebugFormat("{0} DoAppearance ENTRY", MsgId);
 
-            // If we're disabled, do nothing.
+            //// If we're disabled, do nothing.
 
-            if (!enabled)
-            {
-                return;
-            }
+            //if (!enabled)
+            //{
+            //    return;
+            //}
 
-            // Now that we know this is a serious attempt to
-            // access inventory data, we should find out who
-            // is asking, and make sure they are authorized
-            // to do so. We need to validate the caller's
-            // identity before revealing anything about the
-            // status quo. Authenticate throws an exception
-            // via Fail if no identity information is present.
-            //
-            // With the present HTTP server we can't use the
-            // builtin authentication mechanisms because they
-            // would be enforced for all in-bound requests.
-            // Instead we look at the headers ourselves and
-            // handle authentication directly.
+            //// Now that we know this is a serious attempt to
+            //// access inventory data, we should find out who
+            //// is asking, and make sure they are authorized
+            //// to do so. We need to validate the caller's
+            //// identity before revealing anything about the
+            //// status quo. Authenticate throws an exception
+            //// via Fail if no identity information is present.
+            ////
+            //// With the present HTTP server we can't use the
+            //// builtin authentication mechanisms because they
+            //// would be enforced for all in-bound requests.
+            //// Instead we look at the headers ourselves and
+            //// handle authentication directly.
 
-            try
-            {
-                if (!rdata.IsAuthenticated)
-                {
-                    rdata.Fail(Rest.HttpStatusCodeNotAuthorized,String.Format("user \"{0}\" could not be authenticated", rdata.userName));
-                }
-            }
-            catch (RestException e)
-            {
-                if (e.statusCode == Rest.HttpStatusCodeNotAuthorized)
-                {
-                    Rest.Log.WarnFormat("{0} User not authenticated", MsgId);
-                    Rest.Log.DebugFormat("{0} Authorization header: {1}", MsgId, rdata.request.Headers.Get("Authorization"));
-                }
-                else
-                {
-                    Rest.Log.ErrorFormat("{0} User authentication failed", MsgId);
-                    Rest.Log.DebugFormat("{0} Authorization header: {1}", MsgId, rdata.request.Headers.Get("Authorization"));
-                }
-                throw (e);
-            }
+            //try
+            //{
+            //    if (!rdata.IsAuthenticated)
+            //    {
+            //        rdata.Fail(Rest.HttpStatusCodeNotAuthorized,String.Format("user \"{0}\" could not be authenticated", rdata.userName));
+            //    }
+            //}
+            //catch (RestException e)
+            //{
+            //    if (e.statusCode == Rest.HttpStatusCodeNotAuthorized)
+            //    {
+            //        Rest.Log.WarnFormat("{0} User not authenticated", MsgId);
+            //        Rest.Log.DebugFormat("{0} Authorization header: {1}", MsgId, rdata.request.Headers.Get("Authorization"));
+            //    }
+            //    else
+            //    {
+            //        Rest.Log.ErrorFormat("{0} User authentication failed", MsgId);
+            //        Rest.Log.DebugFormat("{0} Authorization header: {1}", MsgId, rdata.request.Headers.Get("Authorization"));
+            //    }
+            //    throw (e);
+            //}
 
-            Rest.Log.DebugFormat("{0} Authenticated {1}", MsgId, rdata.userName);
+            //Rest.Log.DebugFormat("{0} Authenticated {1}", MsgId, rdata.userName);
 
-            // We can only get here if we are authorized
-            //
-            // The requestor may have specified an UUID or
-            // a conjoined FirstName LastName string. We'll
-            // try both. If we fail with the first, UUID,
-            // attempt, we try the other. As an example, the
-            // URI for a valid inventory request might be:
-            //
-            // http://<host>:<port>/admin/inventory/Arthur Dent
-            //
-            // Indicating that this is an inventory request for
-            // an avatar named Arthur Dent. This is ALL that is
-            // required to designate a GET for an entire
-            // inventory.
-            //
+            //// We can only get here if we are authorized
+            ////
+            //// The requestor may have specified an UUID or
+            //// a conjoined FirstName LastName string. We'll
+            //// try both. If we fail with the first, UUID,
+            //// attempt, we try the other. As an example, the
+            //// URI for a valid inventory request might be:
+            ////
+            //// http://<host>:<port>/admin/inventory/Arthur Dent
+            ////
+            //// Indicating that this is an inventory request for
+            //// an avatar named Arthur Dent. This is ALL that is
+            //// required to designate a GET for an entire
+            //// inventory.
+            ////
 
-            // Do we have at least a user agent name?
+            //// Do we have at least a user agent name?
 
-            if (rdata.Parameters.Length < 1)
-            {
-                Rest.Log.WarnFormat("{0} Appearance: No user agent identifier specified", MsgId);
-                rdata.Fail(Rest.HttpStatusCodeBadRequest, "no user identity specified");
-            }
+            //if (rdata.Parameters.Length < 1)
+            //{
+            //    Rest.Log.WarnFormat("{0} Appearance: No user agent identifier specified", MsgId);
+            //    rdata.Fail(Rest.HttpStatusCodeBadRequest, "no user identity specified");
+            //}
 
-            // The first parameter MUST be the agent identification, either an UUID
-            // or a space-separated First-name Last-Name specification. We check for
-            // an UUID first, if anyone names their character using a valid UUID
-            // that identifies another existing avatar will cause this a problem...
+            //// The first parameter MUST be the agent identification, either an UUID
+            //// or a space-separated First-name Last-Name specification. We check for
+            //// an UUID first, if anyone names their character using a valid UUID
+            //// that identifies another existing avatar will cause this a problem...
 
-            try
-            {
-                rdata.uuid = new UUID(rdata.Parameters[PARM_USERID]);
-                Rest.Log.DebugFormat("{0} UUID supplied", MsgId);
-                rdata.userProfile = Rest.UserServices.GetUserProfile(rdata.uuid);
-            }
-            catch
-            {
-                string[] names = rdata.Parameters[PARM_USERID].Split(Rest.CA_SPACE);
-                if (names.Length == 2)
-                {
-                    Rest.Log.DebugFormat("{0} Agent Name supplied [2]", MsgId);
-                    rdata.userProfile = Rest.UserServices.GetUserProfile(names[0],names[1]);
-                }
-                else
-                {
-                    Rest.Log.WarnFormat("{0} A Valid UUID or both first and last names must be specified", MsgId);
-                    rdata.Fail(Rest.HttpStatusCodeBadRequest, "invalid user identity");
-                }
-            }
+            //try
+            //{
+            //    rdata.uuid = new UUID(rdata.Parameters[PARM_USERID]);
+            //    Rest.Log.DebugFormat("{0} UUID supplied", MsgId);
+            //    rdata.userProfile = Rest.UserServices.GetUserProfile(rdata.uuid);
+            //}
+            //catch
+            //{
+            //    string[] names = rdata.Parameters[PARM_USERID].Split(Rest.CA_SPACE);
+            //    if (names.Length == 2)
+            //    {
+            //        Rest.Log.DebugFormat("{0} Agent Name supplied [2]", MsgId);
+            //        rdata.userProfile = Rest.UserServices.GetUserProfile(names[0],names[1]);
+            //    }
+            //    else
+            //    {
+            //        Rest.Log.WarnFormat("{0} A Valid UUID or both first and last names must be specified", MsgId);
+            //        rdata.Fail(Rest.HttpStatusCodeBadRequest, "invalid user identity");
+            //    }
+            //}
 
-            // If the user profile is null then either the server is broken, or the
-            // user is not known. We always assume the latter case.
+            //// If the user profile is null then either the server is broken, or the
+            //// user is not known. We always assume the latter case.
 
-            if (rdata.userProfile != null)
-            {
-                Rest.Log.DebugFormat("{0} User profile obtained for agent {1} {2}",
-                                     MsgId, rdata.userProfile.FirstName, rdata.userProfile.SurName);
-            }
-            else
-            {
-                Rest.Log.WarnFormat("{0} No user profile for {1}", MsgId, rdata.path);
-                rdata.Fail(Rest.HttpStatusCodeNotFound, "unrecognized user identity");
-            }
+            //if (rdata.userProfile != null)
+            //{
+            //    Rest.Log.DebugFormat("{0} User profile obtained for agent {1} {2}",
+            //                         MsgId, rdata.userProfile.FirstName, rdata.userProfile.SurName);
+            //}
+            //else
+            //{
+            //    Rest.Log.WarnFormat("{0} No user profile for {1}", MsgId, rdata.path);
+            //    rdata.Fail(Rest.HttpStatusCodeNotFound, "unrecognized user identity");
+            //}
 
-            // If we get to here, then we have effectively validated the user's
+            //// If we get to here, then we have effectively validated the user's
 
-            switch (rdata.method)
-            {
-                case Rest.HEAD   : // Do the processing, set the status code, suppress entity
-                    DoGet(rdata);
-                    rdata.buffer = null;
-                    break;
+            //switch (rdata.method)
+            //{
+            //    case Rest.HEAD   : // Do the processing, set the status code, suppress entity
+            //        DoGet(rdata);
+            //        rdata.buffer = null;
+            //        break;
 
-                case Rest.GET    : // Do the processing, set the status code, return entity
-                    DoGet(rdata);
-                    break;
+            //    case Rest.GET    : // Do the processing, set the status code, return entity
+            //        DoGet(rdata);
+            //        break;
 
-                case Rest.PUT    : // Update named element
-                    DoUpdate(rdata);
-                    break;
+            //    case Rest.PUT    : // Update named element
+            //        DoUpdate(rdata);
+            //        break;
 
-                case Rest.POST   : // Add new information to identified context.
-                    DoExtend(rdata);
-                    break;
+            //    case Rest.POST   : // Add new information to identified context.
+            //        DoExtend(rdata);
+            //        break;
 
-                case Rest.DELETE : // Delete information
-                    DoDelete(rdata);
-                    break;
+            //    case Rest.DELETE : // Delete information
+            //        DoDelete(rdata);
+            //        break;
 
-                default :
-                    Rest.Log.WarnFormat("{0} Method {1} not supported for {2}",
-                                         MsgId, rdata.method, rdata.path);
-                    rdata.Fail(Rest.HttpStatusCodeMethodNotAllowed, 
-                               String.Format("{0} not supported", rdata.method));
-                    break;
-            }
+            //    default :
+            //        Rest.Log.WarnFormat("{0} Method {1} not supported for {2}",
+            //                             MsgId, rdata.method, rdata.path);
+            //        rdata.Fail(Rest.HttpStatusCodeMethodNotAllowed, 
+            //                   String.Format("{0} not supported", rdata.method));
+            //        break;
+            //}
         }
 
         #endregion Interface
@@ -292,31 +295,31 @@ namespace OpenSim.ApplicationPlugins.Rest.Inventory
         /// </summary>
         /// <param name=rdata>HTTP service request work area</param>
 
-        private void DoGet(AppearanceRequestData rdata)
-        {
-
-            rdata.userAppearance = Rest.AvatarServices.GetUserAppearance(rdata.userProfile.ID);
-
-            if (rdata.userAppearance == null)
-            {
-                rdata.Fail(Rest.HttpStatusCodeNoContent,
-                    String.Format("appearance data not found for user {0} {1}", 
-                      rdata.userProfile.FirstName, rdata.userProfile.SurName));
-            }
-
-            rdata.initXmlWriter();
-
-            FormatUserAppearance(rdata);
-
-            // Indicate a successful request
-
-            rdata.Complete();
-
-            // Send the response to the user. The body will be implicitly
-            // constructed from the result of the XML writer.
-
-            rdata.Respond(String.Format("Appearance {0} Normal completion", rdata.method));
-        }
+//        private void DoGet(AppearanceRequestData rdata)
+//        {
+//            AvatarData adata = Rest.AvatarServices.GetAvatar(rdata.userProfile.ID);
+//
+//            if (adata == null)
+//            {
+//                rdata.Fail(Rest.HttpStatusCodeNoContent,
+//                    String.Format("appearance data not found for user {0} {1}", 
+//                      rdata.userProfile.FirstName, rdata.userProfile.SurName));
+//            }
+//            rdata.userAppearance = adata.ToAvatarAppearance(rdata.userProfile.ID);
+//
+//            rdata.initXmlWriter();
+//
+//            FormatUserAppearance(rdata);
+//
+//            // Indicate a successful request
+//
+//            rdata.Complete();
+//
+//            // Send the response to the user. The body will be implicitly
+//            // constructed from the result of the XML writer.
+//
+//            rdata.Respond(String.Format("Appearance {0} Normal completion", rdata.method));
+//        }
 
         /// <summary>
         /// POST adds NEW information to the user profile database.
@@ -324,108 +327,112 @@ namespace OpenSim.ApplicationPlugins.Rest.Inventory
         /// characteristics supplied in the request.
         /// </summary>
 
-        private void DoExtend(AppearanceRequestData rdata)
-        {
-
-            bool  created  = false;
-            bool  modified = false;
-            string newnode = String.Empty;
-
-            Rest.Log.DebugFormat("{0} POST ENTRY", MsgId);
-
-            //AvatarAppearance old = Rest.AvatarServices.GetUserAppearance(rdata.userProfile.ID);
-
-            rdata.userAppearance = new AvatarAppearance();
-
-            //  Although the following behavior is admitted by HTTP I am becoming 
-            //  increasingly doubtful that it is appropriate for REST. If I attempt to
-            //  add a new record, and it already exists, then it seems to me that the
-            //  attempt should fail, rather than update the existing record.
-
-            if (GetUserAppearance(rdata))
-            {
-                modified = rdata.userAppearance != null;
-                created  = !modified;
-                Rest.AvatarServices.UpdateUserAppearance(rdata.userProfile.ID, rdata.userAppearance);
-            //    Rest.UserServices.UpdateUserProfile(rdata.userProfile);
-            }
-            else
-            {
-                created  = true;
-                Rest.AvatarServices.UpdateUserAppearance(rdata.userProfile.ID, rdata.userAppearance);
-             //   Rest.UserServices.UpdateUserProfile(rdata.userProfile);
-            }
-
-            if (created)
-            {
-                newnode = String.Format("{0} {1}", rdata.userProfile.FirstName,
-                                   rdata.userProfile.SurName);
-                // Must include a location header with a URI that identifies the new resource.
-
-                rdata.AddHeader(Rest.HttpHeaderLocation,String.Format("http://{0}{1}:{2}{3}{4}",
-                         rdata.hostname,rdata.port,rdata.path,Rest.UrlPathSeparator, newnode));
-                rdata.Complete(Rest.HttpStatusCodeCreated);
-
-            }
-            else
-            {
-                if (modified)
-                {
-                    rdata.Complete(Rest.HttpStatusCodeOK);
-                }
-                else
-                {
-                    rdata.Complete(Rest.HttpStatusCodeNoContent);
-                }
-            }
-
-            rdata.Respond(String.Format("Appearance {0} : Normal completion", rdata.method));
-            
-        }
+//        private void DoExtend(AppearanceRequestData rdata)
+//        {
+//
+//            bool  created  = false;
+//            bool  modified = false;
+//            string newnode = String.Empty;
+//
+//            Rest.Log.DebugFormat("{0} POST ENTRY", MsgId);
+//
+//            //AvatarAppearance old = Rest.AvatarServices.GetUserAppearance(rdata.userProfile.ID);
+//
+//            rdata.userAppearance = new AvatarAppearance();
+//
+//            //  Although the following behavior is admitted by HTTP I am becoming 
+//            //  increasingly doubtful that it is appropriate for REST. If I attempt to
+//            //  add a new record, and it already exists, then it seems to me that the
+//            //  attempt should fail, rather than update the existing record.
+//            AvatarData adata = null;
+//            if (GetUserAppearance(rdata))
+//            {
+//                modified = rdata.userAppearance != null;
+//                created  = !modified;
+//                adata = new AvatarData(rdata.userAppearance);
+//                Rest.AvatarServices.SetAvatar(rdata.userProfile.ID, adata);
+//            //    Rest.UserServices.UpdateUserProfile(rdata.userProfile);
+//            }
+//            else
+//            {
+//                created  = true;
+//                adata = new AvatarData(rdata.userAppearance);
+//                Rest.AvatarServices.SetAvatar(rdata.userProfile.ID, adata);
+//             //   Rest.UserServices.UpdateUserProfile(rdata.userProfile);
+//            }
+//
+//            if (created)
+//            {
+//                newnode = String.Format("{0} {1}", rdata.userProfile.FirstName,
+//                                   rdata.userProfile.SurName);
+//                // Must include a location header with a URI that identifies the new resource.
+//
+//                rdata.AddHeader(Rest.HttpHeaderLocation,String.Format("http://{0}{1}:{2}{3}{4}",
+//                         rdata.hostname,rdata.port,rdata.path,Rest.UrlPathSeparator, newnode));
+//                rdata.Complete(Rest.HttpStatusCodeCreated);
+//
+//            }
+//            else
+//            {
+//                if (modified)
+//                {
+//                    rdata.Complete(Rest.HttpStatusCodeOK);
+//                }
+//                else
+//                {
+//                    rdata.Complete(Rest.HttpStatusCodeNoContent);
+//                }
+//            }
+//
+//            rdata.Respond(String.Format("Appearance {0} : Normal completion", rdata.method));
+//
+//        }
 
         /// <summary>
         /// This updates the user's appearance. not all aspects need to be provided,
         /// only those supplied will be changed.
         /// </summary>
 
-        private void DoUpdate(AppearanceRequestData rdata)
-        {
-
-            bool  created  = false;
-            bool  modified = false;
-
-
-            rdata.userAppearance = Rest.AvatarServices.GetUserAppearance(rdata.userProfile.ID);
-
-            // If the user exists then this is considered a modification regardless
-            // of what may, or may not be, specified in the payload.
-
-            if (rdata.userAppearance != null)
-            {
-                modified = true;
-                Rest.AvatarServices.UpdateUserAppearance(rdata.userProfile.ID, rdata.userAppearance);
-                Rest.UserServices.UpdateUserProfile(rdata.userProfile);
-            }
-
-            if (created)
-            {
-                rdata.Complete(Rest.HttpStatusCodeCreated);
-            }
-            else
-            {
-                if (modified)
-                {
-                    rdata.Complete(Rest.HttpStatusCodeOK);
-                }
-                else
-                {
-                    rdata.Complete(Rest.HttpStatusCodeNoContent);
-                }
-            }
-
-            rdata.Respond(String.Format("Appearance {0} : Normal completion", rdata.method));
-
-        }
+//        private void DoUpdate(AppearanceRequestData rdata)
+//        {
+//
+//            // REFACTORING PROBLEM This was commented out. It doesn't work for 0.7
+//
+//            //bool  created  = false;
+//            //bool  modified = false;
+//
+//
+//            //rdata.userAppearance = Rest.AvatarServices.GetUserAppearance(rdata.userProfile.ID);
+//
+//            //// If the user exists then this is considered a modification regardless
+//            //// of what may, or may not be, specified in the payload.
+//
+//            //if (rdata.userAppearance != null)
+//            //{
+//            //    modified = true;
+//            //    Rest.AvatarServices.UpdateUserAppearance(rdata.userProfile.ID, rdata.userAppearance);
+//            //    Rest.UserServices.UpdateUserProfile(rdata.userProfile);
+//            //}
+//
+//            //if (created)
+//            //{
+//            //    rdata.Complete(Rest.HttpStatusCodeCreated);
+//            //}
+//            //else
+//            //{
+//            //    if (modified)
+//            //    {
+//            //        rdata.Complete(Rest.HttpStatusCodeOK);
+//            //    }
+//            //    else
+//            //    {
+//            //        rdata.Complete(Rest.HttpStatusCodeNoContent);
+//            //    }
+//            //}
+//
+//            rdata.Respond(String.Format("Appearance {0} : Normal completion", rdata.method));
+//
+//        }
 
         /// <summary>
         /// Delete the specified user's appearance. This actually performs a reset
@@ -433,30 +440,29 @@ namespace OpenSim.ApplicationPlugins.Rest.Inventory
         /// Existing ownership is preserved. All prior updates are lost and can not
         /// be recovered.
         /// </summary>
-
-        private void DoDelete(AppearanceRequestData rdata)
-        {
-
-            AvatarAppearance old = Rest.AvatarServices.GetUserAppearance(rdata.userProfile.ID);
-
-            if (old != null)
-            {
-                rdata.userAppearance = new AvatarAppearance();
-
-                rdata.userAppearance.Owner = old.Owner;
-                
-                Rest.AvatarServices.UpdateUserAppearance(rdata.userProfile.ID, rdata.userAppearance);
-
-                rdata.Complete();
-            }
-            else
-            {
-                rdata.Complete(Rest.HttpStatusCodeNoContent);
-            }
-
-            rdata.Respond(String.Format("Appearance {0} : Normal completion", rdata.method));
-
-        }
+//        private void DoDelete(AppearanceRequestData rdata)
+//        {
+//            AvatarData adata = Rest.AvatarServices.GetAvatar(rdata.userProfile.ID);
+//
+//            if (adata != null)
+//            {
+//                AvatarAppearance old = adata.ToAvatarAppearance(rdata.userProfile.ID);
+//                rdata.userAppearance = new AvatarAppearance();
+//                rdata.userAppearance.Owner = old.Owner;
+//                adata = new AvatarData(rdata.userAppearance);
+//
+//                Rest.AvatarServices.SetAvatar(rdata.userProfile.ID, adata);
+//
+//                rdata.Complete();
+//            }
+//            else
+//            {
+//
+//                rdata.Complete(Rest.HttpStatusCodeNoContent);
+//            }
+//
+//            rdata.Respond(String.Format("Appearance {0} : Normal completion", rdata.method));
+//        }
 
 #endregion method-specific processing
 
@@ -493,6 +499,7 @@ namespace OpenSim.ApplicationPlugins.Rest.Inventory
                                     indata = true;
                                 }
                             break;
+/*
                             case "Body" :
                                 if (xml.MoveToAttribute("Item"))
                                 {
@@ -649,6 +656,7 @@ namespace OpenSim.ApplicationPlugins.Rest.Inventory
                                     indata = true;
                                 }
                             break;
+*/
                             case "Attachment" :
                                 {
 
@@ -743,6 +751,7 @@ namespace OpenSim.ApplicationPlugins.Rest.Inventory
                     rdata.writer.WriteAttributeString("Owner", rdata.userAppearance.Owner.ToString());
                 rdata.writer.WriteAttributeString("Serial", rdata.userAppearance.Serial.ToString());
 
+/*
                 FormatPart(rdata, "Body", rdata.userAppearance.BodyItem, rdata.userAppearance.BodyAsset);
                 FormatPart(rdata, "Skin", rdata.userAppearance.SkinItem, rdata.userAppearance.SkinAsset);
                 FormatPart(rdata, "Hair", rdata.userAppearance.HairItem, rdata.userAppearance.HairAsset);
@@ -759,26 +768,20 @@ namespace OpenSim.ApplicationPlugins.Rest.Inventory
 
                 FormatPart(rdata, "UnderShirt", rdata.userAppearance.UnderShirtItem, rdata.userAppearance.UnderShirtAsset);
                 FormatPart(rdata, "UnderPants", rdata.userAppearance.UnderPantsItem, rdata.userAppearance.UnderPantsAsset);
+*/
+                Rest.Log.DebugFormat("{0} FormatUserAppearance: Formatting attachments", MsgId);
 
-                Hashtable attachments = rdata.userAppearance.GetAttachments();
-
-                if (attachments != null)
+                rdata.writer.WriteStartElement("Attachments");
+                List<AvatarAttachment> attachments = rdata.userAppearance.GetAttachments();
+                foreach (AvatarAttachment attach in attachments)
                 {
-
-                    Rest.Log.DebugFormat("{0} FormatUserAppearance: Formatting attachments", MsgId);
-
-                    rdata.writer.WriteStartElement("Attachments");
-                    for (int i = 0; i < attachments.Count; i++)
-                    {
-                        Hashtable attachment = attachments[i] as Hashtable;
-                        rdata.writer.WriteStartElement("Attachment");
-                        rdata.writer.WriteAttributeString("AtPoint", i.ToString());
-                        rdata.writer.WriteAttributeString("Item", (string) attachment["item"]);
-                        rdata.writer.WriteAttributeString("Asset", (string) attachment["asset"]);
-                        rdata.writer.WriteEndElement();
-                    }
+                    rdata.writer.WriteStartElement("Attachment");
+                    rdata.writer.WriteAttributeString("AtPoint", attach.AttachPoint.ToString());
+                    rdata.writer.WriteAttributeString("Item", attach.ItemID.ToString());
+                    rdata.writer.WriteAttributeString("Asset", attach.AssetID.ToString());
                     rdata.writer.WriteEndElement();
                 }
+                rdata.writer.WriteEndElement();
 
                 Primitive.TextureEntry texture = rdata.userAppearance.Texture;
 

@@ -32,13 +32,11 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
 using NUnit.Framework;
-using NUnit.Framework.SyntaxHelpers;
 using OpenMetaverse;
 using OpenSim.Framework;
 
 namespace OpenSim.Data.Tests
 {
-
     //This is generic so that the lambda expressions will work right in IDEs.
     public class PropertyScrambler<T>
     {
@@ -165,7 +163,7 @@ namespace OpenSim.Data.Tests
         [Test]
         public void TestScramble()
         {
-            AssetBase actual = new AssetBase(UUID.Random(), "asset one", (sbyte)AssetType.Texture);
+            AssetBase actual = new AssetBase(UUID.Random(), "asset one", (sbyte)AssetType.Texture, UUID.Zero.ToString());
             new PropertyScrambler<AssetBase>().Scramble(actual);
         }
 
@@ -173,7 +171,7 @@ namespace OpenSim.Data.Tests
         public void DontScramble()
         {
             UUID uuid = UUID.Random();
-            AssetBase asset = new AssetBase(uuid, "asset", (sbyte)AssetType.Texture);
+            AssetBase asset = new AssetBase(uuid, "asset", (sbyte)AssetType.Texture, UUID.Zero.ToString());
             new PropertyScrambler<AssetBase>()
                 .DontScramble(x => x.Metadata)
                 .DontScramble(x => x.FullID)

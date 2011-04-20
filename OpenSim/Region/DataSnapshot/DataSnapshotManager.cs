@@ -94,28 +94,16 @@ namespace OpenSim.Region.DataSnapshot
             if (!m_configLoaded) 
             {
                 m_configLoaded = true;
-                m_log.Info("[DATASNAPSHOT]: Loading configuration");
+                //m_log.Debug("[DATASNAPSHOT]: Loading configuration");
                 //Read from the config for options
                 lock (m_syncInit)
                 {
                     try
                     {
                         m_enabled = config.Configs["DataSnapshot"].GetBoolean("index_sims", m_enabled);
-                        if (config.Configs["Startup"].GetBoolean("gridmode", false))
-                        {
-                            m_gridinfo.Add(
-                                 "gridserverURL", 
-                                 config.Configs["Network"].GetString(
-                                     "grid_server_url", "http://127.0.0.1:" + ConfigSettings.DefaultGridServerHttpPort.ToString()));
-                            m_gridinfo.Add(
-                                 "userserverURL", 
-                                 config.Configs["Network"].GetString(
-                                 "user_server_url", "http://127.0.0.1:" + ConfigSettings.DefaultUserServerHttpPort.ToString()));
-                            m_gridinfo.Add(
-                                 "assetserverURL", 
-                                 config.Configs["Network"].GetString(
-                                 "asset_server_url", "http://127.0.0.1:" + ConfigSettings.DefaultAssetServerHttpPort.ToString()));
-                        }
+                        IConfig conf = config.Configs["GridService"];
+                        if (conf != null)
+                            m_gridinfo.Add("gridserverURL", conf.GetString("GridServerURI", "http://127.0.0.1:8003"));
 
                         m_gridinfo.Add(
                             "Name", config.Configs["DataSnapshot"].GetString("gridname", "the lost continent of hippo"));
@@ -135,7 +123,7 @@ namespace OpenSim.Region.DataSnapshot
                     }
                     catch (Exception)
                     {
-                        m_log.Info("[DATASNAPSHOT]: Could not load configuration. DataSnapshot will be disabled.");
+                        m_log.Warn("[DATASNAPSHOT]: Could not load configuration. DataSnapshot will be disabled.");
                         m_enabled = false;
                         return;
                     }
@@ -191,7 +179,7 @@ namespace OpenSim.Region.DataSnapshot
             }
             else
             {
-                m_log.Warn("[DATASNAPSHOT]: Data snapshot disabled, not adding scene to module (or anything else).");
+                //m_log.Debug("[DATASNAPSHOT]: Data snapshot disabled, not adding scene to module (or anything else).");
             }
         }
 

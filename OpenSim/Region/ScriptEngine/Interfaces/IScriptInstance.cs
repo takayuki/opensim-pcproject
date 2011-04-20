@@ -38,10 +38,12 @@ namespace OpenSim.Region.ScriptEngine.Interfaces
 {
     public enum StateSource
     {
-        NewRez = 0,
-        PrimCrossing = 1,
-        ScriptedRez = 2,
-        AttachedRez = 3
+        RegionStart = 0,
+        NewRez = 1,
+        PrimCrossing = 2,
+        ScriptedRez = 3,
+        AttachedRez = 4,
+        Teleporting = 5
     }
 
     public interface IScriptWorkItem
@@ -81,6 +83,9 @@ namespace OpenSim.Region.ScriptEngine.Interfaces
 
         void PostEvent(EventParams data);
         
+        void Suspend();
+        void Resume();
+
         /// <summary>
         /// Process the next event queued for this script
         /// </summary>

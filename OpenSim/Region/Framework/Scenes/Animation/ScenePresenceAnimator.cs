@@ -131,7 +131,7 @@ namespace OpenSim.Region.Framework.Scenes.Animation
                     anim, m_scenePresence.ControllingClient.NextAnimationSequenceNumber, m_scenePresence.UUID))
                 {
                     // 16384 is CHANGED_ANIMATION
-                    m_scenePresence.SendScriptEventToAttachments("changed", new Object[] { 16384 });
+                    m_scenePresence.SendScriptEventToAttachments("changed", new Object[] { (int)Changed.ANIMATION});
                     SendAnimPack();
                 }
             }
@@ -146,7 +146,10 @@ namespace OpenSim.Region.Framework.Scenes.Animation
             const float PREJUMP_DELAY = 0.25f;
 
             #region Inputs
-
+            if (m_scenePresence.SitGround)
+            {
+                return "SIT_GROUND_CONSTRAINED";
+            }
             AgentManager.ControlFlags controlFlags = (AgentManager.ControlFlags)m_scenePresence.AgentControlFlags;
             PhysicsActor actor = m_scenePresence.PhysicsActor;
 
@@ -156,7 +159,8 @@ namespace OpenSim.Region.Framework.Scenes.Animation
             Vector3 left = Vector3.Transform(Vector3.UnitY, rotMatrix);
 
             // Check control flags
-            bool heldForward = (controlFlags & AgentManager.ControlFlags.AGENT_CONTROL_AT_POS) == AgentManager.ControlFlags.AGENT_CONTROL_AT_POS;
+            bool heldForward = 
+                (((controlFlags & AgentManager.ControlFlags.AGENT_CONTROL_AT_POS) == AgentManager.ControlFlags.AGENT_CONTROL_AT_POS) || ((controlFlags & AgentManager.ControlFlags.AGENT_CONTROL_NUDGE_AT_POS) == AgentManager.ControlFlags.AGENT_CONTROL_NUDGE_AT_POS));
             bool heldBack = (controlFlags & AgentManager.ControlFlags.AGENT_CONTROL_AT_NEG) == AgentManager.ControlFlags.AGENT_CONTROL_AT_NEG;
             bool heldLeft = (controlFlags & AgentManager.ControlFlags.AGENT_CONTROL_LEFT_POS) == AgentManager.ControlFlags.AGENT_CONTROL_LEFT_POS;
             bool heldRight = (controlFlags & AgentManager.ControlFlags.AGENT_CONTROL_LEFT_NEG) == AgentManager.ControlFlags.AGENT_CONTROL_LEFT_NEG;
@@ -229,6 +233,11 @@ namespace OpenSim.Region.Framework.Scenes.Animation
                     // Falling long enough to trigger the animation
                     return "FALLDOWN";
                 }
+                else if (m_animTickJump == -1)
+                {
+                    m_animTickJump = 0; 
+                    return "STAND";
+                }
 
                 return m_movementAnimation;
             }
@@ -275,6 +284,8 @@ namespace OpenSim.Region.Framework.Scenes.Animation
                     m_animTickJump = -1;
                     return "JUMP";
                 }
+                else
+                    return "JUMP";
             }
             else
             {
@@ -303,7 +314,7 @@ namespace OpenSim.Region.Framework.Scenes.Animation
 
             #endregion Ground Movement
 
-            return m_movementAnimation;
+            //return m_movementAnimation;
         }
 
         /// <summary>
@@ -312,16 +323,7 @@ namespace OpenSim.Region.Framework.Scenes.Animation
         public void UpdateMovementAnimations()
         {
             m_movementAnimation = GetMovementAnimation();
-
-            if (m_movementAnimation == "PREJUMP" && !m_scenePresence.Scene.m_usePreJump)
-            {
-                // This was the previous behavior before PREJUMP
-                TrySetMovementAnimation("JUMP");
-            }
-            else
-            {
-                TrySetMovementAnimation(m_movementAnimation);
-            }
+            TrySetMovementAnimation(m_movementAnimation);
         }
 
         public UUID[] GetAnimationArray()
@@ -380,7 +382,7 @@ namespace OpenSim.Region.Framework.Scenes.Animation
                 }
             }
 
-            AssetBase Animasset = new AssetBase(UUID.Random(), "Random Animation", (sbyte)AssetType.Animation);
+            AssetBase Animasset = new AssetBase(UUID.Random(), "Random Animation", (sbyte)AssetType.Animation, m_scenePresence.UUID.ToString());
             Animasset.Data = anim.ToBytes();
             Animasset.Temporary = true;
             Animasset.Local = true;
@@ -414,15 +416,13 @@ namespace OpenSim.Region.Framework.Scenes.Animation
         {
             if (m_scenePresence.IsChildAgent)
                 return;
-            
+
             UUID[] animIDs;
             int[] sequenceNums;
             UUID[] objectIDs;
 
             m_animations.GetArrays(out animIDs, out sequenceNums, out objectIDs);
-
-            m_scenePresence.ControllingClient.SendAnimations(
-                animIDs, sequenceNums, m_scenePresence.ControllingClient.AgentId, objectIDs);
+            client.SendAnimations(animIDs, sequenceNums, m_scenePresence.ControllingClient.AgentId, objectIDs);
         }
 
         /// <summary>

@@ -54,11 +54,9 @@ namespace OpenSim.Framework
         private int _claimPrice = 0; //Unemplemented
         private UUID _globalID = UUID.Zero;
         private UUID _groupID = UUID.Zero;
-        private int _groupPrims = 0;
         private bool _isGroupOwned = false;
         private byte[] _bitmap = new byte[512];
         private string _description = String.Empty;
-
 
         private uint _flags = (uint) ParcelFlags.AllowFly | (uint) ParcelFlags.AllowLandmark |
                                 (uint) ParcelFlags.AllowAPrimitiveEntry |
@@ -72,24 +70,91 @@ namespace OpenSim.Framework
         private int _localID = 0;
         private byte _mediaAutoScale = 0;
         private UUID _mediaID = UUID.Zero;
-
         private string _mediaURL = String.Empty;
         private string _musicURL = String.Empty;
-        private int _otherPrims = 0;
         private UUID _ownerID = UUID.Zero;
-        private int _ownerPrims = 0;
         private List<ParcelManager.ParcelAccessEntry> _parcelAccessList = new List<ParcelManager.ParcelAccessEntry>();
         private float _passHours = 0;
         private int _passPrice = 0;
         private int _salePrice = 0; //Unemeplemented. Parcels price.
-        private int _selectedPrims = 0;
         private int _simwideArea = 0;
         private int _simwidePrims = 0;
         private UUID _snapshotID = UUID.Zero;
         private Vector3 _userLocation = new Vector3();
         private Vector3 _userLookAt = new Vector3();
-        private int _dwell = 0;
         private int _otherCleanTime = 0;
+        private string _mediaType = "none/none";
+        private string _mediaDescription = "";
+        private int _mediaHeight = 0;
+        private int _mediaWidth = 0;
+        private bool _mediaLoop = false;
+        private bool _obscureMusic = false;
+        private bool _obscureMedia = false;
+
+        /// <summary>
+        /// Whether to obscure parcel media URL
+        /// </summary>
+        [XmlIgnore]
+        public bool ObscureMedia {
+            get {
+                return _obscureMedia;
+            }
+            set {
+                _obscureMedia = value;
+            }
+        }
+
+        /// <summary>
+        /// Whether to obscure parcel music URL
+        /// </summary>
+        [XmlIgnore]
+        public bool ObscureMusic {
+            get {
+                return _obscureMusic;
+            }
+            set {
+                _obscureMusic = value;
+            }
+        }
+
+        /// <summary>
+        /// Whether to loop parcel media
+        /// </summary>
+        [XmlIgnore]
+        public bool MediaLoop {
+            get {
+                return _mediaLoop;
+            }
+            set {
+                _mediaLoop = value;
+            }
+        }
+
+        /// <summary>
+        /// Height of parcel media render
+        /// </summary>
+        [XmlIgnore]
+        public int MediaHeight {
+            get {
+                return _mediaHeight;
+            }
+            set {
+                _mediaHeight = value;
+            }
+        }
+
+        /// <summary>
+        /// Width of parcel media render
+        /// </summary>
+        [XmlIgnore]
+        public int MediaWidth {
+            get {
+                return _mediaWidth;
+            }
+            set {
+                _mediaWidth = value;
+            }
+        }
 
         /// <summary>
         /// Upper corner of the AABB for the parcel
@@ -209,19 +274,6 @@ namespace OpenSim.Framework
             }
             set {
                 _groupID = value;
-            }
-        }
-
-        /// <summary>
-        /// Number of SceneObjectPart that are owned by a Group
-        /// </summary>
-        [XmlIgnore]
-        public int GroupPrims {
-            get {
-                return _groupPrims;
-            }
-            set {
-                _groupPrims = value;
             }
         }
 
@@ -358,6 +410,18 @@ namespace OpenSim.Framework
             }
         }
 
+        public string MediaType
+        {
+            get
+            {
+                return _mediaType;
+            }
+            set
+            {
+                _mediaType = value;
+            }
+        }
+
         /// <summary>
         /// URL to the shoutcast music stream to play on the parcel
         /// </summary>
@@ -371,20 +435,6 @@ namespace OpenSim.Framework
         }
 
         /// <summary>
-        /// Number of SceneObjectPart that are owned by users who do not own the parcel
-        /// and don't have the 'group.  These are elegable for AutoReturn collection
-        /// </summary>
-        [XmlIgnore]
-        public int OtherPrims {
-            get {
-                return _otherPrims;
-            }
-            set {
-                _otherPrims = value;
-            }
-        }
-
-        /// <summary>
         /// Owner Avatar or Group of the parcel.  Naturally, all land masses must be
         /// owned by someone
         /// </summary>
@@ -394,19 +444,6 @@ namespace OpenSim.Framework
             }
             set {
                 _ownerID = value;
-            }
-        }
-
-        /// <summary>
-        /// Number of SceneObjectPart that are owned by the owner of the parcel
-        /// </summary>
-        [XmlIgnore]
-        public int OwnerPrims {
-            get {
-                return _ownerPrims;
-            }
-            set {
-                _ownerPrims = value;
             }
         }
 
@@ -455,19 +492,6 @@ namespace OpenSim.Framework
             }
             set {
                 _salePrice = value;
-            }
-        }
-
-        /// <summary>
-        /// Number of SceneObjectPart that are currently selected by avatar
-        /// </summary>
-        [XmlIgnore]
-        public int SelectedPrims {
-            get {
-                return _selectedPrims;
-            }
-            set {
-                _selectedPrims = value;
             }
         }
 
@@ -536,19 +560,7 @@ namespace OpenSim.Framework
         }
 
         /// <summary>
-        /// Deprecated idea.  Number of visitors ~= free money
-        /// </summary>
-        public int Dwell {
-            get {
-                return _dwell;
-            }
-            set {
-                _dwell = value;
-            }
-        }
-
-        /// <summary>
-        /// Number of minutes to return SceneObjectGroup that are owned by someone who doesn't own 
+        /// Autoreturn number of minutes to return SceneObjectGroup that are owned by someone who doesn't own 
         /// the parcel and isn't set to the same 'group' as the parcel.
         /// </summary>
         public int OtherCleanTime {
@@ -560,6 +572,17 @@ namespace OpenSim.Framework
             }
         }
 
+        /// <summary>
+        /// parcel media description
+        /// </summary>
+        public string MediaDescription {
+            get {
+                return _mediaDescription;
+            }
+            set {
+                _mediaDescription = value;
+            }
+        }
 
         public LandData()
         {
@@ -584,10 +607,6 @@ namespace OpenSim.Framework
             landData._claimPrice = _claimPrice;
             landData._globalID = _globalID;
             landData._groupID = _groupID;
-            landData._groupPrims = _groupPrims;
-            landData._otherPrims = _otherPrims;
-            landData._ownerPrims = _ownerPrims;
-            landData._selectedPrims = _selectedPrims;
             landData._isGroupOwned = _isGroupOwned;
             landData._localID = _localID;
             landData._landingType = _landingType;
@@ -608,7 +627,15 @@ namespace OpenSim.Framework
             landData._userLocation = _userLocation;
             landData._userLookAt = _userLookAt;
             landData._otherCleanTime = _otherCleanTime;
-            landData._dwell = _dwell;
+            landData._mediaType = _mediaType;
+            landData._mediaDescription = _mediaDescription;
+            landData._mediaWidth = _mediaWidth;
+            landData._mediaHeight = _mediaHeight;
+            landData._mediaLoop = _mediaLoop;
+            landData._obscureMusic = _obscureMusic;
+            landData._obscureMedia = _obscureMedia;
+            landData._simwideArea = _simwideArea;
+            landData._simwidePrims = _simwidePrims;
 
             landData._parcelAccessList.Clear();
             foreach (ParcelManager.ParcelAccessEntry entry in _parcelAccessList)

@@ -66,8 +66,8 @@ namespace OpenSim.Client.MXP.ClientStack
         private readonly IScene m_scene;
         private readonly string m_firstName;
         private readonly string m_lastName;
-        private int m_objectsToSynchronize = 0;
-        private int m_objectsSynchronized = -1;
+//        private int m_objectsToSynchronize = 0;
+//        private int m_objectsSynchronized = -1;
 
         private Vector3 m_startPosition=new Vector3(128f, 128f, 128f);
         #endregion
@@ -158,6 +158,12 @@ namespace OpenSim.Client.MXP.ClientStack
                 if (!value)
                     Stop();
             }
+        }
+
+        public bool IsLoggingOut
+        {
+            get { return false ; }
+            set {  }
         }
 
         #endregion
@@ -299,94 +305,94 @@ namespace OpenSim.Client.MXP.ClientStack
 
         #region MXP Outgoing Message Processing
 
-        private void MXPSendPrimitive(uint localID, UUID ownerID, Vector3 acc, Vector3 rvel, PrimitiveBaseShape primShape, Vector3 pos, UUID objectID, Vector3 vel, Quaternion rotation, uint flags, string text, byte[] textColor, uint parentID, byte[] particleSystem, byte clickAction, byte material, byte[] textureanim)
-        {
-            String typeName = ToOmType(primShape.PCode);
-            m_log.Info("[MXP ClientStack] Transmitting Primitive" + typeName);
-
-            PerceptionEventMessage pe = new PerceptionEventMessage();
-            pe.ObjectFragment.ObjectId = objectID.Guid;
-
-            pe.ObjectFragment.ParentObjectId = Guid.Empty;
-
-            // Resolving parent UUID.
-            OpenSim.Region.Framework.Scenes.Scene scene = (OpenSim.Region.Framework.Scenes.Scene)Scene;
-            if (scene.Entities.ContainsKey(parentID))
-            {
-                pe.ObjectFragment.ParentObjectId = scene.Entities[parentID].UUID.Guid;
-            }
-
-            pe.ObjectFragment.ObjectIndex = localID;
-            pe.ObjectFragment.ObjectName = typeName + " Object";
-            pe.ObjectFragment.OwnerId = ownerID.Guid;
-            pe.ObjectFragment.TypeId = Guid.Empty;
-            pe.ObjectFragment.TypeName = typeName;
-            pe.ObjectFragment.Acceleration = ToOmVector(acc);
-            pe.ObjectFragment.AngularAcceleration=new MsdQuaternion4f();
-            pe.ObjectFragment.AngularVelocity = ToOmQuaternion(rvel);
-            pe.ObjectFragment.BoundingSphereRadius = primShape.Scale.Length();
-
-            pe.ObjectFragment.Location = ToOmVector(pos);
-
-            pe.ObjectFragment.Mass = 1.0f;
-            pe.ObjectFragment.Orientation =  ToOmQuaternion(rotation);
-            pe.ObjectFragment.Velocity =ToOmVector(vel);
-
-            OmSlPrimitiveExt ext = new OmSlPrimitiveExt();
-
-            if (!((primShape.PCode == (byte)PCode.NewTree) || (primShape.PCode == (byte)PCode.Tree) || (primShape.PCode == (byte)PCode.Grass)))
-            {
-
-                ext.PathBegin = primShape.PathBegin;
-                ext.PathEnd = primShape.PathEnd;
-                ext.PathScaleX = primShape.PathScaleX;
-                ext.PathScaleY = primShape.PathScaleY;
-                ext.PathShearX = primShape.PathShearX;
-                ext.PathShearY = primShape.PathShearY;
-                ext.PathSkew = primShape.PathSkew;
-                ext.ProfileBegin = primShape.ProfileBegin;
-                ext.ProfileEnd = primShape.ProfileEnd;
-                ext.PathCurve = primShape.PathCurve;
-                ext.ProfileCurve = primShape.ProfileCurve;
-                ext.ProfileHollow = primShape.ProfileHollow;
-                ext.PathRadiusOffset = primShape.PathRadiusOffset;
-                ext.PathRevolutions = primShape.PathRevolutions;
-                ext.PathTaperX = primShape.PathTaperX;
-                ext.PathTaperY = primShape.PathTaperY;
-                ext.PathTwist = primShape.PathTwist;
-                ext.PathTwistBegin = primShape.PathTwistBegin;
-
-
-            }
-
-            ext.UpdateFlags = flags;
-            ext.ExtraParams = primShape.ExtraParams;
-            ext.State = primShape.State;
-            ext.TextureEntry = primShape.TextureEntry;
-            ext.TextureAnim = textureanim;
-            ext.Scale = ToOmVector(primShape.Scale);
-            ext.Text = text;
-            ext.TextColor = ToOmColor(textColor);
-            ext.PSBlock = particleSystem;
-            ext.ClickAction = clickAction;
-            ext.Material = material;
-
-            pe.SetExtension<OmSlPrimitiveExt>(ext);
-
-            Session.Send(pe);
-
-            if (m_objectsSynchronized != -1)
-            {
-                m_objectsSynchronized++;
-
-                if (m_objectsToSynchronize >= m_objectsSynchronized)
-                {
-                    SynchronizationEndEventMessage synchronizationEndEventMessage = new SynchronizationEndEventMessage();
-                    Session.Send(synchronizationEndEventMessage);
-                    m_objectsSynchronized = -1;
-                }
-            }
-        }
+//        private void MXPSendPrimitive(uint localID, UUID ownerID, Vector3 acc, Vector3 rvel, PrimitiveBaseShape primShape, Vector3 pos, UUID objectID, Vector3 vel, Quaternion rotation, uint flags, string text, byte[] textColor, uint parentID, byte[] particleSystem, byte clickAction, byte material, byte[] textureanim)
+//        {
+//            String typeName = ToOmType(primShape.PCode);
+//            m_log.Info("[MXP ClientStack] Transmitting Primitive" + typeName);
+//
+//            PerceptionEventMessage pe = new PerceptionEventMessage();
+//            pe.ObjectFragment.ObjectId = objectID.Guid;
+//
+//            pe.ObjectFragment.ParentObjectId = Guid.Empty;
+//
+//            // Resolving parent UUID.
+//            OpenSim.Region.Framework.Scenes.Scene scene = (OpenSim.Region.Framework.Scenes.Scene)Scene;
+//            if (scene.Entities.ContainsKey(parentID))
+//            {
+//                pe.ObjectFragment.ParentObjectId = scene.Entities[parentID].UUID.Guid;
+//            }
+//
+//            pe.ObjectFragment.ObjectIndex = localID;
+//            pe.ObjectFragment.ObjectName = typeName + " Object";
+//            pe.ObjectFragment.OwnerId = ownerID.Guid;
+//            pe.ObjectFragment.TypeId = Guid.Empty;
+//            pe.ObjectFragment.TypeName = typeName;
+//            pe.ObjectFragment.Acceleration = ToOmVector(acc);
+//            pe.ObjectFragment.AngularAcceleration=new MsdQuaternion4f();
+//            pe.ObjectFragment.AngularVelocity = ToOmQuaternion(rvel);
+//            pe.ObjectFragment.BoundingSphereRadius = primShape.Scale.Length();
+//
+//            pe.ObjectFragment.Location = ToOmVector(pos);
+//
+//            pe.ObjectFragment.Mass = 1.0f;
+//            pe.ObjectFragment.Orientation =  ToOmQuaternion(rotation);
+//            pe.ObjectFragment.Velocity =ToOmVector(vel);
+//
+//            OmSlPrimitiveExt ext = new OmSlPrimitiveExt();
+//
+//            if (!((primShape.PCode == (byte)PCode.NewTree) || (primShape.PCode == (byte)PCode.Tree) || (primShape.PCode == (byte)PCode.Grass)))
+//            {
+//
+//                ext.PathBegin = primShape.PathBegin;
+//                ext.PathEnd = primShape.PathEnd;
+//                ext.PathScaleX = primShape.PathScaleX;
+//                ext.PathScaleY = primShape.PathScaleY;
+//                ext.PathShearX = primShape.PathShearX;
+//                ext.PathShearY = primShape.PathShearY;
+//                ext.PathSkew = primShape.PathSkew;
+//                ext.ProfileBegin = primShape.ProfileBegin;
+//                ext.ProfileEnd = primShape.ProfileEnd;
+//                ext.PathCurve = primShape.PathCurve;
+//                ext.ProfileCurve = primShape.ProfileCurve;
+//                ext.ProfileHollow = primShape.ProfileHollow;
+//                ext.PathRadiusOffset = primShape.PathRadiusOffset;
+//                ext.PathRevolutions = primShape.PathRevolutions;
+//                ext.PathTaperX = primShape.PathTaperX;
+//                ext.PathTaperY = primShape.PathTaperY;
+//                ext.PathTwist = primShape.PathTwist;
+//                ext.PathTwistBegin = primShape.PathTwistBegin;
+//
+//
+//            }
+//
+//            ext.UpdateFlags = flags;
+//            ext.ExtraParams = primShape.ExtraParams;
+//            ext.State = primShape.State;
+//            ext.TextureEntry = primShape.TextureEntry;
+//            ext.TextureAnim = textureanim;
+//            ext.Scale = ToOmVector(primShape.Scale);
+//            ext.Text = text;
+//            ext.TextColor = ToOmColor(textColor);
+//            ext.PSBlock = particleSystem;
+//            ext.ClickAction = clickAction;
+//            ext.Material = material;
+//
+//            pe.SetExtension<OmSlPrimitiveExt>(ext);
+//
+//            Session.Send(pe);
+//
+//            if (m_objectsSynchronized != -1)
+//            {
+//                m_objectsSynchronized++;
+//
+//                if (m_objectsToSynchronize >= m_objectsSynchronized)
+//                {
+//                    SynchronizationEndEventMessage synchronizationEndEventMessage = new SynchronizationEndEventMessage();
+//                    Session.Send(synchronizationEndEventMessage);
+//                    m_objectsSynchronized = -1;
+//                }
+//            }
+//        }
 
         public void MXPSendAvatarData(string participantName, UUID ownerID, UUID parentId, UUID avatarID, uint avatarLocalID, Vector3 position, Quaternion rotation)
         {
@@ -427,7 +433,7 @@ namespace OpenSim.Client.MXP.ClientStack
             pe.ObjectFragment.ObjectIndex = (uint)(m_scene.RegionInfo.RegionSettings.RegionUUID.GetHashCode() + ((long)int.MaxValue) / 2);
             pe.ObjectFragment.ParentObjectId = UUID.Zero.Guid;
             pe.ObjectFragment.ObjectName = "Terrain of " + m_scene.RegionInfo.RegionName;
-            pe.ObjectFragment.OwnerId = m_scene.RegionInfo.MasterAvatarAssignedUUID.Guid;
+            pe.ObjectFragment.OwnerId = m_scene.RegionInfo.EstateSettings.EstateOwner.Guid;
             pe.ObjectFragment.TypeId = Guid.Empty;
             pe.ObjectFragment.TypeName = "Terrain";
             pe.ObjectFragment.Acceleration = new MsdVector3f();
@@ -456,8 +462,8 @@ namespace OpenSim.Client.MXP.ClientStack
 
         public void MXPSendSynchronizationBegin(int objectCount)
         {
-            m_objectsToSynchronize = objectCount;
-            m_objectsSynchronized = 0;
+//            m_objectsToSynchronize = objectCount;
+//            m_objectsSynchronized = 0;
             SynchronizationBeginEventMessage synchronizationBeginEventMessage = new SynchronizationBeginEventMessage();
             synchronizationBeginEventMessage.ObjectCount = (uint)objectCount;
             Session.Send(synchronizationBeginEventMessage);
@@ -590,8 +596,9 @@ namespace OpenSim.Client.MXP.ClientStack
         public event TeleportLandmarkRequest OnTeleportLandmarkRequest;
         public event DeRezObject OnDeRezObject;
         public event Action<IClientAPI> OnRegionHandShakeReply;
-        public event GenericCall2 OnRequestWearables;
-        public event GenericCall2 OnCompleteMovementToRegion;
+        public event GenericCall1 OnRequestWearables;
+        public event GenericCall1 OnCompleteMovementToRegion;
+        public event UpdateAgent OnPreAgentUpdate;
         public event UpdateAgent OnAgentUpdate;
         public event AgentRequestSit OnAgentRequestSit;
         public event AgentSit OnAgentSit;
@@ -635,6 +642,7 @@ namespace OpenSim.Client.MXP.ClientStack
         public event Action<UUID> OnRemoveAvatar;
         public event ObjectPermissions OnObjectPermissions;
         public event CreateNewInventoryItem OnCreateNewInventoryItem;
+        public event LinkInventoryItem OnLinkInventoryItem;
         public event CreateInventoryFolder OnCreateNewInventoryFolder;
         public event UpdateInventoryFolder OnUpdateInventoryFolder;
         public event MoveInventoryFolder OnMoveInventoryFolder;
@@ -692,6 +700,8 @@ namespace OpenSim.Client.MXP.ClientStack
         public event UUIDNameRequest OnTeleportHomeRequest;
         public event ScriptAnswer OnScriptAnswer;
         public event AgentSit OnUndo;
+        public event AgentSit OnRedo;
+        public event LandUndo OnLandUndo;
         public event ForceReleaseControls OnForceReleaseControls;
         public event GodLandStatRequest OnLandStatRequest;
         public event DetailedEstateDataRequest OnDetailedEstateDataRequest;
@@ -756,6 +766,25 @@ namespace OpenSim.Client.MXP.ClientStack
         public event AvatarNotesUpdate OnAvatarNotesUpdate;
         public event MuteListRequest OnMuteListRequest;
         public event AvatarInterestUpdate OnAvatarInterestUpdate;
+        public event FindAgentUpdate OnFindAgent;
+        public event TrackAgentUpdate OnTrackAgent;
+        public event NewUserReport OnUserReport;
+        public event SaveStateHandler OnSaveState;
+        public event GroupAccountSummaryRequest OnGroupAccountSummaryRequest;
+        public event GroupAccountDetailsRequest OnGroupAccountDetailsRequest;
+        public event GroupAccountTransactionsRequest OnGroupAccountTransactionsRequest;
+        public event FreezeUserUpdate OnParcelFreezeUser;
+        public event EjectUserUpdate OnParcelEjectUser;
+        public event ParcelBuyPass OnParcelBuyPass;
+        public event ParcelGodMark OnParcelGodMark;
+        public event GroupActiveProposalsRequest OnGroupActiveProposalsRequest;
+        public event GroupVoteHistoryRequest OnGroupVoteHistoryRequest;
+        public event SimWideDeletesDelegate OnSimWideDeletes;
+        public event SendPostcard OnSendPostcard;
+        public event MuteListEntryUpdate OnUpdateMuteListEntry;
+        public event MuteListEntryRemove OnRemoveMuteListEntry;
+        public event GodlikeMessage onGodlikeMessage;
+        public event GodUpdateRegionInfoUpdate OnGodUpdateRegionInfoUpdate;
 
         public event PlacesQuery OnPlacesQuery;
 
@@ -832,7 +861,7 @@ namespace OpenSim.Client.MXP.ClientStack
             OpenSim.Region.Framework.Scenes.Scene scene=(OpenSim.Region.Framework.Scenes.Scene)Scene;
             AvatarAppearance appearance;
             scene.GetAvatarAppearance(this,out appearance);
-            OnSetAppearance(appearance.Texture, (byte[])appearance.VisualParams.Clone());
+            OnSetAppearance(this, appearance.Texture, (byte[])appearance.VisualParams.Clone());
         }
 
         public void Stop()
@@ -879,7 +908,7 @@ namespace OpenSim.Client.MXP.ClientStack
 
             if (OnCompleteMovementToRegion != null)
             {
-                OnCompleteMovementToRegion();
+                OnCompleteMovementToRegion(this);
             }
 
             // Need to translate to MXP somehow
@@ -903,6 +932,10 @@ namespace OpenSim.Client.MXP.ClientStack
         }
 
         public void SendGenericMessage(string method, List<string> message)
+        {
+        }
+
+        public void SendGenericMessage(string method, List<byte[]> message)
         {
             // Need to translate to MXP somehow
         }
@@ -982,9 +1015,13 @@ namespace OpenSim.Client.MXP.ClientStack
             // Need to translate to MXP somehow
         }
 
-        public void SendTeleportLocationStart()
+        public void SendTeleportStart(uint flags)
         {
             // Need to translate to MXP somehow
+        }
+
+        public void SendTeleportProgress(uint flags, string message)
+        {
         }
 
         public void SendMoneyBalance(UUID transaction, bool success, byte[] description, int balance)
@@ -997,31 +1034,9 @@ namespace OpenSim.Client.MXP.ClientStack
             // Need to translate to MXP somehow
         }
 
-        public void SendAvatarData(SendAvatarData data)
-        {
-            //ScenePresence presence=((Scene)this.Scene).GetScenePresence(avatarID);
-            UUID ownerID = data.AvatarID;
-            MXPSendAvatarData(data.FirstName + " " + data.LastName, ownerID, UUID.Zero, data.AvatarID, data.AvatarLocalID, data.Position, data.Rotation);
-        }
-
-        public void SendAvatarTerseUpdate(SendAvatarTerseData data)
-        {
-            MovementEventMessage me = new MovementEventMessage();
-            me.ObjectIndex = data.LocalID;
-            me.Location = ToOmVector(data.Position);
-            me.Orientation = ToOmQuaternion(data.Rotation);
-
-            Session.Send(me);
-        }
-
         public void SendCoarseLocationUpdate(List<UUID> users, List<Vector3> CoarseLocations)
         {
             // Minimap function, not used.
-        }
-
-        public void AttachObject(uint localID, Quaternion rotation, byte attachPoint, UUID ownerID)
-        {
-            // Need to translate to MXP somehow
         }
 
         public void SetChildAgentThrottle(byte[] throttle)
@@ -1029,23 +1044,31 @@ namespace OpenSim.Client.MXP.ClientStack
             // Need to translate to MXP somehow
         }
 
-        public void SendPrimitiveToClient(SendPrimitiveData data)
+        public void SendAvatarDataImmediate(ISceneEntity avatar)
         {
-            MXPSendPrimitive(data.localID, data.ownerID, data.acc, data.rvel, data.primShape, data.pos, data.objectID, data.vel,
-                data.rotation, (uint)data.flags, data.text, data.color, data.parentID, data.particleSystem, data.clickAction,
-                data.material, data.textureanim);
+            //ScenePresence presence=((Scene)this.Scene).GetScenePresence(avatarID);
+            ScenePresence presence = (ScenePresence)avatar;
+            UUID ownerID = presence.UUID;
+            MXPSendAvatarData(presence.Firstname + " " + presence.Lastname, ownerID, UUID.Zero, presence.UUID, presence.LocalId, presence.AbsolutePosition, presence.Rotation);
         }
 
-        public void SendPrimTerseUpdate(SendPrimitiveTerseData data)
+        public void SendPrimUpdate(ISceneEntity entity, PrimUpdateFlags updateFlags)
         {
-            MovementEventMessage me = new MovementEventMessage();
-            me.ObjectIndex = data.LocalID;
-            me.Location = ToOmVector(data.Position);
-            me.Orientation = ToOmQuaternion(data.Rotation);
-            Session.Send(me);
+            //MovementEventMessage me = new MovementEventMessage();
+            //me.ObjectIndex = data.LocalID;
+            //me.Location = ToOmVector(data.Position);
+            //me.Orientation = ToOmQuaternion(data.Rotation);
+
+            //MXPSendPrimitive(data.localID, data.ownerID, data.acc, data.rvel, data.primShape, data.pos, data.objectID, data.vel,
+            //    data.rotation, (uint)data.flags, data.text, data.color, data.parentID, data.particleSystem, data.clickAction,
+            //    data.material, data.textureanim);
+
+            //Session.Send(me);
+
+            throw new System.NotImplementedException();
         }
 
-        public void ReprioritizeUpdates(StateUpdateTypes type, UpdatePriorityHandler handler)
+        public void ReprioritizeUpdates()
         {
         }
 
@@ -1092,6 +1115,12 @@ namespace OpenSim.Client.MXP.ClientStack
         {
             // SL Specific, Ignore. (Remove from IClient)
         }
+
+        public void SendAbortXferPacket(ulong xferID)
+        {
+
+        }
+
 
         public void SendEconomyData(float EnergyEfficiency, int ObjectCapacity, int ObjectCount, int PriceEnergyUnit, int PriceGroupCreate, int PriceObjectClaim, float PriceObjectRent, float PriceObjectScaleFactor, int PriceParcelClaim, float PriceParcelClaimFactor, int PriceParcelRent, int PricePublicObjectDecay, int PricePublicObjectDelete, int PriceRentLight, int PriceUpload, int TeleportMinPrice, float TeleportPriceExponent)
         {
@@ -1198,7 +1227,7 @@ namespace OpenSim.Client.MXP.ClientStack
             // Need to translate to MXP somehow
         }
 
-        public void SendEstateManagersList(UUID invoice, UUID[] EstateManagers, uint estateID)
+        public void SendEstateList(UUID invoice, int code, UUID[] Data, uint estateID)
         {
             // Need to translate to MXP somehow
         }
@@ -1223,7 +1252,7 @@ namespace OpenSim.Client.MXP.ClientStack
             // Need to translate to MXP somehow
         }
 
-        public void SendLandProperties(int sequence_id, bool snap_selection, int request_result, LandData landData, float simObjectBonusFactor, int parcelObjectCapacity, int simObjectCapacity, uint regionFlags)
+        public void SendLandProperties(int sequence_id, bool snap_selection, int request_result, ILandObject lo, float simObjectBonusFactor, int parcelObjectCapacity, int simObjectCapacity, uint regionFlags)
         {
             // Need to translate to MXP somehow
         }
@@ -1308,12 +1337,12 @@ namespace OpenSim.Client.MXP.ClientStack
             // Need to translate to MXP somehow
         }
 
-        public void SendObjectPropertiesFamilyData(uint RequestFlags, UUID ObjectUUID, UUID OwnerID, UUID GroupID, uint BaseMask, uint OwnerMask, uint GroupMask, uint EveryoneMask, uint NextOwnerMask, int OwnershipCost, byte SaleType, int SalePrice, uint Category, UUID LastOwnerID, string ObjectName, string Description)
+        public void SendObjectPropertiesFamilyData(ISceneEntity Entity, uint RequestFlags)
         {
             //throw new System.NotImplementedException();
         }
 
-        public void SendObjectPropertiesReply(UUID ItemID, ulong CreationDate, UUID CreatorUUID, UUID FolderUUID, UUID FromTaskUUID, UUID GroupUUID, short InventorySerial, UUID LastOwnerUUID, UUID ObjectUUID, UUID OwnerUUID, string TouchTitle, byte[] TextureID, string SitTitle, string ItemName, string ItemDescription, uint OwnerMask, uint NextOwnerMask, uint GroupMask, uint EveryoneMask, uint BaseMask, byte saleType, int salePrice)
+        public void SendObjectPropertiesReply(ISceneEntity entity)
         {
             //throw new System.NotImplementedException();
         }
@@ -1657,6 +1686,42 @@ namespace OpenSim.Client.MXP.ClientStack
         }
 
         public void SendAvatarInterestsReply(UUID avatarID, uint wantMask, string wantText, uint skillsMask, string skillsText, string languages)
+        {
+        }
+        
+        public void SendGroupAccountingDetails(IClientAPI sender,UUID groupID, UUID transactionID, UUID sessionID, int amt)
+        {
+        }
+        
+        public void SendGroupAccountingSummary(IClientAPI sender,UUID groupID, uint moneyAmt, int totalTier, int usedTier)
+        {
+        }
+        
+        public void SendGroupTransactionsSummaryDetails(IClientAPI sender,UUID groupID, UUID transactionID, UUID sessionID,int amt)
+        {
+        }
+
+        public void SendGroupVoteHistory(UUID groupID, UUID transactionID, GroupVoteHistory[] Votes)
+        {
+        }
+
+        public void SendGroupActiveProposals(UUID groupID, UUID transactionID, GroupActiveProposals[] Proposals)
+        {
+        }
+
+        public void SendChangeUserRights(UUID agentID, UUID friendID, int rights)
+        {
+        }
+
+        public void SendTextBoxRequest(string message, int chatChannel, string objectname, string ownerFirstName, string ownerLastName, UUID objectId)
+        {
+        }
+
+        public void StopFlying(ISceneEntity presence)
+        {
+        }
+
+        public void SendPlacesReply(UUID queryID, UUID transactionID, PlacesReplyData[] data)
         {
         }
     }

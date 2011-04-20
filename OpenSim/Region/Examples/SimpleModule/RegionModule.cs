@@ -34,6 +34,17 @@ using OpenSim.Region.Framework.Scenes;
 
 namespace OpenSim.Region.Examples.SimpleModule
 {
+    /// <summary>
+    /// Example region module.
+    /// </summary>
+    /// <remarks>
+    /// This is an old and unmaintained region module which uses the old style module interface.  It is not loaded into
+    /// OpenSim by default.  If you want to try enabling it, look in the bin folder of this project.
+    /// Please see the README.txt in this project on the filesystem for some more information.  
+    /// Nonetheless, it may contain some useful example code so has been left here for now.
+    /// 
+    /// You can see bare bones examples of the more modern region module system in OpenSim/Region/OptionalModules/Example
+    /// </remarks>
     public class RegionModule : IRegionModule
     {
         #region IRegionModule Members
@@ -88,12 +99,12 @@ namespace OpenSim.Region.Examples.SimpleModule
                 m_scene.AgentCrossing(m_character.AgentId, Vector3.Zero, false);
             }
 
-            List<ScenePresence> avatars = m_scene.GetAvatars();
-            foreach (ScenePresence avatar in avatars)
+            m_scene.ForEachScenePresence(delegate(ScenePresence sp)
             {
-                avatar.AbsolutePosition =
-                    new Vector3((float)Util.RandomClass.Next(100, 200), (float)Util.RandomClass.Next(30, 200), 2);
-            }
+                if (!sp.IsChildAgent)
+                    sp.AbsolutePosition =
+                        new Vector3((float)Util.RandomClass.Next(100, 200), (float)Util.RandomClass.Next(30, 200), 2);
+            });
         }
 
         // private void AddComplexObjects(RegionInfo regionInfo, Vector3 pos)

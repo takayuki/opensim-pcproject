@@ -28,7 +28,6 @@
 using System.Collections.Generic;
 using System.Text;
 using NUnit.Framework;
-using NUnit.Framework.SyntaxHelpers;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
@@ -48,7 +47,9 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         [SetUp]
         public void Init()
         {
-            m_assetService = new MockAssetService();
+            // FIXME: We don't need a full scene here - it would be enough to set up the asset service.
+            Scene scene = SceneSetupHelpers.SetupScene();
+            m_assetService = scene.AssetService;
             m_uuidGatherer = new UuidGatherer(m_assetService);
         }
 
@@ -58,10 +59,11 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             TestHelper.InMethod();
             
             UUID corruptAssetUuid = UUID.Parse("00000000-0000-0000-0000-000000000666");
-            AssetBase corruptAsset = AssetHelpers.CreateAsset(corruptAssetUuid, "CORRUPT ASSET");
+            AssetBase corruptAsset 
+                = AssetHelpers.CreateAsset(corruptAssetUuid, AssetType.Notecard, "CORRUPT ASSET", UUID.Zero);
             m_assetService.Store(corruptAsset);
 
-            IDictionary<UUID, int> foundAssetUuids = new Dictionary<UUID, int>();
+            IDictionary<UUID, AssetType> foundAssetUuids = new Dictionary<UUID, AssetType>();
             m_uuidGatherer.GatherAssetUuids(corruptAssetUuid, AssetType.Object, foundAssetUuids);
 
             // We count the uuid as gathered even if the asset itself is corrupt.
@@ -77,7 +79,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             TestHelper.InMethod();
             
             UUID missingAssetUuid = UUID.Parse("00000000-0000-0000-0000-000000000666");
-            IDictionary<UUID, int> foundAssetUuids = new Dictionary<UUID, int>();
+            IDictionary<UUID, AssetType> foundAssetUuids = new Dictionary<UUID, AssetType>();
             
             m_uuidGatherer.GatherAssetUuids(missingAssetUuid, AssetType.Object, foundAssetUuids);
 

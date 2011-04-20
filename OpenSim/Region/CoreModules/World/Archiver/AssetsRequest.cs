@@ -34,6 +34,7 @@ using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Serialization;
+using OpenSim.Framework.Serialization.External;
 using OpenSim.Services.Interfaces;
 
 namespace OpenSim.Region.CoreModules.World.Archiver
@@ -74,7 +75,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver
         /// <value>
         /// uuids to request
         /// </value>
-        protected ICollection<UUID> m_uuids;
+        protected IDictionary<UUID, AssetType> m_uuids;
 
         /// <value>
         /// Callback used when all the assets requested have been received.
@@ -100,17 +101,26 @@ namespace OpenSim.Region.CoreModules.World.Archiver
         /// Asset service used to request the assets
         /// </value>
         protected IAssetService m_assetService;
+        protected IUserAccountService m_userAccountService;
+        protected UUID m_scopeID; // the grid ID 
 
         protected AssetsArchiver m_assetsArchiver;
 
+        protected Dictionary<string, object> m_options;
+
         protected internal AssetsRequest(
-            AssetsArchiver assetsArchiver, ICollection<UUID> uuids, 
-            IAssetService assetService, AssetsRequestCallback assetsRequestCallback)
+            AssetsArchiver assetsArchiver, IDictionary<UUID, AssetType> uuids, 
+            IAssetService assetService, IUserAccountService userService, 
+            UUID scope, Dictionary<string, object> options, 
+            AssetsRequestCallback assetsRequestCallback)
         {
             m_assetsArchiver = assetsArchiver;
             m_uuids = uuids;
             m_assetsRequestCallback = assetsRequestCallback;
             m_assetService = assetService;
+            m_userAccountService = userService;
+            m_scopeID = scope;
+            m_options = options;
             m_repliesRequired = uuids.Count;
 
             m_requestCallbackTimer = new System.Timers.Timer(TIMEOUT);
@@ -132,9 +142,9 @@ namespace OpenSim.Region.CoreModules.World.Archiver
                 return;
             }
             
-            foreach (UUID uuid in m_uuids)
+            foreach (KeyValuePair<UUID, AssetType> kvp in m_uuids)
             {
-                m_assetService.Get(uuid.ToString(), this, AssetRequestCallback);
+                m_assetService.Get(kvp.Key.ToString(), kvp.Value, PreAssetRequestCallback);
             }
 
             m_requestCallbackTimer.Enabled = true;
@@ -157,7 +167,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver
                 // Calculate which uuids were not found.  This is an expensive way of doing it, but this is a failure
                 // case anyway.
                 List<UUID> uuids = new List<UUID>();
-                foreach (UUID uuid in m_uuids)
+                foreach (UUID uuid in m_uuids.Keys)
                 {
                     uuids.Add(uuid);
                 }
@@ -188,7 +198,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver
                     m_log.ErrorFormat(
                         "[ARCHIVER]: (... {0} more not shown)", uuids.Count - MAX_UUID_DISPLAY_ON_TIMEOUT);
 
-                m_log.Error("[ARCHIVER]: OAR save aborted.");
+                m_log.Error("[ARCHIVER]: OAR save aborted.  PLEASE DO NOT USE THIS OAR, IT WILL BE INCOMPLETE.");
             }
             catch (Exception e)
             {
@@ -198,6 +208,19 @@ namespace OpenSim.Region.CoreModules.World.Archiver
             {
                 m_assetsArchiver.ForceClose();
             }
+        }
+
+        protected void PreAssetRequestCallback(string fetchedAssetID, object assetType, AssetBase fetchedAsset)
+        {
+            // Check for broken asset types and fix them with the AssetType gleaned by UuidGatherer
+            if (fetchedAsset != null && fetchedAsset.Type == (sbyte)AssetType.Unknown)
+            {
+                AssetType type = (AssetType)assetType;
+                m_log.InfoFormat("[ARCHIVER]: Rewriting broken asset type for {0} to {1}", fetchedAsset.ID, type);
+                fetchedAsset.Type = (sbyte)type;
+            }
+
+            AssetRequestCallback(fetchedAssetID, this, fetchedAsset);
         }
 
         /// <summary>
@@ -226,13 +249,18 @@ namespace OpenSim.Region.CoreModules.World.Archiver
                                                            
                     if (asset != null)
                     {
-//                        m_log.DebugFormat("[ARCHIVER]: Recording asset {0} as found", id);
+                        if (m_options.ContainsKey("verbose"))
+                            m_log.InfoFormat("[ARCHIVER]: Writing asset {0}", id);
+
                         m_foundAssetUuids.Add(asset.FullID);
-                        m_assetsArchiver.WriteAsset(asset);
+
+                        m_assetsArchiver.WriteAsset(PostProcess(asset));
                     }
                     else
                     {
-//                        m_log.DebugFormat("[ARCHIVER]: Recording asset {0} as not found", id);
+                        if (m_options.ContainsKey("verbose"))
+                            m_log.InfoFormat("[ARCHIVER]: Recording asset {0} as not found", id);
+
                         m_notFoundAssetUuids.Add(new UUID(id));
                     }
         
@@ -274,6 +302,17 @@ namespace OpenSim.Region.CoreModules.World.Archiver
                 m_log.ErrorFormat(
                     "[ARCHIVER]: Terminating archive creation since asset requster callback failed with {0}", e);
             }
+        }
+
+        protected AssetBase PostProcess(AssetBase asset)
+        {
+            if (asset.Type == (sbyte)AssetType.Object && asset.Data != null && m_options.ContainsKey("profile"))
+            {
+                //m_log.DebugFormat("[ARCHIVER]: Rewriting object data for {0}", asset.ID);
+                string xml = ExternalRepresentationUtils.RewriteSOP(Utils.BytesToString(asset.Data), m_options["profile"].ToString(), m_userAccountService, m_scopeID);
+                asset.Data = Utils.StringToBytes(xml);
+            }
+            return asset;
         }
     }
 }

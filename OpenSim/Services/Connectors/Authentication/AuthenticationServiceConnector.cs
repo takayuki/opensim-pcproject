@@ -33,7 +33,6 @@ using System.Reflection;
 using Nini.Config;
 using OpenSim.Framework;
 using OpenSim.Framework.Communications;
-using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Services.Interfaces;
 using OpenSim.Server.Base;
 using OpenMetaverse;
@@ -67,7 +66,7 @@ namespace OpenSim.Services.Connectors
             IConfig assetConfig = source.Configs["AuthenticationService"];
             if (assetConfig == null)
             {
-                m_log.Error("[USER CONNECTOR]: AuthenticationService missing from OpanSim.ini");
+                m_log.Error("[AUTH CONNECTOR]: AuthenticationService missing from OpenSim.ini");
                 throw new Exception("Authentication connector init error");
             }
 
@@ -76,7 +75,7 @@ namespace OpenSim.Services.Connectors
 
             if (serviceURI == String.Empty)
             {
-                m_log.Error("[USER CONNECTOR]: No Server URI named in section AuthenticationService");
+                m_log.Error("[AUTH CONNECTOR]: No Server URI named in section AuthenticationService");
                 throw new Exception("Authentication connector init error");
             }
             m_ServerURI = serviceURI;
@@ -84,7 +83,7 @@ namespace OpenSim.Services.Connectors
 
         public string Authenticate(UUID principalID, string password, int lifetime)
         {
-            Dictionary<string, string> sendData = new Dictionary<string, string>();
+            Dictionary<string, object> sendData = new Dictionary<string, object>();
             sendData["LIFETIME"] = lifetime.ToString();
             sendData["PRINCIPAL"] = principalID.ToString();
             sendData["PASSWORD"] = password;
@@ -106,7 +105,7 @@ namespace OpenSim.Services.Connectors
 
         public bool Verify(UUID principalID, string token, int lifetime)
         {
-            Dictionary<string, string> sendData = new Dictionary<string, string>();
+            Dictionary<string, object> sendData = new Dictionary<string, object>();
             sendData["LIFETIME"] = lifetime.ToString();
             sendData["PRINCIPAL"] = principalID.ToString();
             sendData["TOKEN"] = token;
@@ -128,7 +127,7 @@ namespace OpenSim.Services.Connectors
 
         public bool Release(UUID principalID, string token)
         {
-            Dictionary<string, string> sendData = new Dictionary<string, string>();
+            Dictionary<string, object> sendData = new Dictionary<string, object>();
             sendData["PRINCIPAL"] = principalID.ToString();
             sendData["TOKEN"] = token;
 
@@ -145,6 +144,12 @@ namespace OpenSim.Services.Connectors
                 return false;
 
             return true;
+        }
+
+        public bool SetPassword(UUID principalID, string passwd)
+        {
+            // nope, we don't do this
+            return false;
         }
     }
 }

@@ -59,6 +59,7 @@ namespace OpenSim.Services.Interfaces
         /// </summary>
         /// <param name="userID"></param>
         /// <returns></returns>
+        [Obsolete]
         InventoryCollection GetUserInventory(UUID userID);
 
         /// <summary>
@@ -67,6 +68,7 @@ namespace OpenSim.Services.Interfaces
         /// </summary>
         /// <param name="userID"></param>
         /// <param name="callback"></param>
+        [Obsolete]
         void GetUserInventory(UUID userID, InventoryReceiptCallback callback);
 
         /// <summary>
@@ -139,8 +141,11 @@ namespace OpenSim.Services.Interfaces
         /// <summary>
         /// Add a new item to the user's inventory
         /// </summary>
-        /// <param name="item"></param>
-        /// <returns>true if the item was successfully added</returns>
+        /// <param name="item">
+        /// The item to be added.  If item.FolderID == UUID.Zero then the item is added to the most suitable system
+        /// folder.  If there is no suitable folder then the item is added to the user's root inventory folder.
+        /// </param>
+        /// <returns>true if the item was successfully added, false if it was not</returns>
         bool AddItem(InventoryItemBase item);
 
         /// <summary>
@@ -164,7 +169,7 @@ namespace OpenSim.Services.Interfaces
         /// Get an item, given by its UUID
         /// </summary>
         /// <param name="item"></param>
-        /// <returns></returns>
+        /// <returns>null if no item was found, otherwise the found item</returns>
         InventoryItemBase GetItem(InventoryItemBase item);
 
         /// <summary>

@@ -55,6 +55,11 @@ namespace OpenSim.Tests.Common.Mock
         {
             return new List<ILandObject>();
         }
+        
+        public void Clear(bool setupDefaultParcel)
+        {
+            // Intentionally blank since we don't save any parcel data in the test channel
+        }
 
         protected ILandObject GetNoLand()
         {
@@ -85,5 +90,9 @@ namespace OpenSim.Tests.Common.Mock
         public void setParcelObjectMaxOverride(overrideParcelMaxPrimCountDelegate overrideDel) {}
         public void setSimulatorObjectMaxOverride(overrideSimulatorMaxPrimCountDelegate overrideDel) {}
         public void SetParcelOtherCleanTime(IClientAPI remoteClient, int localID, int otherCleanTime) {}
+
+        public void Join(int start_x, int start_y, int end_x, int end_y, UUID attempting_user_id) {}
+        public void Subdivide(int start_x, int start_y, int end_x, int end_y, UUID attempting_user_id) {}
+
     }
 }

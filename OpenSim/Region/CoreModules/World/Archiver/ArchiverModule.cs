@@ -50,7 +50,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver
         /// <value>
         /// The file used to load and save an opensimulator archive if no filename has been specified
         /// </value>
-        protected const string DEFAULT_OAR_BACKUP_FILENAME = "region.oar";        
+        protected const string DEFAULT_OAR_BACKUP_FILENAME = "region.oar";
 
         public string Name 
         { 
@@ -94,8 +94,11 @@ namespace OpenSim.Region.CoreModules.World.Archiver
         public void HandleLoadOarConsoleCommand(string module, string[] cmdparams)
         {
             bool mergeOar = false;
+            bool skipAssets = false;
             
             OptionSet options = new OptionSet().Add("m|merge", delegate (string v) { mergeOar = v != null; });
+            options.Add("s|skip-assets", delegate (string v) { skipAssets = v != null; });
+            
             List<string> mainParams = options.Parse(cmdparams);
           
 //            m_log.DebugFormat("MERGE OAR IS [{0}]", mergeOar);
@@ -105,13 +108,13 @@ namespace OpenSim.Region.CoreModules.World.Archiver
             
             if (mainParams.Count > 2)
             {
-                DearchiveRegion(mainParams[2], mergeOar, Guid.Empty);
+                DearchiveRegion(mainParams[2], mergeOar, skipAssets, Guid.Empty);
             }
             else
             {
-                DearchiveRegion(DEFAULT_OAR_BACKUP_FILENAME, mergeOar, Guid.Empty);
+                DearchiveRegion(DEFAULT_OAR_BACKUP_FILENAME, mergeOar, skipAssets, Guid.Empty);
             }
-        }        
+        }
 
         /// <summary>
         /// Save a region to a file, including all the assets needed to restore it.
@@ -119,60 +122,68 @@ namespace OpenSim.Region.CoreModules.World.Archiver
         /// <param name="cmdparams"></param>
         public void HandleSaveOarConsoleCommand(string module, string[] cmdparams)
         {
-            if (cmdparams.Length > 2)
+            Dictionary<string, object> options = new Dictionary<string, object>();
+
+            OptionSet ops = new OptionSet();
+//            ops.Add("v|version=", delegate(string v) { options["version"] = v; });
+            ops.Add("p|profile=", delegate(string v) { options["profile"] = v; });
+
+            List<string> mainParams = ops.Parse(cmdparams);
+
+            if (mainParams.Count > 2)
             {
-                ArchiveRegion(cmdparams[2]);
+                ArchiveRegion(mainParams[2], options);
             }
             else
             {
-                ArchiveRegion(DEFAULT_OAR_BACKUP_FILENAME);
+                ArchiveRegion(DEFAULT_OAR_BACKUP_FILENAME, options);
             }
         }
         
-        public void ArchiveRegion(string savePath)
+        public void ArchiveRegion(string savePath, Dictionary<string, object> options)
         {
-            ArchiveRegion(savePath, Guid.Empty);
+            ArchiveRegion(savePath, Guid.Empty, options);
         }
-        
-        public void ArchiveRegion(string savePath, Guid requestId)
+
+        public void ArchiveRegion(string savePath, Guid requestId, Dictionary<string, object> options)
         {
             m_log.InfoFormat(
                 "[ARCHIVER]: Writing archive for region {0} to {1}", m_scene.RegionInfo.RegionName, savePath);
             
-            new ArchiveWriteRequestPreparation(m_scene, savePath, requestId).ArchiveRegion();
+            new ArchiveWriteRequestPreparation(m_scene, savePath, requestId).ArchiveRegion(options);
         }
-        
+
         public void ArchiveRegion(Stream saveStream)
         {
             ArchiveRegion(saveStream, Guid.Empty);
         }
-        
+
         public void ArchiveRegion(Stream saveStream, Guid requestId)
         {
-            new ArchiveWriteRequestPreparation(m_scene, saveStream, requestId).ArchiveRegion();
+            new ArchiveWriteRequestPreparation(m_scene, saveStream, requestId).ArchiveRegion(new Dictionary<string, object>());
         }
 
         public void DearchiveRegion(string loadPath)
         {
-            DearchiveRegion(loadPath, false, Guid.Empty);
+            DearchiveRegion(loadPath, false, false, Guid.Empty);
         }
         
-        public void DearchiveRegion(string loadPath, bool merge, Guid requestId)
+        public void DearchiveRegion(string loadPath, bool merge, bool skipAssets, Guid requestId)
         {
             m_log.InfoFormat(
                 "[ARCHIVER]: Loading archive to region {0} from {1}", m_scene.RegionInfo.RegionName, loadPath);
             
-            new ArchiveReadRequest(m_scene, loadPath, merge, requestId).DearchiveRegion();
+            new ArchiveReadRequest(m_scene, loadPath, merge, skipAssets, requestId).DearchiveRegion();
         }
         
         public void DearchiveRegion(Stream loadStream)
         {
-            DearchiveRegion(loadStream, false, Guid.Empty);
+            DearchiveRegion(loadStream, false, false, Guid.Empty);
         }
         
-        public void DearchiveRegion(Stream loadStream, bool merge, Guid requestId)
+        public void DearchiveRegion(Stream loadStream, bool merge, bool skipAssets, Guid requestId)
         {
-            new ArchiveReadRequest(m_scene, loadStream, merge, requestId).DearchiveRegion();
+            new ArchiveReadRequest(m_scene, loadStream, merge, skipAssets, requestId).DearchiveRegion();
         }
     }
 }

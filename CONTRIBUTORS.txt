@@ -28,7 +28,7 @@ people that make the day to day of OpenSim happen.
 * Diva (Crista Lopes, University of California, Irvine)
 * nlin (3Di)
 * Arthur Rodrigo S Valadares (IBM)
-
+* BlueWall (James Hughes)
 
 = Past Open Sim Developers =
 These folks are alumns of the OpenSim core group, but are now
@@ -88,12 +88,14 @@ what it is today.
 * Kitto Flora
 * KittyLiu
 * Kurt Taylor (IBM)
+* lkalif
 * lulurun 
 * M.Igarashi
 * maimedleech
 * Mic Bowman
 * Michelle Argus
 * Michael Cortez (The Flotsam Project, http://osflotsam.org/)
+* Micheil Merlin
 * Mike Osias (IBM)
 * Mike Pitman (IBM)
 * mikkopa/_someone - RealXtend
@@ -115,11 +117,13 @@ what it is today.
 * SachaMagne
 * Salahzar Stenvaag
 * sempuki
+* SignpostMarv
 * Snoopy
 * Strawberry Fride
 * tglion
 * tlaukkan/Tommil (Tommi S. E. Laukkanen, Bubble Cloud)
 * tyre
+* VikingErik
 * Vytek
 * webmage (IBM)
 * Xantor
@@ -127,6 +131,7 @@ what it is today.
 * YZh
 * Zackary Geers aka Kunnis Basiat
 * Zha Ewry
+* ziah
 
 
 = LSL Devs =
@@ -162,6 +167,8 @@ This software uses components from the following developers:
 * log4net (http://logging.apache.org/log4net/)
 * GlynnTucker.Cache (http://gtcache.sourceforge.net/)
 * NDesk.Options 0.2.1 (http://www.ndesk.org/Options)
+* Json.NET 3.5 Release 6.  The binary used is actually Newtonsoft.Json.Net20.dll for Mono 2.4 compatability (http://james.newtonking.com/projects/json-net.aspx)
+* zlib.net for C# 1.0.4 (http://www.componentace.com/zlib_.NET.htm)
 
 Some plugins are based on Cable Beach
 Cable Beach is Copyright (c) 2008 Intel Corporation

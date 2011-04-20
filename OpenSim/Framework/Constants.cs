@@ -36,10 +36,10 @@ namespace OpenSim.Framework
 
         public enum EstateAccessCodex : uint
         {
-            AccessOptions = 17,
-            AllowedGroups = 18,
-            EstateBans = 20,
-            EstateManagers = 24
+            AccessOptions = 1,
+            AllowedGroups = 2,
+            EstateBans = 4,
+            EstateManagers = 8
         }
 
         [Flags]public enum TeleportFlags : uint
@@ -83,7 +83,9 @@ namespace OpenSim.Framework
             /// <summary>Finished, Sim Changed</summary>
             FinishedViaNewSim = 1 << 28,
             /// <summary>Finished, Same Sim</summary>
-            FinishedViaSameSim = 1 << 29
+            FinishedViaSameSim = 1 << 29,
+            /// <summary>Agent coming into the grid from another grid</summary>
+            ViaHGLogin = 1 << 30
         }
 
     }

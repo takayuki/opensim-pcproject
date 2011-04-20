@@ -53,15 +53,20 @@ namespace OpenSim.Server.Handlers.Asset
                     String.Empty);
 
             if (assetService == String.Empty)
-                throw new Exception("No AssetService in config file");
+                throw new Exception("No LocalServiceModule in config file");
 
             Object[] args = new Object[] { config };
             m_AssetService =
                     ServerUtils.LoadPlugin<IAssetService>(assetService, args);
 
+            if (m_AssetService == null)
+                throw new Exception(String.Format("Failed to load AssetService from {0}; config is {1}", assetService, m_ConfigName));
+
+            bool allowDelete = serverConfig.GetBoolean("AllowRemoteDelete", false);
+
             server.AddStreamHandler(new AssetServerGetHandler(m_AssetService));
             server.AddStreamHandler(new AssetServerPostHandler(m_AssetService));
-            server.AddStreamHandler(new AssetServerDeleteHandler(m_AssetService));
+            server.AddStreamHandler(new AssetServerDeleteHandler(m_AssetService, allowDelete));
         }
     }
 }

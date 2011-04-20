@@ -42,7 +42,7 @@ namespace OpenSim.Services.Interfaces
         /// <param name="regionInfos"> </param>
         /// <returns></returns>
         /// <exception cref="System.Exception">Thrown if region registration failed</exception>
-        bool RegisterRegion(UUID scopeID, GridRegion regionInfos);
+        string RegisterRegion(UUID scopeID, GridRegion regionInfos);
 
         /// <summary>
         /// Deregister a region with the grid service.
@@ -90,9 +90,14 @@ namespace OpenSim.Services.Interfaces
 
         List<GridRegion> GetRegionRange(UUID scopeID, int xmin, int xmax, int ymin, int ymax);
 
+        List<GridRegion> GetDefaultRegions(UUID scopeID);
+        List<GridRegion> GetFallbackRegions(UUID scopeID, int x, int y);
+        List<GridRegion> GetHyperlinks(UUID scopeID);
+
+        int GetRegionFlags(UUID scopeID, UUID regionID);
     }
 
-    public class GridRegion
+    public class GridRegion : Object
     {
 
         /// <summary>
@@ -110,8 +115,20 @@ namespace OpenSim.Services.Interfaces
         /// </summary>
         public string ServerURI
         {
-            get { return m_serverURI; }
-            set { m_serverURI = value; }
+            get { 
+                if ( m_serverURI != string.Empty ) {
+                    return m_serverURI;
+                } else {
+                    return "http://" + m_externalHostName + ":" + m_httpPort + "/";
+                }
+            }
+            set { 
+                if ( value.EndsWith("/") ) {
+                    m_serverURI = value;
+                } else {
+                    m_serverURI = value + '/';
+                }
+            }
         }
         protected string m_serverURI;
 
@@ -154,10 +171,12 @@ namespace OpenSim.Services.Interfaces
         public UUID TerrainImage = UUID.Zero;
         public byte Access;
         public int  Maturity;
-        public string RegionSecret;
+        public string RegionSecret = string.Empty;
+        public string Token = string.Empty;
 
         public GridRegion()
         {
+            m_serverURI = string.Empty;
         }
 
         public GridRegion(int regionLocX, int regionLocY, IPEndPoint internalEndPoint, string externalUri)
@@ -200,12 +219,6 @@ namespace OpenSim.Services.Interfaces
             Maturity = ConvertFrom.RegionSettings.Maturity;
             RegionSecret = ConvertFrom.regionSecret;
             EstateOwner = ConvertFrom.EstateSettings.EstateOwner;
-            if (EstateOwner == UUID.Zero)
-            {
-                EstateOwner = ConvertFrom.MasterAvatarAssignedUUID;
-                ConvertFrom.EstateSettings.EstateOwner = EstateOwner;
-                ConvertFrom.EstateSettings.Save();
-            }
         }
 
         public GridRegion(GridRegion ConvertFrom)
@@ -224,6 +237,33 @@ namespace OpenSim.Services.Interfaces
             RegionSecret = ConvertFrom.RegionSecret;
             EstateOwner = ConvertFrom.EstateOwner;
         }
+
+        # region Definition of equality
+
+        /// <summary>
+        /// Define equality as two regions having the same, non-zero UUID.
+        /// </summary>
+        public bool Equals(GridRegion region)
+        {
+            if ((object)region == null)
+                return false;
+            // Return true if the non-zero UUIDs are equal:
+            return (RegionID != UUID.Zero) && RegionID.Equals(region.RegionID);
+        }
+
+        public override bool Equals(Object obj)
+        {
+            if (obj == null)
+                return false;
+            return Equals(obj as GridRegion);
+        }
+
+        public override int GetHashCode()
+        {
+            return RegionID.GetHashCode() ^ TerrainImage.GetHashCode();
+        }
+
+        #endregion
 
         /// <value>
         /// This accessor can throw all the exceptions that Dns.GetHostAddresses can throw.
@@ -267,8 +307,6 @@ namespace OpenSim.Services.Interfaces
 
                 return new IPEndPoint(ia, m_internalEndPoint.Port);
             }
-
-            set { m_externalHostName = value.ToString(); }
         }
 
         public string ExternalHostName
@@ -288,11 +326,6 @@ namespace OpenSim.Services.Interfaces
             get { return Util.UIntsToLong((uint)RegionLocX, (uint)RegionLocY); }
         }
 
-        public int getInternalEndPointPort()
-        {
-            return m_internalEndPoint.Port;
-        }
-
         public Dictionary<string, object> ToKeyValuePairs()
         {
             Dictionary<string, object> kvp = new Dictionary<string, object>();
@@ -308,6 +341,7 @@ namespace OpenSim.Services.Interfaces
             kvp["access"] = Access.ToString();
             kvp["regionSecret"] = RegionSecret;
             kvp["owner_uuid"] = EstateOwner.ToString();
+            kvp["Token"] = Token.ToString();
             // Maturity doesn't seem to exist in the DB
             return kvp;
         }
@@ -364,6 +398,9 @@ namespace OpenSim.Services.Interfaces
 
             if (kvp.ContainsKey("owner_uuid"))
                 EstateOwner = new UUID(kvp["owner_uuid"].ToString());
+
+            if (kvp.ContainsKey("Token"))
+                Token = kvp["Token"].ToString();
 
         }
     }

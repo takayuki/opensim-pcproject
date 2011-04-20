@@ -34,7 +34,6 @@ using Nini.Config;
 using OpenSim.Framework;
 using OpenSim.Framework.Console;
 using OpenSim.Framework.Communications;
-using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 
@@ -68,7 +67,7 @@ namespace OpenSim.Services.Connectors
             IConfig assetConfig = source.Configs["AssetService"];
             if (assetConfig == null)
             {
-                m_log.Error("[ASSET CONNECTOR]: AssetService missing from OpanSim.ini");
+                m_log.Error("[ASSET CONNECTOR]: AssetService missing from OpenSim.ini");
                 throw new Exception("Asset connector init error");
             }
 
@@ -109,6 +108,14 @@ namespace OpenSim.Services.Connectors
                     m_Cache.Cache(asset);
             }
             return asset;
+        }
+
+        public AssetBase GetCached(string id)
+        {
+            if (m_Cache != null)
+                return m_Cache.Get(id);
+
+            return null;
         }
 
         public AssetMetadata GetMetadata(string id)
@@ -243,7 +250,7 @@ namespace OpenSim.Services.Connectors
                 if (metadata == null)
                     return false;
 
-                asset = new AssetBase(metadata.FullID, metadata.Name, metadata.Type);
+                asset = new AssetBase(metadata.FullID, metadata.Name, metadata.Type, UUID.Zero.ToString());
                 asset.Metadata = metadata;
             }
             asset.Data = data;

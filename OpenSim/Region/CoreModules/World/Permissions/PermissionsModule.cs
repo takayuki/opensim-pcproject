@@ -32,60 +32,10 @@ using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
-using OpenSim.Framework.Communications.Cache;
+
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
-
-// Temporary fix of wrong GroupPowers constants in OpenMetaverse library
-enum GroupPowers : long
-     {
-        None = 0,
-        LandEjectAndFreeze = 1,
-        Invite = 2,
-        ReturnGroupSet = 2,
-        Eject = 4,
-        ReturnNonGroup = 4,
-        ChangeOptions = 8,
-        LandGardening = 8,
-        CreateRole = 16,
-        DeedObject = 16,
-        ModerateChat = 32,
-        DeleteRole = 32,
-        RoleProperties = 64,
-        ObjectManipulate = 64,
-        ObjectSetForSale = 128,
-        AssignMemberLimited = 128,
-        AssignMember = 256,
-        Accountable = 256,
-        RemoveMember = 512,
-        SendNotices = 1024,
-        ChangeActions = 1024,
-        ChangeIdentity = 2048,
-        ReceiveNotices = 2048,
-        StartProposal = 4096,
-        LandDeed = 4096,
-        VoteOnProposal = 8192,
-        LandRelease = 8192,
-        LandSetSale = 16384,
-        LandDivideJoin = 32768,
-        ReturnGroupOwned = 65536,
-        JoinChat = 65536,
-        FindPlaces = 131072,
-        LandChangeIdentity = 262144,
-        SetLandingPoint = 524288,
-        ChangeMedia = 1048576,
-        LandEdit = 2097152,
-        LandOptions = 4194304,
-        AllowEditLand = 8388608,
-        AllowFly = 16777216,
-        AllowRez = 33554432,
-        AllowLandmark = 67108864,
-        AllowVoiceChat = 134217728,
-        AllowSetHome = 268435456,
-        LandManageAllowed = 536870912,
-        LandManageBanned = 1073741824
-     }
 
 namespace OpenSim.Region.CoreModules.World.Permissions
 {
@@ -94,6 +44,23 @@ namespace OpenSim.Region.CoreModules.World.Permissions
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
                 
         protected Scene m_scene;
+
+        private InventoryFolderImpl m_libraryRootFolder;
+        protected InventoryFolderImpl LibraryRootFolder
+        {
+            get
+            {
+                if (m_libraryRootFolder != null)
+                    return m_libraryRootFolder;
+
+                ILibraryService lib = m_scene.RequestModuleInterface<ILibraryService>();
+                if (lib != null)
+                {
+                    m_libraryRootFolder = lib.LibraryRootFolder;
+                }
+                return m_libraryRootFolder;
+            }
+        }
 
         #region Constants
         // These are here for testing.  They will be taken out
@@ -125,6 +92,7 @@ namespace OpenSim.Region.CoreModules.World.Permissions
         private bool m_debugPermissions = false;
         private bool m_allowGridGods = false;
         private bool m_RegionOwnerIsGod = false;
+        private bool m_RegionManagerIsGod = false;
         private bool m_ParcelOwnerIsGod = false;
         
         /// <value>
@@ -144,7 +112,9 @@ namespace OpenSim.Region.CoreModules.World.Permissions
         private Dictionary<string, bool> GrantVB = new Dictionary<string, bool>();
         private Dictionary<string, bool> GrantJS = new Dictionary<string, bool>();
         private Dictionary<string, bool> GrantYP = new Dictionary<string, bool>();
-        private IFriendsModule m_friendsModule = null;
+        private IFriendsModule m_friendsModule;
+        private IGroupsModule m_groupsModule;
+        private IMoapModule m_moapModule;
 
         #endregion
 
@@ -158,7 +128,7 @@ namespace OpenSim.Region.CoreModules.World.Permissions
 
             string permissionModules = myConfig.GetString("permissionmodules", "DefaultPermissionsModule");
 
-            List<string> modules=new List<string>(permissionModules.Split(','));
+            List<string> modules = new List<string>(permissionModules.Split(','));
 
             if (!modules.Contains("DefaultPermissionsModule"))
                 return;
@@ -167,6 +137,7 @@ namespace OpenSim.Region.CoreModules.World.Permissions
             m_bypassPermissions = !myConfig.GetBoolean("serverside_object_permissions", false);
             m_propagatePermissions = myConfig.GetBoolean("propagate_permissions", true);
             m_RegionOwnerIsGod = myConfig.GetBoolean("region_owner_is_god", true);
+            m_RegionManagerIsGod = myConfig.GetBoolean("region_manager_is_god", false);
             m_ParcelOwnerIsGod = myConfig.GetBoolean("parcel_owner_is_god", true);
             
             m_allowedScriptCreators 
@@ -189,16 +160,17 @@ namespace OpenSim.Region.CoreModules.World.Permissions
             m_scene.Permissions.OnDeedParcel += CanDeedParcel;
             m_scene.Permissions.OnDeedObject += CanDeedObject;
             m_scene.Permissions.OnIsGod += IsGod;
+            m_scene.Permissions.OnIsAdministrator += IsAdministrator;
             m_scene.Permissions.OnDuplicateObject += CanDuplicateObject;
             m_scene.Permissions.OnDeleteObject += CanDeleteObject; //MAYBE FULLY IMPLEMENTED
             m_scene.Permissions.OnEditObject += CanEditObject; //MAYBE FULLY IMPLEMENTED
-            m_scene.Permissions.OnEditParcel += CanEditParcel; //MAYBE FULLY IMPLEMENTED
+            m_scene.Permissions.OnEditParcelProperties += CanEditParcelProperties; //MAYBE FULLY IMPLEMENTED
             m_scene.Permissions.OnInstantMessage += CanInstantMessage;
             m_scene.Permissions.OnInventoryTransfer += CanInventoryTransfer; //NOT YET IMPLEMENTED
             m_scene.Permissions.OnIssueEstateCommand += CanIssueEstateCommand; //FULLY IMPLEMENTED
             m_scene.Permissions.OnMoveObject += CanMoveObject; //MAYBE FULLY IMPLEMENTED
             m_scene.Permissions.OnObjectEntry += CanObjectEntry;
-            m_scene.Permissions.OnReturnObject += CanReturnObject; //NOT YET IMPLEMENTED
+            m_scene.Permissions.OnReturnObjects += CanReturnObjects; //NOT YET IMPLEMENTED
             m_scene.Permissions.OnRezObject += CanRezObject; //MAYBE FULLY IMPLEMENTED
             m_scene.Permissions.OnRunConsoleCommand += CanRunConsoleCommand;
             m_scene.Permissions.OnRunScript += CanRunScript; //NOT YET IMPLEMENTED
@@ -216,7 +188,7 @@ namespace OpenSim.Region.CoreModules.World.Permissions
             m_scene.Permissions.OnEditNotecard += CanEditNotecard; //NOT YET IMPLEMENTED
             m_scene.Permissions.OnEditScript += CanEditScript; //NOT YET IMPLEMENTED
             
-            m_scene.Permissions.OnCreateObjectInventory += CanCreateObjectInventory; //NOT IMPLEMENTED HERE 
+            m_scene.Permissions.OnCreateObjectInventory += CanCreateObjectInventory;
             m_scene.Permissions.OnEditObjectInventory += CanEditObjectInventory;//MAYBE FULLY IMPLEMENTED
             m_scene.Permissions.OnCopyObjectInventory += CanCopyObjectInventory; //NOT YET IMPLEMENTED
             m_scene.Permissions.OnDeleteObjectInventory += CanDeleteObjectInventory; //NOT YET IMPLEMENTED
@@ -228,7 +200,9 @@ namespace OpenSim.Region.CoreModules.World.Permissions
             m_scene.Permissions.OnDeleteUserInventory += CanDeleteUserInventory; //NOT YET IMPLEMENTED
             
             m_scene.Permissions.OnTeleport += CanTeleport; //NOT YET IMPLEMENTED
-            m_scene.Permissions.OnUseObjectReturn += CanUseObjectReturn; //NOT YET IMPLEMENTED
+            
+            m_scene.Permissions.OnControlPrimMedia += CanControlPrimMedia;
+            m_scene.Permissions.OnInteractWithPrimMedia += CanInteractWithPrimMedia;
 
             m_scene.AddCommand(this, "bypass permissions",
                     "bypass permissions <true / false>",
@@ -368,9 +342,18 @@ namespace OpenSim.Region.CoreModules.World.Permissions
             m_friendsModule = m_scene.RequestModuleInterface<IFriendsModule>();
 
             if (m_friendsModule == null)
-                m_log.Error("[PERMISSIONS]: Friends module not found, friend permissions will not work");
-            else
-                m_log.Info("[PERMISSIONS]: Friends module found, friend permissions enabled");
+                m_log.Warn("[PERMISSIONS]: Friends module not found, friend permissions will not work");
+
+            m_groupsModule = m_scene.RequestModuleInterface<IGroupsModule>();
+
+            if (m_groupsModule == null)
+                m_log.Warn("[PERMISSIONS]: Groups module not found, group permissions will not work");
+            
+            m_moapModule = m_scene.RequestModuleInterface<IMoapModule>();
+            
+            // This log line will be commented out when no longer required for debugging
+//            if (m_moapModule == null)
+//                m_log.Warn("[PERMISSIONS]: Media on a prim module not found, media on a prim permissions will not work");
         }
 
         public void Close()
@@ -405,14 +388,17 @@ namespace OpenSim.Region.CoreModules.World.Permissions
         // with the powers requested (powers = 0 for no powers check)
         protected bool IsGroupMember(UUID groupID, UUID userID, ulong powers)
         {
-            ScenePresence sp = m_scene.GetScenePresence(userID);
-            if (sp != null)
-            {
-                IClientAPI client = sp.ControllingClient;
+            if (null == m_groupsModule)
+                return false;
 
-                return ((groupID == client.ActiveGroupId) && (client.ActiveGroupPowers != 0) &&
-                    ((powers == 0) || ((client.ActiveGroupPowers & powers) == powers)));
+            GroupMembershipData gmd = m_groupsModule.GetMembershipData(groupID, userID);
+
+            if (gmd != null)
+            {
+                if (((gmd.GroupPowers != 0) && powers == 0) || (gmd.GroupPowers & powers) == powers)
+                    return true;
             }
+
             return false;
         }
             
@@ -460,30 +446,36 @@ namespace OpenSim.Region.CoreModules.World.Permissions
         {
             if (user == UUID.Zero) return false;
         
-            if (m_scene.RegionInfo.MasterAvatarAssignedUUID != UUID.Zero)
-            {
-                if (m_RegionOwnerIsGod && (m_scene.RegionInfo.MasterAvatarAssignedUUID == user))
-                    return true;
-            }
-            
             if (m_scene.RegionInfo.EstateSettings.EstateOwner != UUID.Zero)
             {
-                if (m_scene.RegionInfo.EstateSettings.EstateOwner == user)
+                if (m_scene.RegionInfo.EstateSettings.EstateOwner == user && m_RegionOwnerIsGod)
                     return true;
             }
             
+            if (IsEstateManager(user) && m_RegionManagerIsGod)
+                return true;
+
             if (m_allowGridGods)
             {
-                CachedUserInfo profile = m_scene.CommsManager.UserProfileCacheService.GetUserDetails(user);
-                if (profile != null && profile.UserProfile != null)
+                ScenePresence sp = m_scene.GetScenePresence(user);
+                if (sp != null)
                 {
-                    if (profile.UserProfile.GodLevel >= 200)
+                    if (sp.UserLevel >= 200)
+                        return true;
+                    return false;
+                }
+
+                UserAccount account = m_scene.UserAccountService.GetUserAccount(m_scene.RegionInfo.ScopeID, user);
+                if (account != null)
+                {
+                    if (account.UserLevel >= 200)
                         return true;
                 }
             }
 
             return false;
         }
+
         protected bool IsFriendWithPerms(UUID user,UUID objectOwner)
         {
             
@@ -493,13 +485,10 @@ namespace OpenSim.Region.CoreModules.World.Permissions
             if (m_friendsModule == null)
                 return false;
 
-            List<FriendListItem> profile = m_friendsModule.GetUserFriends(user);
+            uint friendPerms = m_friendsModule.GetFriendPerms(user, objectOwner);
+            if ((friendPerms & (uint)FriendRights.CanModifyObjects) != 0)
+                return true;
 
-            foreach (FriendListItem item in profile)
-            {
-                if (item.Friend == objectOwner && (item.FriendPerms & (uint)FriendRights.CanModifyObjects) != 0)
-                    return true;
-            }
             return false;
         }
 
@@ -595,16 +584,17 @@ namespace OpenSim.Region.CoreModules.World.Permissions
             if (IsFriendWithPerms(user, objectOwner))
                 return objectOwnerMask;
 
-            // Estate users should be able to edit anything in the sim
-            if (IsEstateManager(user) && m_RegionOwnerIsGod && !IsAdministrator(objectOwner))
+            // Estate users should be able to edit anything in the sim if RegionOwnerIsGod is set
+            if (m_RegionOwnerIsGod && IsEstateManager(user) && !IsAdministrator(objectOwner))
                 return objectOwnerMask;
 
             // Admin should be able to edit anything in the sim (including admin objects)
             if (IsAdministrator(user))
                 return objectOwnerMask;
-        
+            
             // Users should be able to edit what is over their land.
-            ILandObject parcel = m_scene.LandChannel.GetLandObject(task.AbsolutePosition.X, task.AbsolutePosition.Y);
+            Vector3 taskPos = task.AbsolutePosition;
+            ILandObject parcel = m_scene.LandChannel.GetLandObject(taskPos.X, taskPos.Y);
             if (parcel != null && parcel.LandData.OwnerID == user && m_ParcelOwnerIsGod)
             {
                 // Admin objects should not be editable by the above
@@ -652,7 +642,7 @@ namespace OpenSim.Region.CoreModules.World.Permissions
         /// implemented by callers.
         /// </summary>
         /// <param name="currentUser"></param>
-        /// <param name="objId"></param>
+        /// <param name="objId">This is a scene object group UUID</param>
         /// <param name="denyOnLocked"></param>
         /// <returns></returns>
         protected bool GenericObjectPermission(UUID currentUser, UUID objId, bool denyOnLocked)
@@ -699,8 +689,17 @@ namespace OpenSim.Region.CoreModules.World.Permissions
                 permission = false;
             }
 
+//            m_log.DebugFormat(
+//                "[PERMISSIONS]: group.GroupID = {0}, part.GroupMask = {1}, isGroupMember = {2} for {3}", 
+//                group.GroupID,
+//                m_scene.GetSceneObjectPart(objId).GroupMask, 
+//                IsGroupMember(group.GroupID, currentUser, 0), 
+//                currentUser);
+            
             // Group members should be able to edit group objects
-            if ((group.GroupID != UUID.Zero) && ((m_scene.GetSceneObjectPart(objId).GroupMask & (uint)PermissionMask.Modify) != 0) && IsGroupMember(group.GroupID, currentUser, 0))
+            if ((group.GroupID != UUID.Zero) 
+                && ((m_scene.GetSceneObjectPart(objId).GroupMask & (uint)PermissionMask.Modify) != 0) 
+                && IsGroupMember(group.GroupID, currentUser, 0))
             {
                 // Return immediately, so that the administrator can shares group objects
                 return true;
@@ -800,7 +799,7 @@ namespace OpenSim.Region.CoreModules.World.Permissions
         }
     
         protected bool GenericParcelOwnerPermission(UUID user, ILandObject parcel, ulong groupPowers)
-        {          
+        {
             if (parcel.LandData.OwnerID == user)
             {
                 // Returning immediately so that group deeded objects on group deeded land don't trigger a NRE on
@@ -935,7 +934,6 @@ namespace OpenSim.Region.CoreModules.World.Permissions
             DebugPermissionInformation(MethodInfo.GetCurrentMethod().Name);
             if (m_bypassPermissions) return m_bypassPermissionsValue;
 
-
             return GenericObjectPermission(editorID, objectID, false);
         }
 
@@ -957,12 +955,12 @@ namespace OpenSim.Region.CoreModules.World.Permissions
             return GenericObjectPermission(editorID, objectID, false);
         }
 
-        private bool CanEditParcel(UUID user, ILandObject parcel, Scene scene)
+        private bool CanEditParcelProperties(UUID user, ILandObject parcel, GroupPowers p, Scene scene)
         {
             DebugPermissionInformation(MethodInfo.GetCurrentMethod().Name);
             if (m_bypassPermissions) return m_bypassPermissionsValue;
 
-            return GenericParcelOwnerPermission(user, parcel, (ulong)GroupPowers.LandDivideJoin);
+            return GenericParcelOwnerPermission(user, parcel, (ulong)p);
         }
 
         /// <summary>
@@ -1005,9 +1003,9 @@ namespace OpenSim.Region.CoreModules.World.Permissions
                 IInventoryService invService = m_scene.InventoryService;
                 InventoryItemBase assetRequestItem = new InventoryItemBase(notecard, user);
                 assetRequestItem = invService.GetItem(assetRequestItem);
-                if (assetRequestItem == null) // Library item
+                if (assetRequestItem == null && LibraryRootFolder != null) // Library item
                 {
-                    assetRequestItem = scene.CommsManager.UserProfileCacheService.LibraryRoot.FindItem(notecard);
+                    assetRequestItem = LibraryRootFolder.FindItem(notecard);
 
                     if (assetRequestItem != null) // Implicitly readable
                         return true;
@@ -1042,7 +1040,9 @@ namespace OpenSim.Region.CoreModules.World.Permissions
             
                     if ((part.GroupMask & (uint)PermissionMask.Modify) == 0)
                         return false;
-                } else {
+                } 
+                else
+                {
                     if ((part.OwnerMask & (uint)PermissionMask.Modify) == 0)
                     return false;
                 }
@@ -1058,7 +1058,7 @@ namespace OpenSim.Region.CoreModules.World.Permissions
                         return false;
 
                     if (!IsGroupMember(ti.GroupID, user, 0))
-                    return false;
+                        return false;
                 }
 
                 // Require full perms
@@ -1252,12 +1252,106 @@ namespace OpenSim.Region.CoreModules.World.Permissions
             return false;
         }
 
-        private bool CanReturnObject(UUID objectID, UUID returnerID, Scene scene)
+        private bool CanReturnObjects(ILandObject land, UUID user, List<SceneObjectGroup> objects, Scene scene)
         {
             DebugPermissionInformation(MethodInfo.GetCurrentMethod().Name);
             if (m_bypassPermissions) return m_bypassPermissionsValue;
 
-            return GenericObjectPermission(returnerID, objectID, false);
+            GroupPowers powers;
+            ILandObject l;
+
+            ScenePresence sp = scene.GetScenePresence(user);
+            if (sp == null)
+                return false;
+
+            IClientAPI client = sp.ControllingClient;
+
+            foreach (SceneObjectGroup g in new List<SceneObjectGroup>(objects))
+            {
+                // Any user can return their own objects at any time
+                //
+                if (GenericObjectPermission(user, g.UUID, false))
+                    continue;
+
+                // This is a short cut for efficiency. If land is non-null,
+                // then all objects are on that parcel and we can save
+                // ourselves the checking for each prim. Much faster.
+                //
+                if (land != null)
+                {
+                    l = land;
+                }
+                else
+                {
+                    Vector3 pos = g.AbsolutePosition;
+
+                    l = scene.LandChannel.GetLandObject(pos.X, pos.Y);
+                }
+
+                // If it's not over any land, then we can't do a thing
+                if (l == null)
+                {
+                    objects.Remove(g);
+                    continue;
+                }
+
+                // If we own the land outright, then allow
+                //
+                if (l.LandData.OwnerID == user)
+                    continue;
+
+                // Group voodoo
+                //
+                if (l.LandData.IsGroupOwned)
+                {
+                    powers = (GroupPowers)client.GetGroupPowers(l.LandData.GroupID);
+                    // Not a group member, or no rights at all
+                    //
+                    if (powers == (GroupPowers)0)
+                    {
+                        objects.Remove(g);
+                        continue;
+                    }
+
+                    // Group deeded object?
+                    //
+                    if (g.OwnerID == l.LandData.GroupID &&
+                        (powers & GroupPowers.ReturnGroupOwned) == (GroupPowers)0)
+                    {
+                        objects.Remove(g);
+                        continue;
+                    }
+
+                    // Group set object?
+                    //
+                    if (g.GroupID == l.LandData.GroupID &&
+                        (powers & GroupPowers.ReturnGroupSet) == (GroupPowers)0)
+                    {
+                        objects.Remove(g);
+                        continue;
+                    }
+
+                    if ((powers & GroupPowers.ReturnNonGroup) == (GroupPowers)0)
+                    {
+                        objects.Remove(g);
+                        continue;
+                    }
+
+                    // So we can remove all objects from this group land.
+                    // Fine.
+                    //
+                    continue;
+                }
+
+                // By default, we can't remove
+                //
+                objects.Remove(g);
+            }
+
+            if (objects.Count == 0)
+                return false;
+
+            return true;
         }
 
         private bool CanRezObject(int objectCount, UUID owner, Vector3 objectPosition, Scene scene)
@@ -1425,9 +1519,9 @@ namespace OpenSim.Region.CoreModules.World.Permissions
                 IInventoryService invService = m_scene.InventoryService;
                 InventoryItemBase assetRequestItem = new InventoryItemBase(script, user);
                 assetRequestItem = invService.GetItem(assetRequestItem);
-                if (assetRequestItem == null) // Library item
+                if (assetRequestItem == null && LibraryRootFolder != null) // Library item
                 {
-                    assetRequestItem = m_scene.CommsManager.UserProfileCacheService.LibraryRoot.FindItem(script);
+                    assetRequestItem = LibraryRootFolder.FindItem(script);
 
                     if (assetRequestItem != null) // Implicitly readable
                         return true;
@@ -1462,14 +1556,16 @@ namespace OpenSim.Region.CoreModules.World.Permissions
                 if (part.OwnerID != user)
                 {
                     if (part.GroupID == UUID.Zero)
-                    return false;
+                        return false;
 
                     if (!IsGroupMember(part.GroupID, user, 0))
                         return false;
             
                     if ((part.GroupMask & (uint)PermissionMask.Modify) == 0)
                         return false;
-                } else {
+                } 
+                else 
+                {
                     if ((part.OwnerMask & (uint)PermissionMask.Modify) == 0)
                         return false;
                 }
@@ -1520,9 +1616,9 @@ namespace OpenSim.Region.CoreModules.World.Permissions
                 IInventoryService invService = m_scene.InventoryService;
                 InventoryItemBase assetRequestItem = new InventoryItemBase(notecard, user);
                 assetRequestItem = invService.GetItem(assetRequestItem);
-                if (assetRequestItem == null) // Library item
+                if (assetRequestItem == null && LibraryRootFolder != null) // Library item
                 {
-                    assetRequestItem = m_scene.CommsManager.UserProfileCacheService.LibraryRoot.FindItem(notecard);
+                    assetRequestItem = LibraryRootFolder.FindItem(notecard);
 
                     if (assetRequestItem != null) // Implicitly readable
                         return true;
@@ -1586,7 +1682,7 @@ namespace OpenSim.Region.CoreModules.World.Permissions
             DebugPermissionInformation(MethodInfo.GetCurrentMethod().Name);
             if (m_bypassPermissions) return m_bypassPermissionsValue;
 
-            return true;
+            return GenericObjectPermission(userID, objectID, false);
         }
 
         private bool CanDelinkObject(UUID userID, UUID objectID)
@@ -1594,7 +1690,7 @@ namespace OpenSim.Region.CoreModules.World.Permissions
             DebugPermissionInformation(MethodInfo.GetCurrentMethod().Name);
             if (m_bypassPermissions) return m_bypassPermissionsValue;
 
-            return true;
+            return GenericObjectPermission(userID, objectID, false);
         }
 
         private bool CanBuyLand(UUID userID, ILandObject parcel, Scene scene)
@@ -1634,10 +1730,28 @@ namespace OpenSim.Region.CoreModules.World.Permissions
             DebugPermissionInformation(MethodInfo.GetCurrentMethod().Name);
             if (m_bypassPermissions) return m_bypassPermissionsValue;
 
-            if ((int)InventoryType.LSL == invType)
-                if (m_allowedScriptCreators == UserSet.Administrators && !IsAdministrator(userID))
-                    return false;
-            
+            SceneObjectPart part = m_scene.GetSceneObjectPart(objectID);
+            ScenePresence p = m_scene.GetScenePresence(userID);
+
+            if (part == null || p == null)
+                return false;
+
+            if (!IsAdministrator(userID))
+            {
+                if (part.OwnerID != userID)
+                {
+                    // Group permissions
+                    if ((part.GroupID == UUID.Zero) || (p.ControllingClient.GetGroupPowers(part.GroupID) == 0) || ((part.GroupMask & (uint)PermissionMask.Modify) == 0))
+                        return false;
+                } else {
+                    if ((part.OwnerMask & (uint)PermissionMask.Modify) == 0)
+                        return false;
+                }
+                if ((int)InventoryType.LSL == invType)
+                    if (m_allowedScriptCreators == UserSet.Administrators)
+                        return false;
+            }
+
             return true;
         }
         
@@ -1724,68 +1838,8 @@ namespace OpenSim.Region.CoreModules.World.Permissions
             return GenericObjectPermission(agentID, prim, false);
         }
 
-        private bool CanUseObjectReturn(ILandObject parcel, uint type, IClientAPI client, List<SceneObjectGroup> retlist, Scene scene)
+        private bool CanCompileScript(UUID ownerUUID, int scriptType, Scene scene) 
         {
-            DebugPermissionInformation(MethodInfo.GetCurrentMethod().Name);
-            if (m_bypassPermissions) return m_bypassPermissionsValue;
-
-            long powers = 0;
-            if (parcel.LandData.GroupID != UUID.Zero)
-                client.GetGroupPowers(parcel.LandData.GroupID);
-
-            switch (type)
-            {
-            case (uint)ObjectReturnType.Owner:
-                // Don't let group members return owner's objects, ever
-                //
-                if (parcel.LandData.IsGroupOwned)
-                {
-                    if ((powers & (long)GroupPowers.ReturnGroupOwned) != 0)
-                        return true;
-                }
-                else
-                {
-                    if (parcel.LandData.OwnerID != client.AgentId)
-                        return false;
-                }
-        return GenericParcelOwnerPermission(client.AgentId, parcel, (ulong)GroupPowers.ReturnGroupOwned);
-            case (uint)ObjectReturnType.Group:
-                if (parcel.LandData.OwnerID != client.AgentId)
-                {
-                    // If permissionis granted through a group...
-                    //
-                    if ((powers & (long)GroupPowers.ReturnGroupSet) != 0)
-                    {
-                        foreach (SceneObjectGroup g in new List<SceneObjectGroup>(retlist))
-                        {
-                            // check for and remove group owned objects unless
-                            // the user also has permissions to return those
-                            //
-                            if (g.OwnerID == g.GroupID &&
-                                    ((powers & (long)GroupPowers.ReturnGroupOwned) == 0))
-                            {
-                                retlist.Remove(g);
-                            }
-                        }
-                        // And allow the operation
-                        //
-                        return true;
-                    }
-                }
-                return GenericParcelOwnerPermission(client.AgentId, parcel, (ulong)GroupPowers.ReturnGroupSet);
-            case (uint)ObjectReturnType.Other:
-                if ((powers & (long)GroupPowers.ReturnNonGroup) != 0)
-                    return true;
-                return GenericParcelOwnerPermission(client.AgentId, parcel, (ulong)GroupPowers.ReturnNonGroup);
-            case (uint)ObjectReturnType.List:
-                break;
-            }
-
-            return GenericParcelOwnerPermission(client.AgentId, parcel, 0);
-        // Is it correct to be less restrictive for lists of objects to be returned?
-        }
-        
-        private bool CanCompileScript(UUID ownerUUID, int scriptType, Scene scene) {
              //m_log.DebugFormat("check if {0} is allowed to compile {1}", ownerUUID, scriptType);
             switch (scriptType) {
                 case 0:
@@ -1817,6 +1871,81 @@ namespace OpenSim.Region.CoreModules.World.Permissions
                     break;
             }
             return(false);
+        }
+        
+        private bool CanControlPrimMedia(UUID agentID, UUID primID, int face)
+        {
+//            m_log.DebugFormat(
+//                "[PERMISSONS]: Performing CanControlPrimMedia check with agentID {0}, primID {1}, face {2}",
+//                agentID, primID, face);
+            
+            if (null == m_moapModule)
+                return false;
+            
+            SceneObjectPart part = m_scene.GetSceneObjectPart(primID);
+            if (null == part)
+                return false;
+            
+            MediaEntry me = m_moapModule.GetMediaEntry(part, face);
+            
+            // If there is no existing media entry then it can be controlled (in this context, created).
+            if (null == me)
+                return true;
+            
+//            m_log.DebugFormat(
+//                "[PERMISSIONS]: Checking CanControlPrimMedia for {0} on {1} face {2} with control permissions {3}", 
+//                agentID, primID, face, me.ControlPermissions);
+            
+            return GenericObjectPermission(agentID, part.ParentGroup.UUID, true);
+        }
+        
+        private bool CanInteractWithPrimMedia(UUID agentID, UUID primID, int face)
+        {
+//            m_log.DebugFormat(
+//                "[PERMISSONS]: Performing CanInteractWithPrimMedia check with agentID {0}, primID {1}, face {2}",
+//                agentID, primID, face);
+            
+            if (null == m_moapModule)
+                return false;
+            
+            SceneObjectPart part = m_scene.GetSceneObjectPart(primID);
+            if (null == part)
+                return false;
+            
+            MediaEntry me = m_moapModule.GetMediaEntry(part, face);
+            
+            // If there is no existing media entry then it can be controlled (in this context, created).
+            if (null == me)
+                return true;
+            
+//            m_log.DebugFormat(
+//                "[PERMISSIONS]: Checking CanInteractWithPrimMedia for {0} on {1} face {2} with interact permissions {3}", 
+//                agentID, primID, face, me.InteractPermissions);
+            
+            return GenericPrimMediaPermission(part, agentID, me.InteractPermissions);
+        }
+        
+        private bool GenericPrimMediaPermission(SceneObjectPart part, UUID agentID, MediaPermission perms)
+        {
+//            if (IsAdministrator(agentID))
+//                return true;
+            
+            if ((perms & MediaPermission.Anyone) == MediaPermission.Anyone)
+                return true;
+
+            if ((perms & MediaPermission.Owner) == MediaPermission.Owner)
+            {
+                if (agentID == part.OwnerID)
+                    return true;
+            }
+            
+            if ((perms & MediaPermission.Group) == MediaPermission.Group)
+            {
+                if (IsGroupMember(part.GroupID, agentID, 0))
+                    return true;
+            }
+            
+            return false;
         }
     }
 }

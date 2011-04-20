@@ -25,15 +25,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
-using OpenSim.Framework.Communications.Cache;
+
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Services.Interfaces;
 
 namespace OpenSim.Region.CoreModules.Avatar.Dialog
 {
@@ -47,12 +49,16 @@ namespace OpenSim.Region.CoreModules.Avatar.Dialog
         {
             m_scene = scene;
             m_scene.RegisterModuleInterface<IDialogModule>(this);
-            
-            m_scene.AddCommand(
-                this, "alert", "alert <first> <last> <message>", "Send an alert to a user", HandleAlertConsoleCommand);
 
             m_scene.AddCommand(
-                this, "alert general", "alert general <message>", "Send an alert to everyone", HandleAlertConsoleCommand);
+                this, "alert", "alert <message>",
+                "Send an alert to everyone",
+                HandleAlertConsoleCommand);
+
+            m_scene.AddCommand(
+                this, "alert-user", "alert-user <first> <last> <message>",
+                "Send an alert to a user",
+                HandleAlertConsoleCommand);
         }
         
         public void PostInitialise() {}
@@ -85,43 +91,30 @@ namespace OpenSim.Region.CoreModules.Avatar.Dialog
         
         public void SendAlertToUser(string firstName, string lastName, string message, bool modal)
         {
-            ScenePresence[] presenceList = m_scene.GetScenePresences();
-
-            for (int i = 0; i < presenceList.Length; i++)
-            {
-                ScenePresence presence = presenceList[i];
-
-                if (presence.Firstname == firstName && presence.Lastname == lastName)
-                {
-                    presence.ControllingClient.SendAgentAlertMessage(message, modal);
-                    break;
-                }
-            }
+            ScenePresence presence = m_scene.GetScenePresence(firstName, lastName);
+            if (presence != null)
+                presence.ControllingClient.SendAgentAlertMessage(message, modal);
         }
         
         public void SendGeneralAlert(string message)
         {
-            ScenePresence[] presenceList = m_scene.GetScenePresences();
-
-            for (int i = 0; i < presenceList.Length; i++)
+            m_scene.ForEachScenePresence(delegate(ScenePresence presence)
             {
-                ScenePresence presence = presenceList[i];
-
                 if (!presence.IsChildAgent)
                     presence.ControllingClient.SendAlertMessage(message);
-            }
+            });
         }
 
         public void SendDialogToUser(
             UUID avatarID, string objectName, UUID objectID, UUID ownerID,
             string message, UUID textureID, int ch, string[] buttonlabels)
         {
-            CachedUserInfo info = m_scene.CommsManager.UserProfileCacheService.GetUserDetails(ownerID);
+            UserAccount account = m_scene.UserAccountService.GetUserAccount(m_scene.RegionInfo.ScopeID, ownerID);
             string ownerFirstName, ownerLastName;
-            if (info != null)
+            if (account != null)
             {
-                ownerFirstName = info.UserProfile.FirstName;
-                ownerLastName = info.UserProfile.SurName;
+                ownerFirstName = account.FirstName;
+                ownerLastName = account.LastName;
             }
             else
             {
@@ -143,25 +136,35 @@ namespace OpenSim.Region.CoreModules.Avatar.Dialog
                 sp.ControllingClient.SendLoadURL(objectName, objectID, ownerID, groupOwned, message, url);
         }
         
-        public void SendNotificationToUsersInEstate(
-            UUID fromAvatarID, string fromAvatarName, string message)
+        public void SendTextBoxToUser(UUID avatarid, string message, int chatChannel, string name, UUID objectid, UUID ownerid)
         {
-            // TODO: This does not yet do what it says on the tin - it only sends the message to users in the same
-            // region as the sending avatar.
-            SendNotificationToUsersInRegion(fromAvatarID, fromAvatarName, message);
+            UserAccount account = m_scene.UserAccountService.GetUserAccount(m_scene.RegionInfo.ScopeID, ownerid);
+            string ownerFirstName, ownerLastName;
+            if (account != null)
+            {
+                ownerFirstName = account.FirstName;
+                ownerLastName = account.LastName;
+            }
+            else
+            {
+                ownerFirstName = "(unknown";
+                ownerLastName = "user)";
+            }
+
+            ScenePresence sp = m_scene.GetScenePresence(avatarid);
+            
+            if (sp != null)
+                sp.ControllingClient.SendTextBoxRequest(message, chatChannel, name, ownerFirstName, ownerLastName, objectid);
         }
-        
+
         public void SendNotificationToUsersInRegion(
             UUID fromAvatarID, string fromAvatarName, string message)
         {
-            ScenePresence[] presences = m_scene.GetScenePresences();
-
-            for (int i = 0; i < presences.Length; i++)
+            m_scene.ForEachScenePresence(delegate(ScenePresence presence)
             {
-                ScenePresence presence = presences[i];
                 if (!presence.IsChildAgent)
                     presence.ControllingClient.SendBlueBoxMessage(fromAvatarID, fromAvatarName, message);
-            }
+            });
         }
         
         /// <summary>
@@ -173,25 +176,31 @@ namespace OpenSim.Region.CoreModules.Avatar.Dialog
         {
             if (m_scene.ConsoleScene() != null && m_scene.ConsoleScene() != m_scene)
                 return;
-            
-            if (cmdparams[1] == "general")
+
+            string message = string.Empty;
+
+            if (cmdparams[0].ToLower().Equals("alert"))
             {
-                string message = CombineParams(cmdparams, 2);
-                
-                m_log.InfoFormat(
-                    "[DIALOG]: Sending general alert in region {0} with message {1}", m_scene.RegionInfo.RegionName, message);
+                message = CombineParams(cmdparams, 1);
+                m_log.InfoFormat("[DIALOG]: Sending general alert in region {0} with message {1}",
+                    m_scene.RegionInfo.RegionName, message);
                 SendGeneralAlert(message);
             }
-            else
+            else if (cmdparams.Length > 3)
             {
                 string firstName = cmdparams[1];
                 string lastName = cmdparams[2];
-                string message = CombineParams(cmdparams, 3);
-                
+                message = CombineParams(cmdparams, 3);
                 m_log.InfoFormat(
-                    "[DIALOG]: Sending alert in region {0} to {1} {2} with message {3}", 
+                    "[DIALOG]: Sending alert in region {0} to {1} {2} with message {3}",
                     m_scene.RegionInfo.RegionName, firstName, lastName, message);
                 SendAlertToUser(firstName, lastName, message, false);
+            }
+            else
+            {
+                OpenSim.Framework.Console.MainConsole.Instance.Output(
+                    "Usage: alert <message> | alert-user <first> <last> <message>");
+                return;
             }
         }
 

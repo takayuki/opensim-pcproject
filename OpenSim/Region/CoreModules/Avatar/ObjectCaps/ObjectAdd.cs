@@ -43,8 +43,9 @@ namespace OpenSim.Region.CoreModules.Avatar.ObjectCaps
 {
     public class ObjectAdd : IRegionModule
     {
-        private static readonly ILog m_log =
-            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILog m_log =
+//            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        
         private Scene m_scene;
         #region IRegionModule Members
 
@@ -63,7 +64,7 @@ namespace OpenSim.Region.CoreModules.Avatar.ObjectCaps
         {
             UUID capuuid = UUID.Random();
             
-            m_log.InfoFormat("[OBJECTADD]: {0}", "/CAPS/OA/" + capuuid + "/");
+//            m_log.InfoFormat("[OBJECTADD]: {0}", "/CAPS/OA/" + capuuid + "/");
 
             caps.RegisterHandler("ObjectAdd",
                                  new RestHTTPHandler("POST", "/CAPS/OA/" + capuuid + "/",
@@ -82,7 +83,7 @@ namespace OpenSim.Region.CoreModules.Avatar.ObjectCaps
             responsedata["str_response_string"] = "Request wasn't what was expected";
             ScenePresence avatar;
             
-            if (!m_scene.TryGetAvatar(AgentId, out avatar))
+            if (!m_scene.TryGetScenePresence(AgentId, out avatar))
                 return responsedata;
 
 

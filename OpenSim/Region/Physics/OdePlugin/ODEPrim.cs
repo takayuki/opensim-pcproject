@@ -1,5 +1,7 @@
-/* Copyright (c) Contributors, http://opensimulator.org/
+/*
+ * Copyright (c) Contributors, http://opensimulator.org/
  * See CONTRIBUTORS.TXT for a full list of copyright holders.
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *     * Redistributions of source code must retain the above copyright
@@ -93,7 +95,7 @@ namespace OpenSim.Region.Physics.OdePlugin
         private float m_targetHoverHeight;
         private float m_groundHeight;
         private float m_waterHeight;
-        private float m_buoyancy;				//KF: m_buoyancy should be set by llSetBuoyancy() for non-vehicle. 
+        private float m_buoyancy;                //KF: m_buoyancy should be set by llSetBuoyancy() for non-vehicle. 
 
         // private float m_tensor = 5f;
         private int body_autodisable_frames = 20;
@@ -168,7 +170,7 @@ namespace OpenSim.Region.Physics.OdePlugin
         private bool m_lastUpdateSent;
 
         public IntPtr Body = IntPtr.Zero;
-        public String m_primName;
+        public String Name { get; private set; }
         private Vector3 _target_velocity;
         public d.Mass pMass;
 
@@ -186,6 +188,7 @@ namespace OpenSim.Region.Physics.OdePlugin
         public OdePrim(String primName, OdeScene parent_scene, Vector3 pos, Vector3 size,
                        Quaternion rotation, IMesh mesh, PrimitiveBaseShape pbs, bool pisPhysical, CollisionLocker dode)
         {
+            Name = primName;
             m_vehicle = new ODEDynamics();
             //gc = GCHandle.Alloc(prim_geom, GCHandleType.Pinned);
             ode = dode;
@@ -193,7 +196,7 @@ namespace OpenSim.Region.Physics.OdePlugin
             {
                 pos = new Vector3(((float)Constants.RegionSize * 0.5f), ((float)Constants.RegionSize * 0.5f),
                     parent_scene.GetTerrainHeightAtXY(((float)Constants.RegionSize * 0.5f), ((float)Constants.RegionSize * 0.5f)) + 0.5f);
-                m_log.Warn("[PHYSICS]: Got nonFinite Object create Position");
+                m_log.WarnFormat("[PHYSICS]: Got nonFinite Object create Position for {0}", Name);
             }
             _position = pos;
             m_taintposition = pos;
@@ -210,7 +213,7 @@ namespace OpenSim.Region.Physics.OdePlugin
             if (!pos.IsFinite())
             {
                 size = new Vector3(0.5f, 0.5f, 0.5f);
-                m_log.Warn("[PHYSICS]: Got nonFinite Object create Size");
+                m_log.WarnFormat("[PHYSICS]: Got nonFinite Object create Size for {0}", Name);
             }
 
             if (size.X <= 0) size.X = 0.01f;
@@ -223,7 +226,7 @@ namespace OpenSim.Region.Physics.OdePlugin
             if (!QuaternionIsFinite(rotation))
             {
                 rotation = Quaternion.Identity;
-                m_log.Warn("[PHYSICS]: Got nonFinite Object create Rotation");
+                m_log.WarnFormat("[PHYSICS]: Got nonFinite Object create Rotation for {0}", Name);
             }
 
             _orientation = rotation;
@@ -244,7 +247,7 @@ namespace OpenSim.Region.Physics.OdePlugin
                 if (m_isphysical)
                     m_targetSpace = _parent_scene.space;
             }
-            m_primName = primName;
+
             m_taintadd = true;
             _parent_scene.AddPhysicsActorTaint(this);
             //  don't do .add() here; old geoms get recycled with the same hash
@@ -294,7 +297,7 @@ namespace OpenSim.Region.Physics.OdePlugin
                     m_taintselected = value;
                     m_isSelected = value;
                 }
-                if(m_isSelected) disableBodySoft();         
+                if (m_isSelected) disableBodySoft();
             }
         }
 
@@ -302,7 +305,7 @@ namespace OpenSim.Region.Physics.OdePlugin
         {
             prev_geom = prim_geom;
             prim_geom = geom;
-//Console.WriteLine("SetGeom to " + prim_geom + " for " + m_primName);     
+//Console.WriteLine("SetGeom to " + prim_geom + " for " + Name);
             if (prim_geom != IntPtr.Zero)
             {
                 d.GeomSetCategoryBits(prim_geom, (int)m_collisionCategories);
@@ -314,7 +317,7 @@ namespace OpenSim.Region.Physics.OdePlugin
                 if (_parent != null && _parent is OdePrim)
                 {
                     OdePrim parent = (OdePrim)_parent;
-//Console.WriteLine("SetGeom calls ChildSetGeom");                    
+//Console.WriteLine("SetGeom calls ChildSetGeom");
                     parent.ChildSetGeom(this);
                 }
             }
@@ -331,7 +334,7 @@ namespace OpenSim.Region.Physics.OdePlugin
                 {
                     d.BodyEnable(Body);
                     if (m_vehicle.Type != Vehicle.TYPE_NONE)
-	                    m_vehicle.Enable(Body, _parent_scene);
+                        m_vehicle.Enable(Body, _parent_scene);
                 }
 
                 m_disabled = false;
@@ -376,7 +379,7 @@ namespace OpenSim.Region.Physics.OdePlugin
                 d.BodySetAutoDisableSteps(Body, body_autodisable_frames);
                 
                 // disconnect from world gravity so we can apply buoyancy
-				d.BodySetGravityMode (Body, false);
+                d.BodySetGravityMode (Body, false);
 
                 m_interpenetrationcount = 0;
                 m_collisionscore = 0;
@@ -400,300 +403,285 @@ namespace OpenSim.Region.Physics.OdePlugin
 
         private float CalculateMass()
         {
-            float volume = 0;
-
-            // No material is passed to the physics engines yet..  soo..
-            // we're using the m_density constant in the class definition
+            float volume = _size.X * _size.Y * _size.Z; // default
+            float tmp;
 
             float returnMass = 0;
-
+            float hollowAmount = (float)_pbs.ProfileHollow * 2.0e-5f;
+            float hollowVolume = hollowAmount * hollowAmount; 
+            
             switch (_pbs.ProfileShape)
             {
                 case ProfileShape.Square:
-                    // Profile Volume
+                    // default box
 
-                    volume = _size.X*_size.Y*_size.Z;
-
-                    // If the user has 'hollowed out'
-                    // ProfileHollow is one of those 0 to 50000 values :P
-                    // we like percentages better..   so turning into a percentage
-
-                    if (((float) _pbs.ProfileHollow/50000f) > 0.0)
-                    {
-                        float hollowAmount = (float) _pbs.ProfileHollow/50000f;
-
-                        // calculate the hollow volume by it's shape compared to the prim shape
-                        float hollowVolume = 0;
-                        switch (_pbs.HollowShape)
+                    if (_pbs.PathCurve == (byte)Extrusion.Straight)
                         {
-                            case HollowShape.Square:
-                            case HollowShape.Same:
-                                // Cube Hollow volume calculation
-                                float hollowsizex = _size.X*hollowAmount;
-                                float hollowsizey = _size.Y*hollowAmount;
-                                float hollowsizez = _size.Z*hollowAmount;
-                                hollowVolume = hollowsizex*hollowsizey*hollowsizez;
-                                break;
+                        if (hollowAmount > 0.0)
+                            {
+                            switch (_pbs.HollowShape)
+                                {
+                                case HollowShape.Square:
+                                case HollowShape.Same:
+                                    break;
 
-                            case HollowShape.Circle:
-                                // Hollow shape is a perfect cyllinder in respect to the cube's scale
-                                // Cyllinder hollow volume calculation
-                                float hRadius = _size.X/2;
-                                float hLength = _size.Z;
+                                case HollowShape.Circle:
 
-                                // pi * r2 * h
-                                hollowVolume = ((float) (Math.PI*Math.Pow(hRadius, 2)*hLength)*hollowAmount);
-                                break;
+                                    hollowVolume *= 0.78539816339f;
+                                    break;
 
-                            case HollowShape.Triangle:
-                                // Equilateral Triangular Prism volume hollow calculation
-                                // Triangle is an Equilateral Triangular Prism with aLength = to _size.Y
+                                case HollowShape.Triangle:
 
-                                float aLength = _size.Y;
-                                // 1/2 abh
-                                hollowVolume = (float) ((0.5*aLength*_size.X*_size.Z)*hollowAmount);
-                                break;
+                                    hollowVolume *= (0.5f * .5f);
+                                    break;
 
-                            default:
-                                hollowVolume = 0;
-                                break;
+                                default:
+                                    hollowVolume = 0;
+                                    break;
+                                }
+                            volume *= (1.0f - hollowVolume);
+                            }
                         }
-                        volume = volume - hollowVolume;
-                    }
+
+                    else if (_pbs.PathCurve == (byte)Extrusion.Curve1)
+                        {
+                        //a tube 
+
+                        volume *= 0.78539816339e-2f * (float)(200 - _pbs.PathScaleX);
+                        tmp= 1.0f -2.0e-2f * (float)(200 - _pbs.PathScaleY);
+                        volume -= volume*tmp*tmp;
+                        
+                        if (hollowAmount > 0.0)
+                            {
+                            hollowVolume *= hollowAmount;
+                            
+                            switch (_pbs.HollowShape)
+                                {
+                                case HollowShape.Square:
+                                case HollowShape.Same:
+                                    break;
+
+                                case HollowShape.Circle:
+                                    hollowVolume *= 0.78539816339f;;
+                                    break;
+
+                                case HollowShape.Triangle:
+                                    hollowVolume *= 0.5f * 0.5f;
+                                    break;
+                                default:
+                                    hollowVolume = 0;
+                                    break;
+                                }
+                            volume *= (1.0f - hollowVolume);
+                            }
+                        }
 
                     break;
+
                 case ProfileShape.Circle:
+
                     if (_pbs.PathCurve == (byte)Extrusion.Straight)
-                    {
-                        // Cylinder
-                        float volume1 = (float)(Math.PI * Math.Pow(_size.X/2, 2) * _size.Z);
-                        float volume2 = (float)(Math.PI * Math.Pow(_size.Y/2, 2) * _size.Z);
-
-                        // Approximating the cylinder's irregularity.
-                        if (volume1 > volume2)
                         {
-                            volume = (float)volume1 - (volume1 - volume2);
+                        volume *= 0.78539816339f; // elipse base
+
+                        if (hollowAmount > 0.0)
+                            {
+                            switch (_pbs.HollowShape)
+                                {
+                                case HollowShape.Same:
+                                case HollowShape.Circle:
+                                    break;
+
+                                case HollowShape.Square:
+                                    hollowVolume *= 0.5f * 2.5984480504799f;
+                                    break;
+
+                                case HollowShape.Triangle:
+                                    hollowVolume *= .5f * 1.27323954473516f;
+                                    break;
+
+                                default:
+                                    hollowVolume = 0;
+                                    break;
+                                }
+                            volume *= (1.0f - hollowVolume);
+                            }
                         }
-                        else if (volume2 > volume1)
+
+                    else if (_pbs.PathCurve == (byte)Extrusion.Curve1)
                         {
-                            volume = (float)volume2 - (volume2 - volume1);
+                        volume *= 0.61685027506808491367715568749226e-2f * (float)(200 - _pbs.PathScaleX);
+                        tmp = 1.0f - .02f * (float)(200 - _pbs.PathScaleY);
+                        volume *= (1.0f - tmp * tmp);
+                        
+                        if (hollowAmount > 0.0)
+                            {
+
+                            // calculate the hollow volume by it's shape compared to the prim shape
+                            hollowVolume *= hollowAmount;
+
+                            switch (_pbs.HollowShape)
+                                {
+                                case HollowShape.Same:
+                                case HollowShape.Circle:
+                                    break;
+
+                                case HollowShape.Square:
+                                    hollowVolume *= 0.5f * 2.5984480504799f;
+                                    break;
+
+                                case HollowShape.Triangle:
+                                    hollowVolume *= .5f * 1.27323954473516f;
+                                    break;
+
+                                default:
+                                    hollowVolume = 0;
+                                    break;
+                                }
+                            volume *= (1.0f - hollowVolume);
+                            }
                         }
-                        else
-                        {
-                            // Regular cylinder
-                            volume = volume1;
-                        }
-                    }
-                    else
-                    {
-                        // We don't know what the shape is yet, so use default
-                        volume = _size.X * _size.Y * _size.Z;
-                    }
-                    // If the user has 'hollowed out'
-                    // ProfileHollow is one of those 0 to 50000 values :P
-                    // we like percentages better..   so turning into a percentage
-
-                    if (((float)_pbs.ProfileHollow / 50000f) > 0.0)
-                    {
-                        float hollowAmount = (float)_pbs.ProfileHollow / 50000f;
-
-                        // calculate the hollow volume by it's shape compared to the prim shape
-                        float hollowVolume = 0;
-                        switch (_pbs.HollowShape)
-                        {
-                            case HollowShape.Same:
-                            case HollowShape.Circle:
-                                // Hollow shape is a perfect cyllinder in respect to the cube's scale
-                                // Cyllinder hollow volume calculation
-                                float hRadius = _size.X / 2;
-                                float hLength = _size.Z;
-
-                                // pi * r2 * h
-                                hollowVolume = ((float)(Math.PI * Math.Pow(hRadius, 2) * hLength) * hollowAmount);
-                                break;
-
-                            case HollowShape.Square:
-                                // Cube Hollow volume calculation
-                                float hollowsizex = _size.X * hollowAmount;
-                                float hollowsizey = _size.Y * hollowAmount;
-                                float hollowsizez = _size.Z * hollowAmount;
-                                hollowVolume = hollowsizex * hollowsizey * hollowsizez;
-                                break;
-
-                            case HollowShape.Triangle:
-                                // Equilateral Triangular Prism volume hollow calculation
-                                // Triangle is an Equilateral Triangular Prism with aLength = to _size.Y
-
-                                float aLength = _size.Y;
-                                // 1/2 abh
-                                hollowVolume = (float)((0.5 * aLength * _size.X * _size.Z) * hollowAmount);
-                                break;
-
-                            default:
-                                hollowVolume = 0;
-                                break;
-                        }
-                        volume = volume - hollowVolume;
-                    }
                     break;
 
                 case ProfileShape.HalfCircle:
                     if (_pbs.PathCurve == (byte)Extrusion.Curve1)
                     {
-                        if (_size.X == _size.Y && _size.Y == _size.Z)
-                        {
-                            // regular sphere
-                            // v = 4/3 * pi * r^3
-                            float sradius3 = (float)Math.Pow((_size.X / 2), 3);
-                            volume = (float)((4f / 3f) * Math.PI * sradius3);
-                        }
-                        else
-                        {
-                            // we treat this as a box currently
-                            volume = _size.X * _size.Y * _size.Z;
-                        }
-                    }
-                    else
-                    {
-                        // We don't know what the shape is yet, so use default
-                        volume = _size.X * _size.Y * _size.Z;
+                    volume *= 0.52359877559829887307710723054658f;
                     }
                     break;
 
                 case ProfileShape.EquilateralTriangle:
-                    /*
-                        v = (abs((xB*yA-xA*yB)+(xC*yB-xB*yC)+(xA*yC-xC*yA))/2) * h
 
-                        // seed mesh
-                        Vertex MM = new Vertex(-0.25f, -0.45f, 0.0f);
-                        Vertex PM = new Vertex(+0.5f, 0f, 0.0f);
-                        Vertex PP = new Vertex(-0.25f, +0.45f, 0.0f);
-                     */
-                    float xA = -0.25f * _size.X;
-                    float yA = -0.45f * _size.Y;
-
-                    float xB = 0.5f * _size.X;
-                    float yB = 0;
-
-                    float xC = -0.25f * _size.X;
-                    float yC = 0.45f * _size.Y;
-
-                    volume = (float)((Math.Abs((xB * yA - xA * yB) + (xC * yB - xB * yC) + (xA * yC - xC * yA)) / 2) * _size.Z);
-
-                    // If the user has 'hollowed out'
-                    // ProfileHollow is one of those 0 to 50000 values :P
-                    // we like percentages better..   so turning into a percentage
-                    float fhollowFactor = ((float)_pbs.ProfileHollow / 1.9f);
-                    if (((float)fhollowFactor / 50000f) > 0.0)
-                    {
-                        float hollowAmount = (float)fhollowFactor / 50000f;
-
-                        // calculate the hollow volume by it's shape compared to the prim shape
-                        float hollowVolume = 0;
-                        switch (_pbs.HollowShape)
+                    if (_pbs.PathCurve == (byte)Extrusion.Straight)
                         {
-                            case HollowShape.Same:
-                            case HollowShape.Triangle:
-                                // Equilateral Triangular Prism volume hollow calculation
-                                // Triangle is an Equilateral Triangular Prism with aLength = to _size.Y
+                        volume *= 0.32475953f;
 
-                                float aLength = _size.Y;
-                                // 1/2 abh
-                                hollowVolume = (float)((0.5 * aLength * _size.X * _size.Z) * hollowAmount);
-                                break;
+                        if (hollowAmount > 0.0)
+                            {
 
-                            case HollowShape.Square:
-                                // Cube Hollow volume calculation
-                                float hollowsizex = _size.X * hollowAmount;
-                                float hollowsizey = _size.Y * hollowAmount;
-                                float hollowsizez = _size.Z * hollowAmount;
-                                hollowVolume = hollowsizex * hollowsizey * hollowsizez;
-                                break;
+                            // calculate the hollow volume by it's shape compared to the prim shape
+                            switch (_pbs.HollowShape)
+                                {
+                                case HollowShape.Same:
+                                case HollowShape.Triangle:
+                                    hollowVolume *= .25f;
+                                    break;
 
-                            case HollowShape.Circle:
-                                // Hollow shape is a perfect cyllinder in respect to the cube's scale
-                                // Cyllinder hollow volume calculation
-                                float hRadius = _size.X / 2;
-                                float hLength = _size.Z;
+                                case HollowShape.Square:
+                                    hollowVolume *= 0.499849f * 3.07920140172638f;
+                                    break;
 
-                                // pi * r2 * h
-                                hollowVolume = ((float)((Math.PI * Math.Pow(hRadius, 2) * hLength)/2) * hollowAmount);
-                                break;
+                                case HollowShape.Circle:
+                                    // Hollow shape is a perfect cyllinder in respect to the cube's scale
+                                    // Cyllinder hollow volume calculation
 
-                            default:
-                                hollowVolume = 0;
-                                break;
+                                    hollowVolume *= 0.1963495f * 3.07920140172638f;
+                                    break;
+
+                                default:
+                                    hollowVolume = 0;
+                                    break;
+                                }
+                            volume *= (1.0f - hollowVolume);
+                            }
                         }
-                        volume = volume - hollowVolume;
-                    }
-                    break;
+                    else if (_pbs.PathCurve == (byte)Extrusion.Curve1)
+                        {
+                        volume *= 0.32475953f;
+                        volume *= 0.01f * (float)(200 - _pbs.PathScaleX);
+                        tmp = 1.0f - .02f * (float)(200 - _pbs.PathScaleY);
+                        volume *= (1.0f - tmp * tmp);
+
+                        if (hollowAmount > 0.0)
+                            {
+
+                            hollowVolume *= hollowAmount;
+
+                            switch (_pbs.HollowShape)
+                                {
+                                case HollowShape.Same:
+                                case HollowShape.Triangle:
+                                    hollowVolume *= .25f;
+                                    break;
+
+                                case HollowShape.Square:
+                                    hollowVolume *= 0.499849f * 3.07920140172638f;
+                                    break;
+
+                                case HollowShape.Circle:
+
+                                    hollowVolume *= 0.1963495f * 3.07920140172638f;
+                                    break;
+
+                                default:
+                                    hollowVolume = 0;
+                                    break;
+                                }
+                            volume *= (1.0f - hollowVolume);
+                            }
+                        }
+                        break;
 
                 default:
-                    // we don't have all of the volume formulas yet so
-                    // use the common volume formula for all
-                    volume = _size.X*_size.Y*_size.Z;
                     break;
-            }
-
-            // Calculate Path cut effect on volume
-            // Not exact, in the triangle hollow example
-            // They should never be zero or less then zero..
-            // we'll ignore it if it's less then zero
-
-            // ProfileEnd and ProfileBegin are values
-            // from 0 to 50000
-
-            // Turning them back into percentages so that I can cut that percentage off the volume
-
-            float PathCutEndAmount = _pbs.ProfileEnd;
-            float PathCutStartAmount = _pbs.ProfileBegin;
-            if (((PathCutStartAmount + PathCutEndAmount)/50000f) > 0.0f)
-            {
-                float pathCutAmount = ((PathCutStartAmount + PathCutEndAmount)/50000f);
-
-                // Check the return amount for sanity
-                if (pathCutAmount >= 0.99f)
-                    pathCutAmount = 0.99f;
-
-                volume = volume - (volume*pathCutAmount);
-            }
-            UInt16 taperX = _pbs.PathScaleX;
-            UInt16 taperY = _pbs.PathScaleY;
-            float taperFactorX = 0;
-            float taperFactorY = 0;
-
-            // Mass = density * volume
-            if (taperX != 100)
-            {
-                if (taperX > 100)
-                {
-                    taperFactorX = 1.0f - ((float)taperX / 200);
-                    //m_log.Warn("taperTopFactorX: " + extr.taperTopFactorX.ToString());
                 }
-                else
-                {
-                    taperFactorX = 1.0f - ((100 - (float)taperX) / 100);
-                    //m_log.Warn("taperBotFactorX: " + extr.taperBotFactorX.ToString());
-                }
-                volume = (float)volume * ((taperFactorX / 3f) + 0.001f);
-            }
 
-            if (taperY != 100)
-            {
-                if (taperY > 100)
+
+
+            float taperX1;
+            float taperY1;
+            float taperX;
+            float taperY;
+            float pathBegin;
+            float pathEnd;
+            float profileBegin;
+            float profileEnd;
+
+            if (_pbs.PathCurve == (byte)Extrusion.Straight || _pbs.PathCurve == (byte)Extrusion.Flexible)
                 {
-                    taperFactorY = 1.0f - ((float)taperY / 200);
-                    //m_log.Warn("taperTopFactorY: " + extr.taperTopFactorY.ToString());
+                taperX1 = _pbs.PathScaleX * 0.01f;
+                if (taperX1 > 1.0f)
+                    taperX1 = 2.0f - taperX1;
+                taperX = 1.0f - taperX1;
+
+                taperY1 = _pbs.PathScaleY * 0.01f;
+                if (taperY1 > 1.0f)
+                    taperY1 = 2.0f - taperY1;
+                taperY = 1.0f - taperY1;
                 }
-                else
+            else
                 {
-                    taperFactorY = 1.0f - ((100 - (float)taperY) / 100);
-                    //m_log.Warn("taperBotFactorY: " + extr.taperBotFactorY.ToString());
+                taperX = _pbs.PathTaperX * 0.01f;
+                if (taperX < 0.0f)
+                    taperX = -taperX;
+                taperX1 = 1.0f - taperX;
+
+                taperY = _pbs.PathTaperY * 0.01f;
+                if (taperY < 0.0f)
+                    taperY = -taperY;
+                taperY1 = 1.0f - taperY;
+
                 }
-                volume = (float)volume * ((taperFactorY / 3f) + 0.001f);
-            }
-            returnMass = m_density*volume;
-            if (returnMass <= 0) returnMass = 0.0001f;//ckrinke: Mass must be greater then zero.
+
+
+            volume *= (taperX1 * taperY1 + 0.5f * (taperX1 * taperY + taperX * taperY1) + 0.3333333333f * taperX * taperY);
+
+            pathBegin = (float)_pbs.PathBegin * 2.0e-5f;
+            pathEnd = 1.0f - (float)_pbs.PathEnd * 2.0e-5f;
+            volume *= (pathEnd - pathBegin);
+
+// this is crude aproximation
+            profileBegin = (float)_pbs.ProfileBegin * 2.0e-5f;
+            profileEnd = 1.0f - (float)_pbs.ProfileEnd * 2.0e-5f;
+            volume *= (profileEnd - profileBegin);
+
+            returnMass = m_density * volume;
+
+            if (returnMass <= 0)
+                returnMass = 0.0001f;//ckrinke: Mass must be greater then zero.
+//            else if (returnMass > _parent_scene.maximumMassObject)
+//                returnMass = _parent_scene.maximumMassObject;
+
 
 
 
@@ -855,7 +843,7 @@ namespace OpenSim.Region.Physics.OdePlugin
             }
             catch (AccessViolationException)
             {
-                m_log.Error("[PHYSICS]: MESH LOCKED");
+                m_log.ErrorFormat("[PHYSICS]: MESH LOCKED FOR {0}", Name);
                 return;
             }
 
@@ -872,7 +860,7 @@ namespace OpenSim.Region.Physics.OdePlugin
 
         public void ProcessTaints(float timestep)
         {
-//Console.WriteLine("ProcessTaints for " + m_primName );
+//Console.WriteLine("ProcessTaints for " + Name);
             if (m_taintadd)
             {
                 changeadd(timestep);
@@ -880,24 +868,24 @@ namespace OpenSim.Region.Physics.OdePlugin
             
             if (prim_geom != IntPtr.Zero)
             {
-	        	 if (!_position.ApproxEquals(m_taintposition, 0f))
-	                    changemove(timestep);
+                 if (!_position.ApproxEquals(m_taintposition, 0f))
+                        changemove(timestep);
 
-	             if (m_taintrot != _orientation)
-	             {
-	                if(childPrim && IsPhysical)	// For physical child prim...
-	                {
-	                    rotate(timestep);       
-	                    // KF: ODE will also rotate the parent prim!
-	                    // so rotate the root back to where it was
-	                    OdePrim parent = (OdePrim)_parent;
-	                    parent.rotate(timestep);
+                 if (m_taintrot != _orientation)
+                 {
+                    if (childPrim && IsPhysical)    // For physical child prim...
+                    {
+                        rotate(timestep);
+                        // KF: ODE will also rotate the parent prim!
+                        // so rotate the root back to where it was
+                        OdePrim parent = (OdePrim)_parent;
+                        parent.rotate(timestep);
                     }
                     else
                     {
-	                    //Just rotate the prim
-	                    rotate(timestep);
-                    }  
+                        //Just rotate the prim
+                        rotate(timestep);
+                    }
                 }
                 //
             
@@ -943,7 +931,7 @@ namespace OpenSim.Region.Physics.OdePlugin
             }
             else
             {
-                m_log.Error("[PHYSICS]: The scene reused a disposed PhysActor! *waves finger*, Don't be evil.  A couple of things can cause this.   An improper prim breakdown(be sure to set prim_geom to zero after d.GeomDestroy!   An improper buildup (creating the geom failed).   Or, the Scene Reused a physics actor after disposing it.)");
+                m_log.ErrorFormat("[PHYSICS]: The scene reused a disposed PhysActor for {0}! *waves finger*, Don't be evil.  A couple of things can cause this.   An improper prim breakdown(be sure to set prim_geom to zero after d.GeomDestroy!   An improper buildup (creating the geom failed).   Or, the Scene Reused a physics actor after disposing it.)", Name);
             }
         }
 
@@ -1006,7 +994,7 @@ namespace OpenSim.Region.Physics.OdePlugin
             // destroy link
             else if (_parent != null && m_taintparent == null)
             {
-//Console.WriteLine("  changelink B");        
+//Console.WriteLine("  changelink B");
             
                 if (_parent is OdePrim)
                 {
@@ -1033,7 +1021,7 @@ namespace OpenSim.Region.Physics.OdePlugin
         // prim is the child
         public void ParentPrim(OdePrim prim)
         {
-//Console.WriteLine("ParentPrim  " + m_primName);        
+//Console.WriteLine("ParentPrim  " + Name);
             if (this.m_localID != prim.m_localID)
             {
                 if (Body == IntPtr.Zero)
@@ -1047,7 +1035,7 @@ namespace OpenSim.Region.Physics.OdePlugin
                     {
                         if (!childrenPrim.Contains(prim))
                         {
-//Console.WriteLine("childrenPrim.Add " + prim);                          
+//Console.WriteLine("childrenPrim.Add " + prim);
                             childrenPrim.Add(prim);
                             
                             foreach (OdePrim prm in childrenPrim)
@@ -1069,18 +1057,20 @@ namespace OpenSim.Region.Physics.OdePlugin
                                 d.MassTranslate(ref m2, Position.X - prm.Position.X, Position.Y - prm.Position.Y, Position.Z - prm.Position.Z);
                                 d.MassAdd(ref pMass, ref m2);
                             }
+                            
                             foreach (OdePrim prm in childrenPrim)
                             {
-                       
                                 prm.m_collisionCategories |= CollisionCategories.Body;
                                 prm.m_collisionFlags |= (CollisionCategories.Land | CollisionCategories.Wind);
 
                                 if (prm.prim_geom == IntPtr.Zero)
                                 {
-                                    m_log.Warn("[PHYSICS]: Unable to link one of the linkset elements.  No geom yet");
+                                    m_log.WarnFormat(
+                                        "[PHYSICS]: Unable to link one of the linkset elements {0} for parent {1}.  No geom yet", 
+                                        prm.Name, prim.Name);
                                     continue;
                                 }
-//Console.WriteLine(" GeomSetCategoryBits 1: " + prm.prim_geom + " - " + (int)prm.m_collisionCategories + " for " + m_primName);    
+//Console.WriteLine(" GeomSetCategoryBits 1: " + prm.prim_geom + " - " + (int)prm.m_collisionCategories + " for " + Name);
                                 d.GeomSetCategoryBits(prm.prim_geom, (int)prm.m_collisionCategories);
                                 d.GeomSetCollideBits(prm.prim_geom, (int)prm.m_collisionFlags);
 
@@ -1109,7 +1099,7 @@ namespace OpenSim.Region.Physics.OdePlugin
                                 }
                                 else
                                 {
-                                    m_log.Debug("[PHYSICS]:I ain't got no boooooooooddy, no body");
+                                    m_log.DebugFormat("[PHYSICS]: {0} ain't got no boooooooooddy, no body", Name);
                                 }
 
 
@@ -1128,7 +1118,7 @@ namespace OpenSim.Region.Physics.OdePlugin
                             m_collisionCategories |= CollisionCategories.Body;
                             m_collisionFlags |= (CollisionCategories.Land | CollisionCategories.Wind);
 
-//Console.WriteLine("GeomSetCategoryBits 2: " + prim_geom + " - " + (int)m_collisionCategories + " for " + m_primName);  
+//Console.WriteLine("GeomSetCategoryBits 2: " + prim_geom + " - " + (int)m_collisionCategories + " for " + Name);
                             d.GeomSetCategoryBits(prim_geom, (int)m_collisionCategories);
 //Console.WriteLine(" Post GeomSetCategoryBits 2");
                             d.GeomSetCollideBits(prim_geom, (int)m_collisionFlags);
@@ -1203,7 +1193,7 @@ namespace OpenSim.Region.Physics.OdePlugin
             {
                 foreach (OdePrim prm in childrenPrim)
                 {
-//Console.WriteLine("ChildSetGeom calls ParentPrim");               
+//Console.WriteLine("ChildSetGeom calls ParentPrim");
                     ParentPrim(prm);
                 }
             }
@@ -1230,7 +1220,7 @@ namespace OpenSim.Region.Physics.OdePlugin
 
             lock (childrenPrim)
             {
- //Console.WriteLine("childrenPrim.Remove " + odePrim);          
+ //Console.WriteLine("childrenPrim.Remove " + odePrim);
                 childrenPrim.Remove(odePrim);
             }
             
@@ -1248,7 +1238,7 @@ namespace OpenSim.Region.Physics.OdePlugin
             {
                 foreach (OdePrim prm in childrenPrim)
                 {
-//Console.WriteLine("ChildDelink calls ParentPrim");                
+//Console.WriteLine("ChildDelink calls ParentPrim");
                     ParentPrim(prm);
                 }
             }
@@ -1350,7 +1340,7 @@ namespace OpenSim.Region.Physics.OdePlugin
 
         public void CreateGeom(IntPtr m_targetSpace, IMesh _mesh)
         {
-//Console.WriteLine("CreateGeom:");         
+//Console.WriteLine("CreateGeom:");
             if (_mesh != null)
             {
                 setMesh(_parent_scene, _mesh);
@@ -1371,7 +1361,7 @@ namespace OpenSim.Region.Physics.OdePlugin
                             }
                             catch (AccessViolationException)
                             {
-                                m_log.Warn("[PHYSICS]: Unable to create physics proxy for object");
+                                m_log.WarnFormat("[PHYSICS]: Unable to create physics proxy for object {0}", Name);
                                 ode.dunlock(_parent_scene.world);
                                 return;
                             }
@@ -1381,12 +1371,12 @@ namespace OpenSim.Region.Physics.OdePlugin
                             _parent_scene.waitForSpaceUnlock(m_targetSpace);
                             try
                             {
-//Console.WriteLine(" CreateGeom 2");                           
+//Console.WriteLine(" CreateGeom 2");
                                 SetGeom(d.CreateBox(m_targetSpace, _size.X, _size.Y, _size.Z));
                             }
                             catch (AccessViolationException)
                             {
-                                m_log.Warn("[PHYSICS]: Unable to create physics proxy for object");
+                                m_log.WarnFormat("[PHYSICS]: Unable to create physics proxy for object {0}", Name);
                                 ode.dunlock(_parent_scene.world);
                                 return;
                             }
@@ -1397,12 +1387,12 @@ namespace OpenSim.Region.Physics.OdePlugin
                         _parent_scene.waitForSpaceUnlock(m_targetSpace);
                         try
                         {
-//Console.WriteLine("  CreateGeom 3");                       
+//Console.WriteLine("  CreateGeom 3");
                             SetGeom(d.CreateBox(m_targetSpace, _size.X, _size.Y, _size.Z));
                         }
                         catch (AccessViolationException)
                         {
-                            m_log.Warn("[PHYSICS]: Unable to create physics proxy for object");
+                            m_log.WarnFormat("[PHYSICS]: Unable to create physics proxy for object {0}", Name);
                             ode.dunlock(_parent_scene.world);
                             return;
                         }
@@ -1414,12 +1404,12 @@ namespace OpenSim.Region.Physics.OdePlugin
                     _parent_scene.waitForSpaceUnlock(m_targetSpace);
                     try
                     {
-//Console.WriteLine("  CreateGeom 4");                  
+//Console.WriteLine("  CreateGeom 4");
                         SetGeom(d.CreateBox(m_targetSpace, _size.X, _size.Y, _size.Z));
                     }
                     catch (AccessViolationException)
                     {
-                        m_log.Warn("[PHYSICS]: Unable to create physics proxy for object");
+                        m_log.WarnFormat("[PHYSICS]: Unable to create physics proxy for object {0}", Name);
                         ode.dunlock(_parent_scene.world);
                         return;
                     }
@@ -1442,7 +1432,7 @@ namespace OpenSim.Region.Physics.OdePlugin
                 if (_parent_scene.needsMeshing(_pbs))
                 {
                     // Don't need to re-enable body..   it's done in SetMesh
-                    _mesh = _parent_scene.mesher.CreateMesh(m_primName, _pbs, _size, _parent_scene.meshSculptLOD, IsPhysical);
+                    _mesh = _parent_scene.mesher.CreateMesh(Name, _pbs, _size, _parent_scene.meshSculptLOD, IsPhysical);
                     // createmesh returns null when it's a shape that isn't a cube.
                    // m_log.Debug(m_localID);
                 }
@@ -1451,7 +1441,7 @@ namespace OpenSim.Region.Physics.OdePlugin
 
             lock (_parent_scene.OdeLock)
             {
-//Console.WriteLine("changeadd 1");           
+//Console.WriteLine("changeadd 1");
                 CreateGeom(m_targetSpace, _mesh);
 
                 if (prim_geom != IntPtr.Zero)
@@ -1471,7 +1461,7 @@ namespace OpenSim.Region.Physics.OdePlugin
                 }
             }
 
-            _parent_scene.geom_name_map[prim_geom] = this.m_primName;
+            _parent_scene.geom_name_map[prim_geom] = this.Name;
             _parent_scene.actor_name_map[prim_geom] = (PhysicsActor)this;
 
             changeSelectedStatus(timestep);
@@ -1508,7 +1498,7 @@ namespace OpenSim.Region.Physics.OdePlugin
                             if (Body != (IntPtr)0 && odParent.Body != (IntPtr)0 && Body != odParent.Body)
                             {
 // KF: Fixed Joints were removed? Anyway - this Console.WriteLine does not show up, so routine is not used??
-Console.WriteLine(" JointCreateFixed");                           
+Console.WriteLine(" JointCreateFixed");
                                 m_linkJoint = d.JointCreateFixed(_parent_scene.world, _linkJointGroup);
                                 d.JointAttach(m_linkJoint, Body, odParent.Body);
                                 d.JointSetFixed(m_linkJoint);
@@ -1522,7 +1512,7 @@ Console.WriteLine(" JointCreateFixed");
                     }
                     else
                     {
-                        m_log.Warn("[PHYSICS]: Body Still null after enableBody().  This is a crash scenario.");
+                        m_log.WarnFormat("[PHYSICS]: Body for {0} still null after enableBody().  This is a crash scenario.", Name);
                     }
                 }
                 //else
@@ -1562,244 +1552,246 @@ Console.WriteLine(" JointCreateFixed");
             float fz = 0;
 
                 
-            if (IsPhysical && (Body != IntPtr.Zero) && !m_isSelected && !childPrim)		// KF: Only move root prims.
+            if (IsPhysical && (Body != IntPtr.Zero) && !m_isSelected && !childPrim)        // KF: Only move root prims.
             {
-            	if (m_vehicle.Type != Vehicle.TYPE_NONE)
-            	{
-            		// 'VEHICLES' are dealt with in ODEDynamics.cs
-            		m_vehicle.Step(timestep, _parent_scene);
-            	}
-            	else
-            	{
-//Console.WriteLine("Move " +  m_primName);           	
-            		if(!d.BodyIsEnabled (Body))  d.BodyEnable (Body); // KF add 161009
-            		// NON-'VEHICLES' are dealt with here
-	                if (d.BodyIsEnabled(Body) && !m_angularlock.ApproxEquals(Vector3.Zero, 0.003f))
-	                {
-	                    d.Vector3 avel2 = d.BodyGetAngularVel(Body);
-	                    if (m_angularlock.X == 1)
-	                        avel2.X = 0;
-	                    if (m_angularlock.Y == 1)
-	                        avel2.Y = 0;
-	                    if (m_angularlock.Z == 1)
-	                        avel2.Z = 0;
-	                    d.BodySetAngularVel(Body, avel2.X, avel2.Y, avel2.Z);
-	                }
-	                //float PID_P = 900.0f;
+                if (m_vehicle.Type != Vehicle.TYPE_NONE)
+                {
+                    // 'VEHICLES' are dealt with in ODEDynamics.cs
+                    m_vehicle.Step(timestep, _parent_scene);
+                }
+                else
+                {
+//Console.WriteLine("Move " +  Name);
+                    if (!d.BodyIsEnabled (Body))  d.BodyEnable (Body); // KF add 161009
+                    // NON-'VEHICLES' are dealt with here
+//                    if (d.BodyIsEnabled(Body) && !m_angularlock.ApproxEquals(Vector3.Zero, 0.003f))
+//                    {
+//                        d.Vector3 avel2 = d.BodyGetAngularVel(Body);
+//                        /*
+//                        if (m_angularlock.X == 1)
+//                            avel2.X = 0;
+//                        if (m_angularlock.Y == 1)
+//                            avel2.Y = 0;
+//                        if (m_angularlock.Z == 1)
+//                            avel2.Z = 0;
+//                        d.BodySetAngularVel(Body, avel2.X, avel2.Y, avel2.Z);
+//                         */
+//                    }
+                    //float PID_P = 900.0f;
 
-	                float m_mass = CalculateMass();
+                    float m_mass = CalculateMass();
 
-//	                fz = 0f;
+//                    fz = 0f;
                     //m_log.Info(m_collisionFlags.ToString());
 
-	                
-	                //KF: m_buoyancy should be set by llSetBuoyancy() for non-vehicle.
-	                // would come from SceneObjectPart.cs, public void SetBuoyancy(float fvalue) , PhysActor.Buoyancy = fvalue; ??
-	                // m_buoyancy: (unlimited value) <0=Falls fast; 0=1g; 1=0g; >1 = floats up 
-	                // gravityz multiplier = 1 - m_buoyancy
-	                fz = _parent_scene.gravityz * (1.0f - m_buoyancy) * m_mass;
+                    
+                    //KF: m_buoyancy should be set by llSetBuoyancy() for non-vehicle.
+                    // would come from SceneObjectPart.cs, public void SetBuoyancy(float fvalue) , PhysActor.Buoyancy = fvalue; ??
+                    // m_buoyancy: (unlimited value) <0=Falls fast; 0=1g; 1=0g; >1 = floats up 
+                    // gravityz multiplier = 1 - m_buoyancy
+                    fz = _parent_scene.gravityz * (1.0f - m_buoyancy) * m_mass;
 
-	                if (m_usePID)
-	                {
-//Console.WriteLine("PID " +  m_primName);           	
-                    	// KF - this is for object move? eg. llSetPos() ?
-	                    //if (!d.BodyIsEnabled(Body))
-	                    //d.BodySetForce(Body, 0f, 0f, 0f);
-	                    // If we're using the PID controller, then we have no gravity
-	                    //fz = (-1 * _parent_scene.gravityz) * m_mass; 	//KF: ?? Prims have no global gravity,so simply...
-	                    fz = 0f;
+                    if (m_usePID)
+                    {
+//Console.WriteLine("PID " +  Name);
+                        // KF - this is for object move? eg. llSetPos() ?
+                        //if (!d.BodyIsEnabled(Body))
+                        //d.BodySetForce(Body, 0f, 0f, 0f);
+                        // If we're using the PID controller, then we have no gravity
+                        //fz = (-1 * _parent_scene.gravityz) * m_mass;     //KF: ?? Prims have no global gravity,so simply...
+                        fz = 0f;
 
-	                    //  no lock; for now it's only called from within Simulate()
-	
-	                    // If the PID Controller isn't active then we set our force
-	                    // calculating base velocity to the current position
+                        //  no lock; for now it's only called from within Simulate()
+    
+                        // If the PID Controller isn't active then we set our force
+                        // calculating base velocity to the current position
 
-	                    if ((m_PIDTau < 1) && (m_PIDTau != 0))
-	                    {
-	                        //PID_G = PID_G / m_PIDTau;
-	                        m_PIDTau = 1;
-	                    }
-	
-	                    if ((PID_G - m_PIDTau) <= 0)
-	                    {
-	                        PID_G = m_PIDTau + 1;
-	                    }
-	                    //PidStatus = true;
+                        if ((m_PIDTau < 1) && (m_PIDTau != 0))
+                        {
+                            //PID_G = PID_G / m_PIDTau;
+                            m_PIDTau = 1;
+                        }
+    
+                        if ((PID_G - m_PIDTau) <= 0)
+                        {
+                            PID_G = m_PIDTau + 1;
+                        }
+                        //PidStatus = true;
 
-	                    // PhysicsVector vec = new PhysicsVector();
-	                    d.Vector3 vel = d.BodyGetLinearVel(Body);
+                        // PhysicsVector vec = new PhysicsVector();
+                        d.Vector3 vel = d.BodyGetLinearVel(Body);
 
-	                    d.Vector3 pos = d.BodyGetPosition(Body);
-	                    _target_velocity =
+                        d.Vector3 pos = d.BodyGetPosition(Body);
+                        _target_velocity =
                             new Vector3(
-	                            (m_PIDTarget.X - pos.X) * ((PID_G - m_PIDTau) * timestep),
-	                            (m_PIDTarget.Y - pos.Y) * ((PID_G - m_PIDTau) * timestep),
-	                            (m_PIDTarget.Z - pos.Z) * ((PID_G - m_PIDTau) * timestep)
-	                            );
+                                (m_PIDTarget.X - pos.X) * ((PID_G - m_PIDTau) * timestep),
+                                (m_PIDTarget.Y - pos.Y) * ((PID_G - m_PIDTau) * timestep),
+                                (m_PIDTarget.Z - pos.Z) * ((PID_G - m_PIDTau) * timestep)
+                                );
 
-	                    //  if velocity is zero, use position control; otherwise, velocity control
+                        //  if velocity is zero, use position control; otherwise, velocity control
 
-	                    if (_target_velocity.ApproxEquals(Vector3.Zero,0.1f))
-	                    {
-	                        //  keep track of where we stopped.  No more slippin' & slidin'
-	
-	                        // We only want to deactivate the PID Controller if we think we want to have our surrogate
-	                        // react to the physics scene by moving it's position.
-	                        // Avatar to Avatar collisions
-	                        // Prim to avatar collisions
+                        if (_target_velocity.ApproxEquals(Vector3.Zero,0.1f))
+                        {
+                            //  keep track of where we stopped.  No more slippin' & slidin'
+    
+                            // We only want to deactivate the PID Controller if we think we want to have our surrogate
+                            // react to the physics scene by moving it's position.
+                            // Avatar to Avatar collisions
+                            // Prim to avatar collisions
 
-	                        //fx = (_target_velocity.X - vel.X) * (PID_D) + (_zeroPosition.X - pos.X) * (PID_P * 2);
-	                        //fy = (_target_velocity.Y - vel.Y) * (PID_D) + (_zeroPosition.Y - pos.Y) * (PID_P * 2);
-	                        //fz = fz + (_target_velocity.Z - vel.Z) * (PID_D) + (_zeroPosition.Z - pos.Z) * PID_P;
-	                        d.BodySetPosition(Body, m_PIDTarget.X, m_PIDTarget.Y, m_PIDTarget.Z);
-	                        d.BodySetLinearVel(Body, 0, 0, 0);
-	                        d.BodyAddForce(Body, 0, 0, fz);
-	                        return;
-	                    }
-	                    else
-	                    {
-	                        _zeroFlag = false;
+                            //fx = (_target_velocity.X - vel.X) * (PID_D) + (_zeroPosition.X - pos.X) * (PID_P * 2);
+                            //fy = (_target_velocity.Y - vel.Y) * (PID_D) + (_zeroPosition.Y - pos.Y) * (PID_P * 2);
+                            //fz = fz + (_target_velocity.Z - vel.Z) * (PID_D) + (_zeroPosition.Z - pos.Z) * PID_P;
+                            d.BodySetPosition(Body, m_PIDTarget.X, m_PIDTarget.Y, m_PIDTarget.Z);
+                            d.BodySetLinearVel(Body, 0, 0, 0);
+                            d.BodyAddForce(Body, 0, 0, fz);
+                            return;
+                        }
+                        else
+                        {
+                            _zeroFlag = false;
 
-	                        // We're flying and colliding with something
-	                        fx = ((_target_velocity.X) - vel.X) * (PID_D);
-	                        fy = ((_target_velocity.Y) - vel.Y) * (PID_D);
-	
-	                        // vec.Z = (_target_velocity.Z - vel.Z) * PID_D + (_zeroPosition.Z - pos.Z) * PID_P;
+                            // We're flying and colliding with something
+                            fx = ((_target_velocity.X) - vel.X) * (PID_D);
+                            fy = ((_target_velocity.Y) - vel.Y) * (PID_D);
+    
+                            // vec.Z = (_target_velocity.Z - vel.Z) * PID_D + (_zeroPosition.Z - pos.Z) * PID_P;
 
-	                        fz = fz + ((_target_velocity.Z - vel.Z) * (PID_D) * m_mass);
-	                    }
-	                }		// end if (m_usePID)
+                            fz = fz + ((_target_velocity.Z - vel.Z) * (PID_D) * m_mass);
+                        }
+                    }        // end if (m_usePID)
 
-	                // Hover PID Controller needs to be mutually exlusive to MoveTo PID controller
-	                if (m_useHoverPID && !m_usePID)
-	                {
-//Console.WriteLine("Hover " +  m_primName);           	
-	                
-	                    // If we're using the PID controller, then we have no gravity
-	                    fz = (-1 * _parent_scene.gravityz) * m_mass;
+                    // Hover PID Controller needs to be mutually exlusive to MoveTo PID controller
+                    if (m_useHoverPID && !m_usePID)
+                    {
+//Console.WriteLine("Hover " +  Name);
+                    
+                        // If we're using the PID controller, then we have no gravity
+                        fz = (-1 * _parent_scene.gravityz) * m_mass;
 
-	                    //  no lock; for now it's only called from within Simulate()
+                        //  no lock; for now it's only called from within Simulate()
 
-	                    // If the PID Controller isn't active then we set our force
-	                    // calculating base velocity to the current position
+                        // If the PID Controller isn't active then we set our force
+                        // calculating base velocity to the current position
 
-	                    if ((m_PIDTau < 1))
-	                    {
-	                        PID_G = PID_G / m_PIDTau;
-	                    }
+                        if ((m_PIDTau < 1))
+                        {
+                            PID_G = PID_G / m_PIDTau;
+                        }
 
-	                    if ((PID_G - m_PIDTau) <= 0)
-	                    {
-	                        PID_G = m_PIDTau + 1;
-	                    }
+                        if ((PID_G - m_PIDTau) <= 0)
+                        {
+                            PID_G = m_PIDTau + 1;
+                        }
                     
 
-	                    // Where are we, and where are we headed?
-	                    d.Vector3 pos = d.BodyGetPosition(Body);
-	                    d.Vector3 vel = d.BodyGetLinearVel(Body);
+                        // Where are we, and where are we headed?
+                        d.Vector3 pos = d.BodyGetPosition(Body);
+                        d.Vector3 vel = d.BodyGetLinearVel(Body);
 
 
-						//    Non-Vehicles have a limited set of Hover options.
-	                    // determine what our target height really is based on HoverType
-	                    switch (m_PIDHoverType)
-	                    {
-	                        case PIDHoverType.Ground:
-	                            m_groundHeight = _parent_scene.GetTerrainHeightAtXY(pos.X, pos.Y);
-	                            m_targetHoverHeight = m_groundHeight + m_PIDHoverHeight;
-	                            break;
-	                        case PIDHoverType.GroundAndWater:
-	                            m_groundHeight = _parent_scene.GetTerrainHeightAtXY(pos.X, pos.Y);
-	                            m_waterHeight  = _parent_scene.GetWaterLevel();
-	                            if (m_groundHeight > m_waterHeight)
-	                            {
-	                                m_targetHoverHeight = m_groundHeight + m_PIDHoverHeight;
-	                            }
-	                            else
-	                            {
-	                                m_targetHoverHeight = m_waterHeight + m_PIDHoverHeight;
-	                            }
-	                            break;
+                        //    Non-Vehicles have a limited set of Hover options.
+                        // determine what our target height really is based on HoverType
+                        switch (m_PIDHoverType)
+                        {
+                            case PIDHoverType.Ground:
+                                m_groundHeight = _parent_scene.GetTerrainHeightAtXY(pos.X, pos.Y);
+                                m_targetHoverHeight = m_groundHeight + m_PIDHoverHeight;
+                                break;
+                            case PIDHoverType.GroundAndWater:
+                                m_groundHeight = _parent_scene.GetTerrainHeightAtXY(pos.X, pos.Y);
+                                m_waterHeight  = _parent_scene.GetWaterLevel();
+                                if (m_groundHeight > m_waterHeight)
+                                {
+                                    m_targetHoverHeight = m_groundHeight + m_PIDHoverHeight;
+                                }
+                                else
+                                {
+                                    m_targetHoverHeight = m_waterHeight + m_PIDHoverHeight;
+                                }
+                                break;
 
-	                    } 	// end switch (m_PIDHoverType)
+                        }     // end switch (m_PIDHoverType)
 
 
-	                    _target_velocity =
+                        _target_velocity =
                             new Vector3(0.0f, 0.0f,
-    	                        (m_targetHoverHeight - pos.Z) * ((PID_G - m_PIDHoverTau) * timestep)
-    	                        );
+                                (m_targetHoverHeight - pos.Z) * ((PID_G - m_PIDHoverTau) * timestep)
+                                );
 
-    	                //  if velocity is zero, use position control; otherwise, velocity control
+                        //  if velocity is zero, use position control; otherwise, velocity control
 
-    	                if (_target_velocity.ApproxEquals(Vector3.Zero, 0.1f))
-    	                {
-    	                    //  keep track of where we stopped.  No more slippin' & slidin'
-	
-    	                    // We only want to deactivate the PID Controller if we think we want to have our surrogate
-    	                    // react to the physics scene by moving it's position.
-    	                    // Avatar to Avatar collisions
-    	                    // Prim to avatar collisions
+                        if (_target_velocity.ApproxEquals(Vector3.Zero, 0.1f))
+                        {
+                            //  keep track of where we stopped.  No more slippin' & slidin'
+    
+                            // We only want to deactivate the PID Controller if we think we want to have our surrogate
+                            // react to the physics scene by moving it's position.
+                            // Avatar to Avatar collisions
+                            // Prim to avatar collisions
 
-    	                    d.BodySetPosition(Body, pos.X, pos.Y, m_targetHoverHeight);
-    	                    d.BodySetLinearVel(Body, vel.X, vel.Y, 0);
-    	                    d.BodyAddForce(Body, 0, 0, fz);
-    	                    return;
-    	                }
-    	                else
-    	                {
-    	                    _zeroFlag = false;
+                            d.BodySetPosition(Body, pos.X, pos.Y, m_targetHoverHeight);
+                            d.BodySetLinearVel(Body, vel.X, vel.Y, 0);
+                            d.BodyAddForce(Body, 0, 0, fz);
+                            return;
+                        }
+                        else
+                        {
+                            _zeroFlag = false;
 
-    	                    // We're flying and colliding with something
-    	                    fz = fz + ((_target_velocity.Z - vel.Z) * (PID_D) * m_mass);
-    	                }
-    	            }
+                            // We're flying and colliding with something
+                            fz = fz + ((_target_velocity.Z - vel.Z) * (PID_D) * m_mass);
+                        }
+                    }
 
-    	            fx *= m_mass;
-    	            fy *= m_mass;
-    	            //fz *= m_mass;
+                    fx *= m_mass;
+                    fy *= m_mass;
+                    //fz *= m_mass;
 
-    	            fx += m_force.X;
-    	            fy += m_force.Y;
-    	            fz += m_force.Z;
+                    fx += m_force.X;
+                    fy += m_force.Y;
+                    fz += m_force.Z;
 
-    	            //m_log.Info("[OBJPID]: X:" + fx.ToString() + " Y:" + fy.ToString() + " Z:" + fz.ToString());
-    	            if (fx != 0 || fy != 0 || fz != 0)
-    	            {
-    	                //m_taintdisable = true;
-    	                //base.RaiseOutOfBounds(Position);
-    	                //d.BodySetLinearVel(Body, fx, fy, 0f);
-    	                if (!d.BodyIsEnabled(Body))
-    	                {
-    	                	// A physical body at rest on a surface will auto-disable after a while,
-    	                	// this appears to re-enable it incase the surface it is upon vanishes,
-    	                	// and the body should fall again. 
-    	                    d.BodySetLinearVel(Body, 0f, 0f, 0f);
-    	                    d.BodySetForce(Body, 0, 0, 0);
-    	                    enableBodySoft();
-    	                }
+                    //m_log.Info("[OBJPID]: X:" + fx.ToString() + " Y:" + fy.ToString() + " Z:" + fz.ToString());
+                    if (fx != 0 || fy != 0 || fz != 0)
+                    {
+                        //m_taintdisable = true;
+                        //base.RaiseOutOfBounds(Position);
+                        //d.BodySetLinearVel(Body, fx, fy, 0f);
+                        if (!d.BodyIsEnabled(Body))
+                        {
+                            // A physical body at rest on a surface will auto-disable after a while,
+                            // this appears to re-enable it incase the surface it is upon vanishes,
+                            // and the body should fall again. 
+                            d.BodySetLinearVel(Body, 0f, 0f, 0f);
+                            d.BodySetForce(Body, 0, 0, 0);
+                            enableBodySoft();
+                        }
 
-    	                // 35x10 = 350n times the mass per second applied maximum.
-    	                float nmax = 35f * m_mass;
-    	                float nmin = -35f * m_mass;
+                        // 35x10 = 350n times the mass per second applied maximum.
+                        float nmax = 35f * m_mass;
+                        float nmin = -35f * m_mass;
 
                     
-    	                if (fx > nmax)
-    	                    fx = nmax;
-    	                if (fx < nmin)
-    	                    fx = nmin;
-    	                if (fy > nmax)
-    	                    fy = nmax;
-    	                if (fy < nmin)
-    	                    fy = nmin;
-    	                d.BodyAddForce(Body, fx, fy, fz);
-//Console.WriteLine("AddForce " + fx + "," + fy + "," + fz);    	                
-    	            }
-				}		
+                        if (fx > nmax)
+                            fx = nmax;
+                        if (fx < nmin)
+                            fx = nmin;
+                        if (fy > nmax)
+                            fy = nmax;
+                        if (fy < nmin)
+                            fy = nmin;
+                        d.BodyAddForce(Body, fx, fy, fz);
+//Console.WriteLine("AddForce " + fx + "," + fy + "," + fz);
+                    }
+                }
             }
             else
-            {	// is not physical, or is not a body or is selected
+            {    // is not physical, or is not a body or is selected
               //  _zeroPosition = d.BodyGetPosition(Body);
                 return;
-//Console.WriteLine("Nothing " +  m_primName);           	
+//Console.WriteLine("Nothing " +  Name);
                
             }
         }
@@ -1815,18 +1807,18 @@ Console.WriteLine(" JointCreateFixed");
             myrot.W = _orientation.W;
             if (Body != IntPtr.Zero)
             {
-	            // KF: If this is a root prim do BodySet
+                // KF: If this is a root prim do BodySet
                 d.BodySetQuaternion(Body, ref myrot);
-	            if (m_isphysical)
-	            {
+                if (m_isphysical)
+                {
                     if (!m_angularlock.ApproxEquals(Vector3.One, 0f))
-	                    createAMotor(m_angularlock);
-	            }
-	        }
-	        else
-	        {
-	        	// daughter prim, do Geom set
-	            d.GeomSetQuaternion(prim_geom, ref myrot);
+                        createAMotor(m_angularlock);
+                }
+            }
+            else
+            {
+                // daughter prim, do Geom set
+                d.GeomSetQuaternion(prim_geom, ref myrot);
             }
             
             resetCollisionAccounting();
@@ -1887,10 +1879,10 @@ Console.WriteLine(" JointCreateFixed");
                             catch (System.AccessViolationException)
                             {
                                 prim_geom = IntPtr.Zero;
-                                m_log.Error("[PHYSICS]: PrimGeom dead");
+                                m_log.ErrorFormat("[PHYSICS]: PrimGeom dead for {0}", Name);
                             }
                         }
-//Console.WriteLine("changePhysicsStatus for " + m_primName );
+//Console.WriteLine("changePhysicsStatus for " + Name);
                         changeadd(2f);
                     }
                     if (childPrim)
@@ -1976,7 +1968,7 @@ Console.WriteLine(" JointCreateFixed");
             else
             {
                 _mesh = null;
-//Console.WriteLine("changesize 2");    
+//Console.WriteLine("changesize 2");
                 CreateGeom(m_targetSpace, _mesh);
             }
 
@@ -2059,7 +2051,7 @@ Console.WriteLine(" JointCreateFixed");
             catch (System.AccessViolationException)
             {
                 prim_geom = IntPtr.Zero;
-                m_log.Error("[PHYSICS]: PrimGeom dead");
+                m_log.ErrorFormat("[PHYSICS]: PrimGeom dead for {0}", Name);
             }
             prim_geom = IntPtr.Zero;
             // we don't need to do space calculation because the client sends a position update also.
@@ -2083,7 +2075,7 @@ Console.WriteLine(" JointCreateFixed");
             else
             {
                 _mesh = null;
-//Console.WriteLine("changeshape");              
+//Console.WriteLine("changeshape");
                 CreateGeom(m_targetSpace, null);
             }
 
@@ -2303,7 +2295,7 @@ Console.WriteLine(" JointCreateFixed");
                 }
                 else
                 {
-                    m_log.Warn("[PHYSICS]: Got NaN Size on object");
+                    m_log.WarnFormat("[PHYSICS]: Got NaN Size on object {0}", Name);
                 }
             }
         }
@@ -2325,7 +2317,7 @@ Console.WriteLine(" JointCreateFixed");
                 }
                 else
                 {
-                    m_log.Warn("[PHYSICS]: NaN in Force Applied to an Object");
+                    m_log.WarnFormat("[PHYSICS]: NaN in Force Applied to an Object {0}", Name);
                 }
             }
         }
@@ -2349,6 +2341,11 @@ Console.WriteLine(" JointCreateFixed");
         public override void VehicleRotationParam(int param, Quaternion rotation)
         {
             m_vehicle.ProcessRotationVehicleParam((Vehicle) param, rotation);
+        }
+
+        public override void VehicleFlags(int param, bool remove)
+        {
+            m_vehicle.ProcessVehicleFlags(param, remove);
         }
 
         public override void SetVolumeDetect(int param)
@@ -2404,7 +2401,7 @@ Console.WriteLine(" JointCreateFixed");
                 }
                 else
                 {
-                    m_log.Warn("[PHYSICS]: Got NaN Velocity in Object");
+                    m_log.WarnFormat("[PHYSICS]: Got NaN Velocity in Object {0}", Name);
                 }
 
             }
@@ -2429,7 +2426,7 @@ Console.WriteLine(" JointCreateFixed");
                 }
                 else
                 {
-                    m_log.Warn("[PHYSICS]: Got NaN Torque in Object");
+                    m_log.WarnFormat("[PHYSICS]: Got NaN Torque in Object {0}", Name);
                 }
             }
         }
@@ -2454,9 +2451,9 @@ Console.WriteLine(" JointCreateFixed");
                 if (QuaternionIsFinite(value))
                 {
                     _orientation = value;
-				}
+                }
                 else
-                    m_log.Warn("[PHYSICS]: Got NaN quaternion Orientation from Scene in Object");
+                    m_log.WarnFormat("[PHYSICS]: Got NaN quaternion Orientation from Scene in Object {0}", Name);
 
             }
         }
@@ -2496,7 +2493,7 @@ Console.WriteLine(" JointCreateFixed");
             }
             else
             {
-                m_log.Warn("[PHYSICS]: Got Invalid linear force vector from Scene in Object");
+                m_log.WarnFormat("[PHYSICS]: Got Invalid linear force vector from Scene in Object {0}", Name);
             }
             //m_log.Info("[PHYSICS]: Added Force:" + force.ToString() +  " to prim at " + Position.ToString());
         }
@@ -2510,7 +2507,7 @@ Console.WriteLine(" JointCreateFixed");
             }
             else
             {
-                m_log.Warn("[PHYSICS]: Got Invalid Angular force vector from Scene in Object");
+                m_log.WarnFormat("[PHYSICS]: Got Invalid Angular force vector from Scene in Object {0}", Name);
             }
         }
 
@@ -2536,7 +2533,7 @@ Console.WriteLine(" JointCreateFixed");
                 }
                 else
                 {
-                    m_log.Warn("[PHYSICS]: Got NaN RotationalVelocity in Object");
+                    m_log.WarnFormat("[PHYSICS]: Got NaN RotationalVelocity in Object {0}", Name);
                 }
             }
         }
@@ -2551,7 +2548,7 @@ Console.WriteLine(" JointCreateFixed");
             }
             else if (m_crossingfailures == _parent_scene.geomCrossingFailuresBeforeOutofbounds)
             {
-                m_log.Warn("[PHYSICS]: Too many crossing failures for: " + m_primName);
+                m_log.Warn("[PHYSICS]: Too many crossing failures for: " + Name);
             }
         }
 
@@ -2584,7 +2581,7 @@ Console.WriteLine(" JointCreateFixed");
             }
             else
             {
-                m_log.Warn("[PHYSICS]: Got NaN locking axis from Scene on Object");
+                m_log.WarnFormat("[PHYSICS]: Got NaN locking axis from Scene on Object {0}", Name);
             }
         }
 
@@ -2675,8 +2672,8 @@ Console.WriteLine(" JointCreateFixed");
                         //outofBounds = true;
                     }
 
-					//float Adiff = 1.0f - Math.Abs(Quaternion.Dot(m_lastorientation, l_orientation));
-//Console.WriteLine("Adiff " + m_primName + " = " + Adiff);					
+                    //float Adiff = 1.0f - Math.Abs(Quaternion.Dot(m_lastorientation, l_orientation));
+//Console.WriteLine("Adiff " + Name + " = " + Adiff);
                     if ((Math.Abs(m_lastposition.X - l_position.X) < 0.02)
                         && (Math.Abs(m_lastposition.Y - l_position.Y) < 0.02)
                         && (Math.Abs(m_lastposition.Z - l_position.Z) < 0.02)
@@ -2684,7 +2681,7 @@ Console.WriteLine(" JointCreateFixed");
                         && (1.0 - Math.Abs(Quaternion.Dot(m_lastorientation, l_orientation)) < 0.0001))  // KF 0.01 is far to large
                     {
                         _zeroFlag = true;
-//Console.WriteLine("ZFT 2");                        
+//Console.WriteLine("ZFT 2");
                         m_throttleUpdates = false;
                     }
                     else
@@ -2817,7 +2814,7 @@ Console.WriteLine(" JointCreateFixed");
                     m_PIDTarget = value;
                 }
                 else
-                    m_log.Warn("[PHYSICS]: Got NaN PIDTarget from Scene on Object");
+                    m_log.WarnFormat("[PHYSICS]: Got NaN PIDTarget from Scene on Object {0}", Name);
             } 
         }
         public override bool PIDActive { set { m_usePID = value; } }

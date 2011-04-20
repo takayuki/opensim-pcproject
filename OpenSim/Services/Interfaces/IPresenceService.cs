@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using System;
 using OpenSim.Framework;
 using System.Collections.Generic;
 using OpenMetaverse;
@@ -33,13 +34,40 @@ namespace OpenSim.Services.Interfaces
 {
     public class PresenceInfo
     {
-        public UUID PrincipalID;
+        public string UserID;
         public UUID RegionID;
-        public Dictionary<string, string> Data;
+
+        public PresenceInfo()
+        {
+        }
+
+        public PresenceInfo(Dictionary<string, object> kvp)
+        {
+            if (kvp.ContainsKey("UserID"))
+                UserID = kvp["UserID"].ToString();
+            if (kvp.ContainsKey("RegionID"))
+                UUID.TryParse(kvp["RegionID"].ToString(), out RegionID);
+        }
+
+        public Dictionary<string, object> ToKeyValuePairs()
+        {
+            Dictionary<string, object> result = new Dictionary<string, object>();
+            result["UserID"] = UserID;
+            result["RegionID"] = RegionID.ToString();
+
+            return result;
+        }
     }
 
     public interface IPresenceService
     {
-        bool Report(PresenceInfo presence);
+        bool LoginAgent(string userID, UUID sessionID, UUID secureSessionID);
+        bool LogoutAgent(UUID sessionID);
+        bool LogoutRegionAgents(UUID regionID);
+
+        bool ReportAgent(UUID sessionID, UUID regionID);
+
+        PresenceInfo GetAgent(UUID sessionID);
+        PresenceInfo[] GetAgents(string[] userIDs);
     }
 }

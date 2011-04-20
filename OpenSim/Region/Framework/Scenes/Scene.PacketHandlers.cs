@@ -32,7 +32,7 @@ using OpenMetaverse;
 using OpenMetaverse.Packets;
 using OpenSim.Framework;
 using OpenSim.Framework.Communications;
-using OpenSim.Framework.Communications.Cache;
+using OpenSim.Services.Interfaces;
 
 namespace OpenSim.Region.Framework.Scenes
 {
@@ -116,9 +116,8 @@ namespace OpenSim.Region.Framework.Scenes
         /// <param name="remoteClient"></param>
         public void RequestPrim(uint primLocalID, IClientAPI remoteClient)
         {
-            List<EntityBase> EntityList = GetEntities();
-
-            foreach (EntityBase ent in EntityList)
+            EntityBase[] entityList = GetEntities();
+            foreach (EntityBase ent in entityList)
             {
                 if (ent is SceneObjectGroup)
                 {
@@ -138,9 +137,8 @@ namespace OpenSim.Region.Framework.Scenes
         /// <param name="remoteClient"></param>
         public void SelectPrim(uint primLocalID, IClientAPI remoteClient)
         {
-            List<EntityBase> EntityList = GetEntities();
-
-            foreach (EntityBase ent in EntityList)
+            EntityBase[] entityList = GetEntities();
+            foreach (EntityBase ent in entityList)
             {
                 if (ent is SceneObjectGroup)
                 {
@@ -156,21 +154,27 @@ namespace OpenSim.Region.Framework.Scenes
                         }
                         break;
                     }
-                   else 
-                   {
-                       // We also need to check the children of this prim as they
-                       // can be selected as well and send property information
-                       bool foundPrim = false;
-                       foreach (KeyValuePair<UUID, SceneObjectPart> child in ((SceneObjectGroup) ent).Children)
-                       {
-                           if (child.Value.LocalId == primLocalID) 
-                           {
-                               child.Value.GetProperties(remoteClient);
-                               foundPrim = true;
-                               break;
-                           }
-                       }
-                       if (foundPrim) break;
+                    else 
+                    {
+                        // We also need to check the children of this prim as they
+                        // can be selected as well and send property information
+                        bool foundPrim = false;
+                        
+                        SceneObjectGroup sog = ent as SceneObjectGroup;
+
+                        SceneObjectPart[] partList = sog.Parts;
+                        foreach (SceneObjectPart part in partList)
+                        {
+                            if (part.LocalId == primLocalID) 
+                            {
+                                part.GetProperties(remoteClient);
+                                foundPrim = true;
+                                break;
+                            }
+                        }
+                            
+                        if (foundPrim) 
+                            break;
                    }
                 }
             }
@@ -250,7 +254,7 @@ namespace OpenSim.Region.Framework.Scenes
 
         public virtual void ProcessObjectGrab(uint localID, Vector3 offsetPos, IClientAPI remoteClient, List<SurfaceTouchEventArgs> surfaceArgs)
         {
-            List<EntityBase> EntityList = GetEntities();
+            EntityBase[] EntityList = GetEntities();
 
             SurfaceTouchEventArgs surfaceArg = null;
             if (surfaceArgs != null && surfaceArgs.Count > 0)
@@ -292,9 +296,49 @@ namespace OpenSim.Region.Framework.Scenes
             }
         }
 
+        public virtual void ProcessObjectGrabUpdate(UUID objectID, Vector3 offset, Vector3 pos, IClientAPI remoteClient, List<SurfaceTouchEventArgs> surfaceArgs)
+        {
+            EntityBase[] EntityList = GetEntities();
+
+            SurfaceTouchEventArgs surfaceArg = null;
+            if (surfaceArgs != null && surfaceArgs.Count > 0)
+                surfaceArg = surfaceArgs[0];
+
+            foreach (EntityBase ent in EntityList)
+            {
+                if (ent is SceneObjectGroup)
+                {
+                    SceneObjectGroup obj = ent as SceneObjectGroup;
+                    if (obj != null)
+                    {
+                        // Is this prim part of the group
+                        if (obj.HasChildPrim(objectID))
+                        {
+                            SceneObjectPart part = obj.GetChildPart(objectID);
+
+                            // If the touched prim handles touches, deliver it
+                            // If not, deliver to root prim
+                            if ((part.ScriptEvents & scriptEvents.touch) != 0)
+                                EventManager.TriggerObjectGrabbing(part.LocalId, 0, part.OffsetPosition, remoteClient, surfaceArg);
+                            // Deliver to the root prim if the touched prim doesn't handle touches
+                            // or if we're meant to pass on touches anyway. Don't send to root prim
+                            // if prim touched is the root prim as we just did it
+                            if (((part.ScriptEvents & scriptEvents.touch) == 0) ||
+                                (part.PassTouches && (part.LocalId != obj.RootPart.LocalId)))
+                            {
+                                EventManager.TriggerObjectGrabbing(obj.RootPart.LocalId, part.LocalId, part.OffsetPosition, remoteClient, surfaceArg);
+                            }
+
+                            return;
+                        }
+                    }
+                }
+            }
+         }
+
         public virtual void ProcessObjectDeGrab(uint localID, IClientAPI remoteClient, List<SurfaceTouchEventArgs> surfaceArgs)
         {
-            List<EntityBase> EntityList = GetEntities();
+            EntityBase[] EntityList = GetEntities();
 
             SurfaceTouchEventArgs surfaceArg = null;
             if (surfaceArgs != null && surfaceArgs.Count > 0)
@@ -331,14 +375,16 @@ namespace OpenSim.Region.Framework.Scenes
         {
             //EventManager.TriggerAvatarPickerRequest();
 
-            List<AvatarPickerAvatar> AvatarResponses = new List<AvatarPickerAvatar>();
-            AvatarResponses = m_sceneGridService.GenerateAgentPickerRequestResponse(RequestID, query);
+            List<UserAccount> accounts = UserAccountService.GetUserAccounts(RegionInfo.ScopeID, query);
+
+            if (accounts == null)
+                return;
 
             AvatarPickerReplyPacket replyPacket = (AvatarPickerReplyPacket) PacketPool.Instance.GetPacket(PacketType.AvatarPickerReply);
             // TODO: don't create new blocks if recycling an old packet
 
             AvatarPickerReplyPacket.DataBlock[] searchData =
-                new AvatarPickerReplyPacket.DataBlock[AvatarResponses.Count];
+                new AvatarPickerReplyPacket.DataBlock[accounts.Count];
             AvatarPickerReplyPacket.AgentDataBlock agentData = new AvatarPickerReplyPacket.AgentDataBlock();
 
             agentData.AgentID = avatarID;
@@ -347,16 +393,16 @@ namespace OpenSim.Region.Framework.Scenes
             //byte[] bytes = new byte[AvatarResponses.Count*32];
 
             int i = 0;
-            foreach (AvatarPickerAvatar item in AvatarResponses)
+            foreach (UserAccount item in accounts)
             {
-                UUID translatedIDtem = item.AvatarID;
+                UUID translatedIDtem = item.PrincipalID;
                 searchData[i] = new AvatarPickerReplyPacket.DataBlock();
                 searchData[i].AvatarID = translatedIDtem;
-                searchData[i].FirstName = Utils.StringToBytes((string) item.firstName);
-                searchData[i].LastName = Utils.StringToBytes((string) item.lastName);
+                searchData[i].FirstName = Utils.StringToBytes((string) item.FirstName);
+                searchData[i].LastName = Utils.StringToBytes((string) item.LastName);
                 i++;
             }
-            if (AvatarResponses.Count == 0)
+            if (accounts.Count == 0)
             {
                 searchData = new AvatarPickerReplyPacket.DataBlock[0];
             }
@@ -415,7 +461,8 @@ namespace OpenSim.Region.Framework.Scenes
                 }
             );
         }
-        
+
+
         /// <summary>
         /// Handle a fetch inventory request from the client
         /// </summary>
@@ -424,7 +471,7 @@ namespace OpenSim.Region.Framework.Scenes
         /// <param name="ownerID"></param>
         public void HandleFetchInventory(IClientAPI remoteClient, UUID itemID, UUID ownerID)
         {
-            if (ownerID == CommsManager.UserProfileCacheService.LibraryRoot.Owner)
+            if (LibraryService != null && LibraryService.LibraryRootFolder != null && ownerID == LibraryService.LibraryRootFolder.Owner)
             {
                 //m_log.Debug("request info for library item");
                 return;
@@ -452,19 +499,23 @@ namespace OpenSim.Region.Framework.Scenes
         public void HandleFetchInventoryDescendents(IClientAPI remoteClient, UUID folderID, UUID ownerID,
                                                     bool fetchFolders, bool fetchItems, int sortOrder)
         {
+            if (folderID == UUID.Zero)
+                return;
+
             // FIXME MAYBE: We're not handling sortOrder!
 
-            // TODO: This code for looking in the folder for the library should be folded back into the
-            // CachedUserInfo so that this class doesn't have to know the details (and so that multiple libraries, etc.
+            // TODO: This code for looking in the folder for the library should be folded somewhere else
+            // so that this class doesn't have to know the details (and so that multiple libraries, etc.
             // can be handled transparently).
             InventoryFolderImpl fold = null;
-            if ((fold = CommsManager.UserProfileCacheService.LibraryRoot.FindFolder(folderID)) != null)
-            {
-                remoteClient.SendInventoryFolderDetails(
-                    fold.Owner, folderID, fold.RequestListOfItems(),
-                    fold.RequestListOfFolders(), fold.Version, fetchFolders, fetchItems);
-                return;
-            }
+            if (LibraryService != null && LibraryService.LibraryRootFolder != null)
+                if ((fold = LibraryService.LibraryRootFolder.FindFolder(folderID)) != null)
+                {
+                    remoteClient.SendInventoryFolderDetails(
+                        fold.Owner, folderID, fold.RequestListOfItems(),
+                        fold.RequestListOfFolders(), fold.Version, fetchFolders, fetchItems);
+                    return;
+                }
 
             // We're going to send the reply async, because there may be
             // an enormous quantity of packets -- basically the entire inventory!
@@ -512,15 +563,16 @@ namespace OpenSim.Region.Framework.Scenes
             // CachedUserInfo so that this class doesn't have to know the details (and so that multiple libraries, etc.
             // can be handled transparently).
             InventoryFolderImpl fold;
-            if ((fold = CommsManager.UserProfileCacheService.LibraryRoot.FindFolder(folderID)) != null)
-            {
-                version = 0;
-                InventoryCollection ret = new InventoryCollection();
-                ret.Folders = new List<InventoryFolderBase>();
-                ret.Items = fold.RequestListOfItems();
+            if (LibraryService != null && LibraryService.LibraryRootFolder != null)
+                if ((fold = LibraryService.LibraryRootFolder.FindFolder(folderID)) != null)
+                {
+                    version = 0;
+                    InventoryCollection ret = new InventoryCollection();
+                    ret.Folders = new List<InventoryFolderBase>();
+                    ret.Items = fold.RequestListOfItems();
 
-                return ret;
-            }
+                    return ret;
+                }
 
             InventoryCollection contents = new InventoryCollection();
 

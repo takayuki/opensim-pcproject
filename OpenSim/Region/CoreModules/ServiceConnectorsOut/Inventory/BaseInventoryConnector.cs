@@ -27,25 +27,27 @@
 
 using System;
 using System.Collections.Generic;
-
 using OpenMetaverse;
 using Nini.Config;
 using log4net;
-
 using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
-
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Inventory
 {
     public abstract class BaseInventoryConnector : IInventoryService
     {
-        protected InventoryCache m_cache;
+        protected static InventoryCache m_cache;
+        private static bool m_Initialized;
 
         protected virtual void Init(IConfigSource source)
         {
-            m_cache = new InventoryCache();
-            m_cache.Init(source, this);
+            if (!m_Initialized)
+            {
+                m_cache = new InventoryCache();
+                m_cache.Init(source, this);
+                m_Initialized = true;
+            }
         }
 
         /// <summary>

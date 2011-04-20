@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) Contributors, http://opensimulator.org/
  * See CONTRIBUTORS.TXT for a full list of copyright holders.
  *
@@ -27,10 +27,23 @@
 
 using System;
 using System.Collections.Generic;
+using System.Reflection;
+using System.Text;
+using System.Threading;
+using System.Timers;
+using Timer=System.Timers.Timer;
+using Nini.Config;
 using NUnit.Framework;
 using OpenMetaverse;
 using OpenSim.Framework;
+using OpenSim.Framework.Communications;
+using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
+using OpenSim.Region.CoreModules.World.Serialiser;
+using OpenSim.Region.CoreModules.ServiceConnectorsOut.Simulation;
+using OpenSim.Tests.Common;
+using OpenSim.Tests.Common.Mock;
+using OpenSim.Tests.Common.Setup;
 
 namespace OpenSim.Region.Framework.Scenes.Tests
 {
@@ -40,99 +53,18 @@ namespace OpenSim.Region.Framework.Scenes.Tests
     [TestFixture]
     public class SceneTests
     {
-        private class FakeStorageManager : StorageManager
-        {
-            private class FakeRegionDataStore : IRegionDataStore
-            {
-                public void Initialise(string filename)
-                {
-                }
-
-                public void Dispose()
-                {
-                }
-
-                public void StoreObject(SceneObjectGroup obj, UUID regionUUID)
-                {
-                    throw new NotImplementedException();
-                }
-
-                public void RemoveObject(UUID uuid, UUID regionUUID)
-                {
-                    throw new NotImplementedException();
-                }
-
-                public void StorePrimInventory(UUID primID, ICollection<TaskInventoryItem> items)
-                {
-                    throw new NotImplementedException();
-                }
-
-                public List<SceneObjectGroup> LoadObjects(UUID regionUUID)
-                {
-                    throw new NotImplementedException();
-                }
-
-                public void StoreTerrain(double[,] terrain, UUID regionID)
-                {
-                    throw new NotImplementedException();
-                }
-
-                public double[,] LoadTerrain(UUID regionID)
-                {
-                    throw new NotImplementedException();
-                }
-
-                public void StoreLandObject(ILandObject Parcel)
-                {
-                    throw new NotImplementedException();
-                }
-
-                public void RemoveLandObject(UUID globalID)
-                {
-                    throw new NotImplementedException();
-                }
-
-                public List<LandData> LoadLandObjects(UUID regionUUID)
-                {
-                    throw new NotImplementedException();
-                }
-
-                public void StoreRegionSettings(RegionSettings rs)
-                {
-                    throw new NotImplementedException();
-                }
-
-                public RegionSettings LoadRegionSettings(UUID regionUUID)
-                {
-                    return null;
-                }
-
-                public void Shutdown()
-                {
-                    throw new NotImplementedException();
-                }
-            }
-
-            public FakeStorageManager() : base(new FakeRegionDataStore())
-            {
-            }
-
-            public FakeStorageManager(IRegionDataStore storage) : this()
-            {
-            }
-
-            public FakeStorageManager(string dllName, string connectionstring, string estateconnectionstring) : this()
-            {
-            }
-        }
-
+        /// <summary>
+        /// Very basic scene update test.  Should become more elaborate with time.
+        /// </summary>
         [Test]
-        public void TestConstructor()
+        public void TestUpdateScene()
         {
-            RegionInfo regionInfo = new RegionInfo(0,0,null,null);
-            FakeStorageManager storageManager = new FakeStorageManager();
+            TestHelper.InMethod();
 
-            new Scene(regionInfo, null, null, null, storageManager, null, false, false, false, null, null);
+            Scene scene = SceneSetupHelpers.SetupScene();
+            scene.Update();
+            
+            Assert.That(scene.Frame, Is.EqualTo(1));
         }
     }
 }

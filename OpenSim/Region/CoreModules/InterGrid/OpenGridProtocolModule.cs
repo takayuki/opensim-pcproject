@@ -91,7 +91,7 @@ namespace OpenSim.Region.CoreModules.InterGrid
         private string httpsCN = "";
         private bool httpSSL = false;
         private uint httpsslport = 0;
-        private bool GridMode = false;
+//        private bool GridMode = false;
 
         #region IRegionModule Members
 
@@ -100,7 +100,7 @@ namespace OpenSim.Region.CoreModules.InterGrid
             bool enabled = false;
             IConfig cfg = null;
             IConfig httpcfg = null;
-            IConfig startupcfg = null;
+//            IConfig startupcfg = null;
             try
             {
                 cfg = config.Configs["OpenGridProtocol"];
@@ -117,19 +117,19 @@ namespace OpenSim.Region.CoreModules.InterGrid
             {
                
             }
-            try
-            {
-                startupcfg = config.Configs["Startup"];
-            }
-            catch (NullReferenceException)
-            {
+//            try
+//            {
+//                startupcfg = config.Configs["Startup"];
+//            }
+//            catch (NullReferenceException)
+//            {
+//
+//            }
 
-            }
-
-            if (startupcfg != null)
-            {
-                GridMode = enabled = startupcfg.GetBoolean("gridmode", false);
-            }
+//            if (startupcfg != null)
+//            {
+//                GridMode = enabled = startupcfg.GetBoolean("gridmode", false);
+//            }
 
             if (cfg != null)
             {
@@ -528,36 +528,38 @@ namespace OpenSim.Region.CoreModules.InterGrid
             userProfile.PasswordHash = "$1$";
             userProfile.PasswordSalt = "";
             userProfile.SurName = agentData.lastname;
-            userProfile.UserAssetURI = homeScene.CommsManager.NetworkServersInfo.AssetURL;
+            //userProfile.UserAssetURI = homeScene.CommsManager.NetworkServersInfo.AssetURL;
             userProfile.UserFlags = 0;
-            userProfile.UserInventoryURI = homeScene.CommsManager.NetworkServersInfo.InventoryURL;
+            //userProfile.UserInventoryURI = homeScene.CommsManager.NetworkServersInfo.InventoryURL;
             userProfile.WantDoMask = 0;
             userProfile.WebLoginKey = UUID.Random();
 
-            // Do caps registration
-            // get seed capagentData.firstname = FirstName;agentData.lastname = LastName;
-            if (homeScene.CommsManager.UserService.GetUserProfile(agentData.AgentID) == null && !GridMode)
-            {
-                homeScene.CommsManager.UserAdminService.AddUser(
-                    agentData.firstname, agentData.lastname, CreateRandomStr(7), "", 
-                    homeScene.RegionInfo.RegionLocX, homeScene.RegionInfo.RegionLocY, agentData.AgentID);
+            // !!! REFACTORING PROBLEM. This needs to be changed for 0.7
+            //
+            //// Do caps registration
+            //// get seed capagentData.firstname = FirstName;agentData.lastname = LastName;
+            //if (homeScene.CommsManager.UserService.GetUserProfile(agentData.AgentID) == null && !GridMode)
+            //{
+            //    homeScene.CommsManager.UserAdminService.AddUser(
+            //        agentData.firstname, agentData.lastname, CreateRandomStr(7), "", 
+            //        homeScene.RegionInfo.RegionLocX, homeScene.RegionInfo.RegionLocY, agentData.AgentID);
                 
-                UserProfileData userProfile2 = homeScene.CommsManager.UserService.GetUserProfile(agentData.AgentID);
-                if (userProfile2 != null)
-                {
-                    userProfile = userProfile2;
-                    userProfile.AboutText = "OGP USER";
-                    userProfile.FirstLifeAboutText = "OGP USER";
-                    homeScene.CommsManager.UserService.UpdateUserProfile(userProfile);
-                }
-            }
+            //    UserProfileData userProfile2 = homeScene.CommsManager.UserService.GetUserProfile(agentData.AgentID);
+            //    if (userProfile2 != null)
+            //    {
+            //        userProfile = userProfile2;
+            //        userProfile.AboutText = "OGP USER";
+            //        userProfile.FirstLifeAboutText = "OGP USER";
+            //        homeScene.CommsManager.UserService.UpdateUserProfile(userProfile);
+            //    }
+            //}
             
-            // Stick our data in the cache so the region will know something about us
-            homeScene.CommsManager.UserProfileCacheService.PreloadUserCache(userProfile);
+            //// Stick our data in the cache so the region will know something about us
+            //homeScene.CommsManager.UserProfileCacheService.PreloadUserCache(userProfile);
 
             // Call 'new user' event handler
             string reason;
-            if (!homeScene.NewUserConnection(agentData, out reason))
+            if (!homeScene.NewUserConnection(agentData, (uint)TeleportFlags.ViaLogin, out reason))
             {
                 responseMap["connect"] = OSD.FromBoolean(false);
                 responseMap["message"] = OSD.FromString(String.Format("Connection refused: {0}", reason));
@@ -593,12 +595,12 @@ namespace OpenSim.Region.CoreModules.InterGrid
             // DEPRECATED
             responseMap["seed_capability"] 
                 = OSD.FromString(
-                    regionCapsHttpProtocol + httpaddr + ":" + reg.HttpPort + CapsUtil.GetCapsSeedPath(userCap.CapsObjectPath));
+                    regionCapsHttpProtocol + httpaddr + ":" + reg.HttpPort + "/" + CapsUtil.GetCapsSeedPath(userCap.CapsObjectPath));
             
             // REPLACEMENT
             responseMap["region_seed_capability"] 
                 = OSD.FromString(
-                    regionCapsHttpProtocol + httpaddr + ":" + reg.HttpPort + CapsUtil.GetCapsSeedPath(userCap.CapsObjectPath));
+                    regionCapsHttpProtocol + httpaddr + ":" + reg.HttpPort + "/" + CapsUtil.GetCapsSeedPath(userCap.CapsObjectPath));
 
             responseMap["rez_avatar"] = OSD.FromString(rezHttpProtocol + httpaddr + ":" + urlport + rezAvatarPath);
             responseMap["rez_avatar/rez"] = OSD.FromString(rezHttpProtocol + httpaddr + ":" + urlport + rezAvatarPath);
@@ -1204,25 +1206,26 @@ namespace OpenSim.Region.CoreModules.InterGrid
         {
             Scene homeScene = GetRootScene();
             ScenePresence avatar = null;
-            if (homeScene.TryGetAvatar(avatarId,out avatar))
+            if (homeScene.TryGetScenePresence(avatarId,out avatar))
             {
                 KillAUser ku = new KillAUser(avatar,mod);
                 Watchdog.StartThread(ku.ShutdownNoLogout, "OGPShutdown", ThreadPriority.Normal, true);
             }
         }
 
-        private string CreateRandomStr(int len)
-        {
-            Random rnd = new Random(Environment.TickCount);
-            string returnstring = "";
-            string chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-
-            for (int i = 0; i < len; i++)
-            {
-                returnstring += chars.Substring(rnd.Next(chars.Length), 1);
-            }
-            return returnstring;
-        }
+//        private string CreateRandomStr(int len)
+//        {
+//            Random rnd = new Random(Environment.TickCount);
+//            string returnstring = "";
+//            string chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+//
+//            for (int i = 0; i < len; i++)
+//            {
+//                returnstring += chars.Substring(rnd.Next(chars.Length), 1);
+//            }
+//            return returnstring;
+//        }
+        
         // Temporary hack to allow teleporting to and from Vaak
         private static bool customXertificateValidation(object sender, X509Certificate cert, X509Chain chain, SslPolicyErrors error)
         {

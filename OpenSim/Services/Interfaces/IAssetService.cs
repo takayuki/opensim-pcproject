@@ -48,10 +48,23 @@ namespace OpenSim.Services.Interfaces
         /// <returns></returns>
         AssetMetadata GetMetadata(string id);
         
+        /// <summary>
+        /// Get an asset's data, ignoring the metadata.
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns>null if there is no such asset</returns>
         byte[] GetData(string id);
 
         /// <summary>
-        /// Get an asset asynchronously
+        /// Synchronously fetches an asset from the local cache only
+        /// </summary>
+        /// <param name="id">Asset ID</param>
+        /// <returns>The fetched asset, or null if it did not exist in the local cache</returns>
+        AssetBase GetCached(string id);
+
+        /// <summary>
+        /// Get an asset synchronously or asynchronously (depending on whether 
+        /// it is locally cached) and fire a callback with the fetched asset
         /// </summary>
         /// <param name="id">The asset id</param>
         /// <param name="sender">Represents the requester.  Passed back via the handler</param>

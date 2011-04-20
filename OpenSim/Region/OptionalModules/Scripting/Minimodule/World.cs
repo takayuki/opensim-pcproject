@@ -149,7 +149,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.Minimodule
                 e.Sender = new SOPObject(m_internalScene, ((SceneObjectPart) chat.SenderObject).LocalId, m_security);
                 e.Text = chat.Message;
                 e.Channel = chat.Channel;
-				
+                
                 _OnChat(this, e);
                 return;
             }
@@ -160,7 +160,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.Minimodule
                 e.Sender = new SPAvatar(m_internalScene, chat.SenderUUID, m_security);
                 e.Text = chat.Message;
                 e.Channel = chat.Channel;
-				
+                
                 _OnChat(this, e);
                 return;
             }
@@ -205,10 +205,10 @@ namespace OpenSim.Region.OptionalModules.Scripting.Minimodule
         {
             get
             {
-                List<EntityBase> ents = m_internalScene.Entities.GetAllByType<ScenePresence>();
-                IAvatar[] rets = new IAvatar[ents.Count];
+                EntityBase[] ents = m_internalScene.Entities.GetAllByType<ScenePresence>();
+                IAvatar[] rets = new IAvatar[ents.Length];
 
-                for (int i = 0; i < ents.Count; i++)
+                for (int i = 0; i < ents.Length; i++)
                 {
                     EntityBase ent = ents[i];
                     rets[i] = new SPAvatar(m_internalScene, ent.UUID, m_security);
@@ -231,7 +231,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.Minimodule
             if (soundModule != null)
             {
                 soundModule.TriggerSound(audio, UUID.Zero, UUID.Zero, UUID.Zero, volume, position,
-                                         m_internalScene.RegionInfo.RegionHandle);
+                                         m_internalScene.RegionInfo.RegionHandle, 0);
             }
         }
 
@@ -241,7 +241,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.Minimodule
             if (soundModule != null)
             {
                 soundModule.TriggerSound(audio, UUID.Zero, UUID.Zero, UUID.Zero, 1.0, position,
-                                         m_internalScene.RegionInfo.RegionHandle);
+                                         m_internalScene.RegionInfo.RegionHandle, 0);
             }
         }
 

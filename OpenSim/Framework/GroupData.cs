@@ -48,7 +48,6 @@ namespace OpenSim.Framework
     public class GroupMembershipData
     {
         // Group base data
-        //
         public UUID GroupID;
         public string GroupName;
         public bool AllowPublish = true;
@@ -61,7 +60,6 @@ namespace OpenSim.Framework
         public bool ShowInList = true;
 
         // Per user data
-        //
         public bool AcceptNotices = true;
         public int Contribution = 0;
         public ulong GroupPowers = 0;
@@ -134,5 +132,31 @@ namespace OpenSim.Framework
         public string Subject;
         public bool HasAttachment;
         public byte AssetType;
+    }
+
+    public struct GroupVoteHistory
+    {
+        public string VoteID;
+        public string VoteInitiator;
+        public string Majority;
+        public string Quorum;
+        public string TerseDateID;
+        public string StartDateTime;
+        public string EndDateTime;
+        public string VoteType;
+        public string VoteResult;
+        public string ProposalText;
+    }
+
+    public struct GroupActiveProposals
+    {
+        public string VoteID;
+        public string VoteInitiator;
+        public string Majority;
+        public string Quorum;
+        public string TerseDateID;
+        public string StartDateTime;
+        public string EndDateTime;
+        public string ProposalText;
     }
 }

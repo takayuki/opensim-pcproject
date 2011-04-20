@@ -208,6 +208,7 @@ namespace OpenSim.Region.Physics.Manager
         public abstract void VehicleFloatParam(int param, float value);
         public abstract void VehicleVectorParam(int param, Vector3 value);
         public abstract void VehicleRotationParam(int param, Quaternion rotation);
+        public abstract void VehicleFlags(int param, bool remove);
 
         public abstract void SetVolumeDetect(int param);    // Allows the detection of collisions with inherently non-physical prims. see llVolumeDetect for more
 
@@ -243,7 +244,7 @@ namespace OpenSim.Region.Physics.Manager
         public abstract PIDHoverType PIDHoverType { set;}
         public abstract float PIDHoverTau { set;}
 
-		// For RotLookAt        
+        // For RotLookAt
         public abstract Quaternion APIDTarget { set;}
         public abstract bool APIDActive { set;}
         public abstract float APIDStrength { set;}
@@ -350,6 +351,11 @@ namespace OpenSim.Region.Physics.Manager
         public override void VehicleRotationParam(int param, Quaternion rotation)
         {
 
+        }
+
+        public override void VehicleFlags(int param, bool remove)
+        {
+            
         }
 
         public override void SetVolumeDetect(int param)

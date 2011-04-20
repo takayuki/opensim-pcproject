@@ -47,7 +47,7 @@ namespace OpenSim.Server
         protected static List<IServiceConnector> m_ServiceConnectors =
                 new List<IServiceConnector>();
 
-        static int Main(string[] args)
+        public static int Main(string[] args)
         {
             m_Server = new HttpServerBase("R.O.B.U.S.T.", args);
 
@@ -61,7 +61,7 @@ namespace OpenSim.Server
             string connList = serverConfig.GetString("ServiceConnectors", String.Empty);
             string[] conns = connList.Split(new char[] {',', ' '});
 
-            int i = 0;
+//            int i = 0;
             foreach (string c in conns)
             {
                 if (c == String.Empty)

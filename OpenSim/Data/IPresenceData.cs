@@ -32,25 +32,26 @@ using OpenSim.Framework;
 
 namespace OpenSim.Data
 {
-    public struct PresenceData
+    // This MUST be a ref type!
+    public class PresenceData
     {
-        public UUID UUID;
-        public UUID currentRegion;
+        public string UserID;
+        public UUID RegionID;
+        public UUID SessionID;
         public Dictionary<string, string> Data;
     }
 
     /// <summary>
-    /// An interface for connecting to the authentication datastore
+    /// An interface for connecting to the presence datastore
     /// </summary>
     public interface IPresenceData 
     {
         bool Store(PresenceData data);
 
-        PresenceData Get(UUID principalID);
-
-        bool SetUserDataItem(UUID principalID, string item, string value);
-        bool SetRegionDataItem(UUID principalID, string item, string value);
-
-        bool Delete(UUID regionID);
+        PresenceData Get(UUID sessionID);
+        void LogoutRegionAgents(UUID regionID);
+        bool ReportAgent(UUID sessionID, UUID regionID);
+        PresenceData[] Get(string field, string data);
+        bool Delete(string field, string val);
     }
 }
