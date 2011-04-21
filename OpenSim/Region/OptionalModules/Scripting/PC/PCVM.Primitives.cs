@@ -2137,9 +2137,9 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
         {
             switch (GetScriptPrimType(part.Shape))
             {
-                case PrimType.Box:
-                case PrimType.Cylinder:
-                case PrimType.Prism:
+                case OpenMetaverse.PrimType.Box:
+                case OpenMetaverse.PrimType.Cylinder:
+                case OpenMetaverse.PrimType.Prism:
                     begin = UnpackBeginCut(part.Shape.ProfileBegin);
                     end = UnpackEndCut(part.Shape.ProfileEnd);
                     break;
@@ -2155,9 +2155,9 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
         {
             switch (GetScriptPrimType(part.Shape))
             {
-                case PrimType.Box:
-                case PrimType.Cylinder:
-                case PrimType.Prism:
+                case OpenMetaverse.PrimType.Box:
+                case OpenMetaverse.PrimType.Cylinder:
+                case OpenMetaverse.PrimType.Prism:
                     part.Shape.ProfileBegin = PackBeginCut(begin);
                     part.Shape.ProfileEnd = PackEndCut(end);
                     break;
@@ -2174,9 +2174,9 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
         {
             switch (GetScriptPrimType(part.Shape))
             {
-                case PrimType.Box:
-                case PrimType.Cylinder:
-                case PrimType.Prism:
+                case OpenMetaverse.PrimType.Box:
+                case OpenMetaverse.PrimType.Cylinder:
+                case OpenMetaverse.PrimType.Prism:
                     begin = UnpackBeginCut(part.Shape.PathBegin);
                     end = UnpackEndCut(part.Shape.PathEnd);
                     return true;
@@ -2191,9 +2191,9 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
         {
             switch (GetScriptPrimType(part.Shape))
             {
-                case PrimType.Box:
-                case PrimType.Cylinder:
-                case PrimType.Prism:
+                case OpenMetaverse.PrimType.Box:
+                case OpenMetaverse.PrimType.Cylinder:
+                case OpenMetaverse.PrimType.Prism:
                     part.Shape.PathBegin = PackBeginCut(begin);
                     part.Shape.PathEnd = PackEndCut(end);
                     part.ScheduleFullUpdate();
@@ -2207,7 +2207,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
         {
             switch (GetScriptPrimType(part.Shape))
             {
-                case PrimType.Sphere:
+                case OpenMetaverse.PrimType.Sphere:
                     begin = UnpackBeginCut(part.Shape.ProfileBegin);
                     end = UnpackEndCut(part.Shape.ProfileEnd);
                     return true;
@@ -2222,7 +2222,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
         {
             switch (GetScriptPrimType(part.Shape))
             {
-                case PrimType.Sphere:
+                case OpenMetaverse.PrimType.Sphere:
                     part.Shape.ProfileBegin = PackBeginCut(begin);
                     part.Shape.ProfileEnd = PackEndCut(end);
                     part.ScheduleFullUpdate();
@@ -2236,9 +2236,9 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
         {
             switch (GetScriptPrimType(part.Shape))
             {
-                case PrimType.Torus:
-                case PrimType.Tube:
-                case PrimType.Ring:
+                case OpenMetaverse.PrimType.Torus:
+                case OpenMetaverse.PrimType.Tube:
+                case OpenMetaverse.PrimType.Ring:
                     begin = UnpackBeginCut(part.Shape.ProfileBegin);
                     end = UnpackEndCut(part.Shape.ProfileEnd);
                     return true;
@@ -2253,9 +2253,9 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
         {
             switch (GetScriptPrimType(part.Shape))
             {
-                case PrimType.Torus:
-                case PrimType.Tube:
-                case PrimType.Ring:
+                case OpenMetaverse.PrimType.Torus:
+                case OpenMetaverse.PrimType.Tube:
+                case OpenMetaverse.PrimType.Ring:
                     part.Shape.ProfileBegin = PackBeginCut(begin);
                     part.Shape.ProfileEnd = PackEndCut(end);
                     part.ScheduleFullUpdate();
@@ -2311,9 +2311,9 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
         {
             switch (GetScriptPrimType(part.Shape))
             {
-                case PrimType.Torus:
-                case PrimType.Tube:
-                case PrimType.Ring:
+                case OpenMetaverse.PrimType.Torus:
+                case OpenMetaverse.PrimType.Tube:
+                case OpenMetaverse.PrimType.Ring:
                     value = UnpackSkew(part.Shape.PathSkew);
                     return true;
                 default:
@@ -2326,9 +2326,9 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
         {
             switch (GetScriptPrimType(part.Shape))
             {
-                case PrimType.Torus:
-                case PrimType.Tube:
-                case PrimType.Ring:
+                case OpenMetaverse.PrimType.Torus:
+                case OpenMetaverse.PrimType.Tube:
+                case OpenMetaverse.PrimType.Ring:
                     part.Shape.PathSkew = PackSkew(value);
                     part.ScheduleFullUpdate();
                     return true;
@@ -2341,9 +2341,9 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
         {
             switch (GetScriptPrimType(part.Shape))
             {
-                case PrimType.Box:
-                case PrimType.Cylinder:
-                case PrimType.Prism:
+                case OpenMetaverse.PrimType.Box:
+                case OpenMetaverse.PrimType.Cylinder:
+                case OpenMetaverse.PrimType.Prism:
                     begin = UnpackTwist180(part.Shape.PathTwistBegin);
                     end = UnpackTwist180(part.Shape.PathTwist);
                     return true;
@@ -2358,9 +2358,9 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
         {
             switch (GetScriptPrimType(part.Shape))
             {
-                case PrimType.Box:
-                case PrimType.Cylinder:
-                case PrimType.Prism:
+                case OpenMetaverse.PrimType.Box:
+                case OpenMetaverse.PrimType.Cylinder:
+                case OpenMetaverse.PrimType.Prism:
                     part.Shape.PathTwistBegin = PackTwist180(begin);
                     part.Shape.PathTwist = PackTwist180(end);
                     part.ScheduleFullUpdate();
@@ -2377,9 +2377,9 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
         {
             switch (GetScriptPrimType(part.Shape))
             {
-                case PrimType.Torus:
-                case PrimType.Tube:
-                case PrimType.Ring:
+                case OpenMetaverse.PrimType.Torus:
+                case OpenMetaverse.PrimType.Tube:
+                case OpenMetaverse.PrimType.Ring:
                     x = UnpackHoleSize(part.Shape.PathScaleX);
                     y = UnpackHoleSize(part.Shape.PathScaleY);
                     return true;
@@ -2394,9 +2394,9 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
         {
             switch (GetScriptPrimType(part.Shape))
             {
-                case PrimType.Torus:
-                case PrimType.Tube:
-                case PrimType.Ring:
+                case OpenMetaverse.PrimType.Torus:
+                case OpenMetaverse.PrimType.Tube:
+                case OpenMetaverse.PrimType.Ring:
                     part.Shape.PathScaleX = PackHoleSize(x);
                     part.Shape.PathScaleY = PackHoleSize(y);
                     part.ScheduleFullUpdate();
@@ -2410,15 +2410,15 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
         {
             switch (GetScriptPrimType(part.Shape))
             {
-                case PrimType.Box:
-                case PrimType.Cylinder:
-                case PrimType.Prism:
+                case OpenMetaverse.PrimType.Box:
+                case OpenMetaverse.PrimType.Cylinder:
+                case OpenMetaverse.PrimType.Prism:
                     x = UnpackTaper(part.Shape.PathScaleX);
                     y = UnpackTaper(part.Shape.PathScaleY);
                     return true;
-                case PrimType.Torus:
-                case PrimType.Tube:
-                case PrimType.Ring:
+                case OpenMetaverse.PrimType.Torus:
+                case OpenMetaverse.PrimType.Tube:
+                case OpenMetaverse.PrimType.Ring:
                     x = UnpackSTaper(part.Shape.PathTaperX);
                     y = UnpackSTaper(part.Shape.PathTaperY);
                     return true;
@@ -2433,16 +2433,16 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
         {
             switch (GetScriptPrimType(part.Shape))
             {
-                case PrimType.Box:
-                case PrimType.Cylinder:
-                case PrimType.Prism:
+                case OpenMetaverse.PrimType.Box:
+                case OpenMetaverse.PrimType.Cylinder:
+                case OpenMetaverse.PrimType.Prism:
                     part.Shape.PathScaleX = PackTaper(x);
                     part.Shape.PathScaleY = PackTaper(y);
                     part.ScheduleFullUpdate();
                     return true;
-                case PrimType.Torus:
-                case PrimType.Tube:
-                case PrimType.Ring:
+                case OpenMetaverse.PrimType.Torus:
+                case OpenMetaverse.PrimType.Tube:
+                case OpenMetaverse.PrimType.Ring:
                     part.Shape.PathTaperX = PackSTaper(x);
                     part.Shape.PathTaperY = PackSTaper(y);
                     part.ScheduleFullUpdate();
@@ -2456,12 +2456,12 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
         {
             switch (GetScriptPrimType(part.Shape))
             {
-                case PrimType.Box:
-                case PrimType.Cylinder:
-                case PrimType.Prism:
-                case PrimType.Torus:
-                case PrimType.Tube:
-                case PrimType.Ring:
+                case OpenMetaverse.PrimType.Box:
+                case OpenMetaverse.PrimType.Cylinder:
+                case OpenMetaverse.PrimType.Prism:
+                case OpenMetaverse.PrimType.Torus:
+                case OpenMetaverse.PrimType.Tube:
+                case OpenMetaverse.PrimType.Ring:
                     x = UnpackShear(part.Shape.PathShearX);
                     y = UnpackShear(part.Shape.PathShearY);
                     return true;
@@ -2476,12 +2476,12 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
         {
             switch (GetScriptPrimType(part.Shape))
             {
-                case PrimType.Box:
-                case PrimType.Cylinder:
-                case PrimType.Prism:
-                case PrimType.Torus:
-                case PrimType.Tube:
-                case PrimType.Ring:
+                case OpenMetaverse.PrimType.Box:
+                case OpenMetaverse.PrimType.Cylinder:
+                case OpenMetaverse.PrimType.Prism:
+                case OpenMetaverse.PrimType.Torus:
+                case OpenMetaverse.PrimType.Tube:
+                case OpenMetaverse.PrimType.Ring:
                     part.Shape.PathShearX = PackShear(x);
                     part.Shape.PathShearY = PackShear(y);
                     part.ScheduleFullUpdate();
@@ -2491,37 +2491,37 @@ namespace OpenSim.Region.OptionalModules.Scripting.PC
             }
         }
 
-        private PrimType GetScriptPrimType(PrimitiveBaseShape primShape)
+        private OpenMetaverse.PrimType GetScriptPrimType(PrimitiveBaseShape primShape)
         {
             if (primShape.SculptEntry)
-                return PrimType.Sculpt;
+                return OpenMetaverse.PrimType.Sculpt;
             if ((primShape.ProfileCurve & 0x07) == (byte)ProfileShape.Square)
             {
                 if (primShape.PathCurve == (byte)Extrusion.Straight)
-                    return PrimType.Box;
+                    return OpenMetaverse.PrimType.Box;
                 else if (primShape.PathCurve == (byte)Extrusion.Curve1)
-                    return PrimType.Tube;
+                    return OpenMetaverse.PrimType.Tube;
             }
             else if ((primShape.ProfileCurve & 0x07) == (byte)ProfileShape.Circle)
             {
                 if (primShape.PathCurve == (byte)Extrusion.Straight)
-                    return PrimType.Cylinder;
+                    return OpenMetaverse.PrimType.Cylinder;
                 else if (primShape.PathCurve == (byte)Extrusion.Curve1)
-                    return PrimType.Torus;
+                    return OpenMetaverse.PrimType.Torus;
             }
             else if ((primShape.ProfileCurve & 0x07) == (byte)ProfileShape.HalfCircle)
             {
                 if (primShape.PathCurve == (byte)Extrusion.Curve1 || primShape.PathCurve == (byte)Extrusion.Curve2)
-                    return PrimType.Sphere;
+                    return OpenMetaverse.PrimType.Sphere;
             }
             else if ((primShape.ProfileCurve & 0x07) == (byte)ProfileShape.EquilateralTriangle)
             {
                 if (primShape.PathCurve == (byte)Extrusion.Straight)
-                    return PrimType.Prism;
+                    return OpenMetaverse.PrimType.Prism;
                 else if (primShape.PathCurve == (byte)Extrusion.Curve1)
-                    return PrimType.Ring;
+                    return OpenMetaverse.PrimType.Ring;
             }
-            return PrimType.Box;
+            return OpenMetaverse.PrimType.Box;
         }
     }
 }

@@ -1,15 +1,8 @@
---- prebuild.xml	2009-12-29 18:27:50.828125000 +0900
-+++ prebuild.xml.new	2009-12-29 18:04:16.453125000 +0900
-@@ -1710,6 +1710,8 @@
-       <Reference name="Nini.dll" />
-       <Reference name="log4net.dll"/>
-       <Reference name="DotNetOpenMail.dll"/>
-+      <Reference name="Tools.dll" />
-+      <Reference name="Erlang.NET" />
- 
- 	  
-       <Files>
-@@ -2517,6 +2486,97 @@
+diff --git a/prebuild.xml b/prebuild.xml
+index 49063da..5d328e4 100644
+--- a/prebuild.xml
++++ b/prebuild.xml
+@@ -139,6 +139,97 @@
        </Files>
      </Project>
  
@@ -104,6 +97,15 @@
 +      </Files>
 +    </Project>
 +
-     <Project frameworkVersion="v3_5" name="OpenSim.Region.ScriptEngine.Shared" path="OpenSim/Region/ScriptEngine/Shared" type="Library">
+     <Project frameworkVersion="v3_5" name="OpenSim.Framework" path="OpenSim/Framework" type="Library">
        <Configuration name="Debug">
          <Options>
+@@ -1599,6 +1690,8 @@
+       <Reference name="Nini" path="../../../bin/"/>
+       <Reference name="log4net" path="../../../bin/"/>
+       <Reference name="DotNetOpenMail" path="../../../bin/"/>
++      <Reference name="Tools.dll" />
++      <Reference name="Erlang.NET" />
+ 
+       <Files>
+         <Match pattern="*.cs" recurse="true">
