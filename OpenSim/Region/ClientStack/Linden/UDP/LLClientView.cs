@@ -5982,7 +5982,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
                 AvatarWearingArgs wearingArgs = new AvatarWearingArgs();
                 for (int i = 0; i < nowWearing.WearableData.Length; i++)
                 {
-                    m_log.DebugFormat("[XXX]: Wearable type {0} item {1}", nowWearing.WearableData[i].WearableType, nowWearing.WearableData[i].ItemID);
+                    //m_log.DebugFormat("[XXX]: Wearable type {0} item {1}", nowWearing.WearableData[i].WearableType, nowWearing.WearableData[i].ItemID);
                     AvatarWearingArgs.Wearable wearable =
                         new AvatarWearingArgs.Wearable(nowWearing.WearableData[i].ItemID,
                                                        nowWearing.WearableData[i].WearableType);
@@ -8264,13 +8264,12 @@ namespace OpenSim.Region.ClientStack.LindenUDP
                     return true;
             }
             #endregion
-
             string mapName = Util.UTF8.GetString(map.NameData.Name, 0,
                                                      map.NameData.Name.Length - 1);
             RequestMapName handlerMapNameRequest = OnMapNameRequest;
             if (handlerMapNameRequest != null)
             {
-                handlerMapNameRequest(this, mapName);
+                handlerMapNameRequest(this, mapName, map.AgentData.Flags);
             }
             return true;
         }
