@@ -924,9 +924,9 @@ namespace OpenSim.Region.Framework.Scenes
                                              uint callbackID, string description, string name,
                                              sbyte invType, sbyte type, UUID olditemID)
         {
-            m_log.DebugFormat(
-                "[AGENT INVENTORY]: Received request from {0} to create inventory item link {1} in folder {2} pointing to {3}",
-                remoteClient.Name, name, folderID, olditemID);
+//            m_log.DebugFormat(
+//                "[AGENT INVENTORY]: Received request from {0} to create inventory item link {1} in folder {2} pointing to {3}",
+//                remoteClient.Name, name, folderID, olditemID);
 
             if (!Permissions.CanCreateUserInventory(invType, remoteClient.AgentId))
                 return;
@@ -934,20 +934,25 @@ namespace OpenSim.Region.Framework.Scenes
             ScenePresence presence;
             if (TryGetScenePresence(remoteClient.AgentId, out presence))
             {
-                bool linkAlreadyExists = false;
-                List<InventoryItemBase> existingItems = InventoryService.GetFolderItems(remoteClient.AgentId, folderID);
-                foreach (InventoryItemBase item in existingItems)
-                    if (item.AssetID == olditemID)
-                        linkAlreadyExists = true;
-
-                if (linkAlreadyExists)
-                {
-                    m_log.WarnFormat(
-                        "[AGENT INVENTORY]: Ignoring request from {0} to create item link {1} in folder {2} pointing to {3} since a link already exists",
-                        remoteClient.Name, name, folderID, olditemID);
-
-                    return;
-                }
+                // Disabled the check for duplicate links.
+                //
+                // When outfits are being adjusted, the viewer rapidly sends delete link messages followed by
+                // create links.  However, since these are handled asynchronously, the deletes do not complete before
+                // the creates are handled.  Therefore, we cannot enforce a duplicate link check.
+//                InventoryItemBase existingLink = null;
+//                List<InventoryItemBase> existingItems = InventoryService.GetFolderItems(remoteClient.AgentId, folderID);
+//                foreach (InventoryItemBase item in existingItems)
+//                    if (item.AssetID == olditemID)
+//                        existingLink = item;
+//
+//                if (existingLink != null)
+//                {
+//                    m_log.WarnFormat(
+//                        "[AGENT INVENTORY]: Ignoring request from {0} to create item link {1} in folder {2} pointing to {3} since a link named {4} with id {5} already exists",
+//                        remoteClient.Name, name, folderID, olditemID, existingLink.Name, existingLink.ID);
+//
+//                    return;
+//                }
 
                 AssetBase asset = new AssetBase();
                 asset.FullID = olditemID;
@@ -975,7 +980,11 @@ namespace OpenSim.Region.Framework.Scenes
         /// <param name="itemID"></param>
         private void RemoveInventoryItem(IClientAPI remoteClient, List<UUID> itemIDs)
         {
-            //m_log.Debug("[SCENE INVENTORY]: user " + remoteClient.AgentId);
+//            m_log.DebugFormat(
+//                "[AGENT INVENTORY]: Removing inventory items {0} for {1}",
+//                string.Join(",", itemIDs.ConvertAll<string>(uuid => uuid.ToString()).ToArray()),
+//                remoteClient.Name);
+
             InventoryService.DeleteItems(remoteClient.AgentId, itemIDs);
         }
 
@@ -1382,11 +1391,31 @@ namespace OpenSim.Region.Framework.Scenes
             InventoryFolderBase containingFolder = new InventoryFolderBase(folder.ID, client.AgentId);
             containingFolder = InventoryService.GetFolder(containingFolder);
 
-            //m_log.DebugFormat("[AGENT INVENTORY]: Sending inventory folder contents ({0} nodes) for \"{1}\" to {2} {3}",
-            //    contents.Folders.Count + contents.Items.Count, containingFolder.Name, client.FirstName, client.LastName);
+//            m_log.DebugFormat("[AGENT INVENTORY]: Sending inventory folder contents ({0} nodes) for \"{1}\" to {2} {3}",
+//                contents.Folders.Count + contents.Items.Count, containingFolder.Name, client.FirstName, client.LastName);
 
             if (containingFolder != null && containingFolder != null)
+            {
+                // If the folder requested contains links, then we need to send those folders first, otherwise the links
+                // will be broken in the viewer.
+                HashSet<UUID> linkedItemFolderIdsToSend = new HashSet<UUID>();
+                foreach (InventoryItemBase item in contents.Items)
+                {
+                    if (item.AssetType == (int)AssetType.Link)
+                    {
+                        InventoryItemBase linkedItem = InventoryService.GetItem(new InventoryItemBase(item.AssetID));
+
+                        // Take care of genuinely broken links where the target doesn't exist
+                        if (linkedItem != null)
+                            linkedItemFolderIdsToSend.Add(linkedItem.Folder);
+                    }
+                }
+
+                foreach (UUID linkedItemFolderId in linkedItemFolderIdsToSend)
+                    SendInventoryUpdate(client, new InventoryFolderBase(linkedItemFolderId), false, true);
+
                 client.SendInventoryFolderDetails(client.AgentId, folder.ID, contents.Items, contents.Folders, containingFolder.Version, fetchFolders, fetchItems);
+            }
         }
 
         /// <summary>
@@ -2066,19 +2095,7 @@ namespace OpenSim.Region.Framework.Scenes
                     sourcePart.Inventory.RemoveInventoryItem(item.ItemID);
             }
                                     
-            AddNewSceneObject(group, true);
-            
-            group.AbsolutePosition = pos;
-            group.Velocity = vel;            
-            
-            if (rot != null)
-                group.UpdateGroupRotationR((Quaternion)rot);
-            
-            // TODO: This needs to be refactored with the similar code in 
-            // SceneGraph.AddNewSceneObject(SceneObjectGroup sceneObject, bool attachToBackup, Vector3 pos, Quaternion rot, Vector3 vel)
-            // possibly by allowing this method to take a null rotation.
-            if (group.RootPart.PhysActor != null && group.RootPart.PhysActor.IsPhysical && vel != Vector3.Zero)
-                group.RootPart.ApplyImpulse((vel * group.GetMass()), false);
+            AddNewSceneObject(group, true, pos, rot, vel);
             
             // We can only call this after adding the scene object, since the scene object references the scene
             // to find out if scripts should be activated at all.

@@ -94,7 +94,10 @@ namespace OpenSim.Region.Framework.Scenes
         // root agents when ACL denies access to root agent
         public bool m_strictAccessControl = true;
         public int MaxUndoCount = 5;
+        // Using this for RegionReady module to prevent LoginsDisabled from changing under our feet;
+        public bool LoginLock = false;
         public bool LoginsDisabled = true;
+        public bool StartDisabled = false;
         public bool LoadingPrims;
         public IXfer XferManager;
 
@@ -204,6 +207,7 @@ namespace OpenSim.Region.Framework.Scenes
 
         private Timer m_mapGenerationTimer = new Timer();
         private bool m_generateMaptiles;
+        private bool m_useBackup = true;
 
 //        private Dictionary<UUID, string[]> m_UserNamesCache = new Dictionary<UUID, string[]>();
 
@@ -459,6 +463,11 @@ namespace OpenSim.Region.Framework.Scenes
             get { return m_sceneGraph; }
         }
 
+        public bool UseBackup
+        {
+            get { return m_useBackup; }
+        }
+
         // an instance to the physics plugin's Scene object.
         public PhysicsScene PhysicsScene
         {
@@ -597,7 +606,7 @@ namespace OpenSim.Region.Framework.Scenes
                                           "delete object uuid <UUID>",
                                           "Delete object by uuid", HandleDeleteObject);
             MainConsole.Instance.Commands.AddCommand("region", false, "delete object name",
-                                          "delete object name <UUID>",
+                                          "delete object name <name>",
                                           "Delete object by name", HandleDeleteObject);
 
             //Bind Storage Manager functions to some land manager functions for this scene
@@ -647,6 +656,9 @@ namespace OpenSim.Region.Framework.Scenes
                 IConfig startupConfig = m_config.Configs["Startup"];
 
                 m_defaultDrawDistance = startupConfig.GetFloat("DefaultDrawDistance",m_defaultDrawDistance);
+                m_useBackup = startupConfig.GetBoolean("UseSceneBackup", m_useBackup);
+                if (!m_useBackup)
+                    m_log.InfoFormat("[SCENE]: Backup has been disabled for {0}", RegionInfo.RegionName);
                 
                 //Animation states
                 m_useFlySlow = startupConfig.GetBoolean("enableflyslow", false);
@@ -1064,6 +1076,8 @@ namespace OpenSim.Region.Framework.Scenes
             shuttingdown = true;
 
             m_log.Debug("[SCENE]: Persisting changed objects");
+            EventManager.TriggerSceneShuttingDown(this);
+
             EntityBase[] entities = GetEntities();
             foreach (EntityBase entity in entities)
             {
@@ -1362,9 +1376,25 @@ namespace OpenSim.Region.Framework.Scenes
                     IConfig startupConfig = m_config.Configs["Startup"];
                     if (startupConfig == null || !startupConfig.GetBoolean("StartDisabled", false))
                     {
+                        // This handles a case of a region having no scripts for the RegionReady module
+                        if (m_sceneGraph.GetActiveScriptsCount() == 0)
+                        {
+                            // need to be able to tell these have changed in RegionReady
+                            LoginLock = false;
+                            EventManager.TriggerLoginsEnabled(RegionInfo.RegionName);
+                        }
                         m_log.DebugFormat("[REGION]: Enabling logins for {0}", RegionInfo.RegionName);
-                        LoginsDisabled = false;
+                        // For RegionReady lockouts
+                        if( LoginLock == false)
+                        {
+                            LoginsDisabled = false;
+                        }
                         m_sceneGridService.InformNeighborsThatRegionisUp(RequestModuleInterface<INeighbourService>(), RegionInfo);
+                    }
+                    else
+                    {
+                        StartDisabled = true;
+                        LoginsDisabled = true;
                     }
                 }
             }
@@ -1971,16 +2001,17 @@ namespace OpenSim.Region.Framework.Scenes
         /// <summary>
         /// Add a newly created object to the scene.
         /// </summary>
-        /// 
+        /// <remarks>
         /// This method does not send updates to the client - callers need to handle this themselves.
+        /// </remarks>
         /// <param name="sceneObject"></param>
         /// <param name="attachToBackup"></param>
-        /// <param name="pos">Position of the object</param>
-        /// <param name="rot">Rotation of the object</param>
+        /// <param name="pos">Position of the object.  If null then the position stored in the object is used.</param>
+        /// <param name="rot">Rotation of the object.  If null then the rotation stored in the object is used.</param>
         /// <param name="vel">Velocity of the object.  This parameter only has an effect if the object is physical</param>
         /// <returns></returns>
         public bool AddNewSceneObject(
-            SceneObjectGroup sceneObject, bool attachToBackup, Vector3 pos, Quaternion rot, Vector3 vel)
+            SceneObjectGroup sceneObject, bool attachToBackup, Vector3? pos, Quaternion? rot, Vector3 vel)
         {
             if (m_sceneGraph.AddNewSceneObject(sceneObject, attachToBackup, pos, rot, vel))
             {            
@@ -4278,7 +4309,28 @@ namespace OpenSim.Region.Framework.Scenes
         //        }
 
         /// <summary>
-        /// Get a named prim contained in this scene (will return the first
+        /// Get a group via its UUID
+        /// </summary>
+        /// <param name="fullID"></param>
+        /// <returns>null if no group with that name exists</returns>
+        public SceneObjectGroup GetSceneObjectGroup(UUID fullID)
+        {
+            return m_sceneGraph.GetSceneObjectGroup(fullID);
+        }
+
+        /// <summary>
+        /// Get a group by name from the scene (will return the first
+        /// found, if there are more than one prim with the same name)
+        /// </summary>
+        /// <param name="name"></param>
+        /// <returns>null if no group with that name exists</returns>
+        public SceneObjectGroup GetSceneObjectGroup(string name)
+        {
+            return m_sceneGraph.GetSceneObjectGroup(name);
+        }
+
+        /// <summary>
+        /// Get a prim by name from the scene (will return the first
         /// found, if there are more than one prim with the same name)
         /// </summary>
         /// <param name="name"></param>

@@ -46,6 +46,13 @@
 	;; Robust server in port 8002, but not always)
 	Gatekeeper="http://mygridserver.com:8002"
 
+[Messaging]
+    ; === HG ONLY ===
+    ;; change this to the address of your Gatekeeper service
+    ;; (usually bundled with the rest of the services in one 
+    ;; Robust server in port 8002, but not always)
+    Gatekeeper = "http://mygridserver.com:8002"
+
 [AvatarService]
     ;
     ; change this to your grid-wide grid server
@@ -93,6 +100,12 @@
 	;; uncomment the next line. You may want to do this on sims that have licensed content.
 	; OutboundPermission = False
 
+[UserAgentService]
+    ;
+    ; === HG ONLY ===
+    ; Change this to your user agent server (HG robust)
+    ;
+    UserAgentServerURI = "http://mygridserver.com:8002"
 
 [Modules]
     ;; Choose 0 or 1 cache modules, and the corresponding config file, if it exists.
